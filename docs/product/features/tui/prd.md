@@ -18,7 +18,10 @@ The `agk` Terminal UI acts as the unified user control layer handling explicit i
   - `[Tab]`: Toggle between **GLOBAL** and **WORKSPACE** scopes.
   - `Esc x 2`: Prompt and confirm to quit the application safely. Force-exits the process to kill any lingering background tasks (e.g., slow network calls).
   - `Ctrl-C`: Immediate safe termination.
+  - `Ctrl-O` (Skills/Instructions tab): Open the selected asset's folder in the default file manager (Finder on macOS, explorer on Windows, xdg-open on Linux).
+  - `Ctrl-T` (Skills/Instructions tab): Open a new terminal at the selected asset's folder path.
   - `Type` (on Skills tab): Filters local packages and, when ClawHub vault is active, dispatches a parallel remote search. Results merge with local filtering (local wins on duplicates).
+  - Detail panels (Skills/Vaults/Providers/MCP) automatically wrap long text at widget boundaries so the full content is always readable without horizontal truncation.
 
 ```mermaid
 flowchart TB
