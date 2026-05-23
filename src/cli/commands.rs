@@ -7,6 +7,9 @@ use crate::domain::identity::AssetIdentity;
 use crate::domain::scope::Scope;
 use anyhow::{Context, Result};
 
+#[cfg(test)]
+mod commands_tests;
+
 // ---------------------------------------------------------------------------
 // Output formatting
 // ---------------------------------------------------------------------------
@@ -120,6 +123,16 @@ fn find_package_by_full_identity(
         }
     }
     Ok(None)
+}
+
+fn generate_profile_session_key() -> String {
+    static NEXT_SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let nonce = NEXT_SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{}-{}-{}", nanos, std::process::id(), nonce)
 }
 
 // ---------------------------------------------------------------------------
@@ -689,6 +702,47 @@ fn pack_tarball(
 }
 
 // ---------------------------------------------------------------------------
+// Command: profile start
+// ---------------------------------------------------------------------------
+
+pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32> {
+    let (registry, _scan, store) = bootstrap::build(workspace.to_path_buf())?;
+    let config = store.load(Scope::Workspace)?;
+    let profile = config
+        .find_profile(name)
+        .cloned()
+        .or_else(|| store.load(Scope::Global).ok()?.find_profile(name).cloned())
+        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", name))?;
+
+    let provider = registry
+        .providers
+        .iter()
+        .find(|p| p.id() == profile.provider_id)
+        .and_then(|p| {
+            if p.supports_profiles() {
+                Some(p.as_ref())
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Provider '{}' does not support profiles",
+                profile.provider_id
+            )
+        })?;
+
+    let session_key = generate_profile_session_key();
+    let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
+
+    let exit_status = session.process.wait()?;
+
+    (session.cleanup)()?;
+
+    Ok(if exit_status.success() { 0 } else { 1 })
+}
+
+// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -793,6 +847,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                                 }
                             }
                         }
+
                         Ok(EXIT_SUCCESS)
                     }
                     Err(e) => {
@@ -963,6 +1018,8 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                 Ok(EXIT_SUCCESS)
             }
         },
+
+        Some(Commands::Profile { ref name }) => run_profile_start(name, workspace),
 
         None => {
             // No subcommand — fall through to TUI in main.rs

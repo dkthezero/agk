@@ -5,7 +5,7 @@ use crate::domain::mcp::{McpServer, McpTransport};
 use crate::domain::scope::Scope;
 use crate::infra::provider::common;
 use crate::infra::provider::common::copy_dir;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 pub struct OpenCodeProvider {
@@ -131,6 +131,19 @@ impl ProviderPort for OpenCodeProvider {
             ),
         ]
     }
+    fn supports_profiles(&self) -> bool {
+        true
+    }
+
+    fn start_profile_session(
+        &self,
+        profile: &crate::domain::config::Profile,
+        session_key: &str,
+        _workspace_root: &std::path::Path,
+    ) -> anyhow::Result<crate::app::ports::ProfileSession> {
+        let session = self.start_opencode_session(profile, session_key)?;
+        Ok(session)
+    }
 }
 
 impl McpProvider for OpenCodeProvider {
@@ -213,6 +226,274 @@ impl McpProvider for OpenCodeProvider {
         std::fs::write(&path, content)?;
         Ok(())
     }
+}
+
+// ---------------------------------------------------------------------------
+// Profile session helpers
+// ---------------------------------------------------------------------------
+
+impl OpenCodeProvider {
+    /// Build the workspace path to the profile's base agent markdown.
+    fn profile_agent_path(&self, profile_name: &str) -> PathBuf {
+        self.workspace_root
+            .join(".agk")
+            .join("profiles")
+            .join(profile_name)
+            .join("agent.md")
+    }
+
+    /// Returns the workspace `opencode.json` path.
+    fn workspace_opencode_json(&self) -> PathBuf {
+        self.workspace_root.join("opencode.json")
+    }
+
+    /// Validate profile name is safe for filesystem use.
+    fn validate_profile_name(name: &str) -> Result<()> {
+        if name.is_empty()
+            || name.contains('/')
+            || name.contains('\\')
+            || name.contains('\u{0000}')
+            || name.contains(':')
+            || name == "."
+            || name == ".."
+            || name.starts_with("..")
+        {
+            anyhow::bail!("Profile name contains invalid characters: {}", name);
+        }
+        Ok(())
+    }
+
+    /// Read workspace `opencode.json`.
+    /// Returns (parsed value, original file bytes for lossless restore).
+    /// Errors on parse failure or non-object root instead of silently defaulting.
+    fn read_workspace_config(&self) -> Result<(serde_json::Value, Option<Vec<u8>>)> {
+        let path = self.workspace_opencode_json();
+        if !path.exists() {
+            return Ok((serde_json::json!({}), None));
+        }
+        let content = std::fs::read_to_string(&path)?;
+        let cleaned = strip_jsonc_comments(&content);
+        let value: serde_json::Value = serde_json::from_str(&cleaned).with_context(|| {
+            format!(
+                "Failed to parse workspace opencode.json at {}",
+                path.display()
+            )
+        })?;
+        if !value.is_object() {
+            anyhow::bail!(
+                "Workspace opencode.json root must be an object, got {}",
+                serde_json::to_string(&value).unwrap_or_else(|_| "non-serializable".into())
+            );
+        }
+        // Preserve original bytes for lossless restore (preserves comments/formatting)
+        let original_bytes = std::fs::read(&path).ok();
+        Ok((value, original_bytes))
+    }
+
+    /// Write workspace `opencode.json` or delete it if empty.
+    fn write_workspace_config(&self, value: &serde_json::Value) -> Result<()> {
+        let path = self.workspace_opencode_json();
+        if let Some(obj) = value.as_object() {
+            if obj.is_empty() {
+                if path.exists() {
+                    std::fs::remove_file(&path)?;
+                }
+                return Ok(());
+            }
+        }
+        let content = serde_json::to_string_pretty(value)?;
+        std::fs::write(&path, content)?;
+        Ok(())
+    }
+
+    /// Start an OpenCode session for a profile.
+    fn start_opencode_session(
+        &self,
+        profile: &crate::domain::config::Profile,
+        session_key: &str,
+    ) -> Result<crate::app::ports::ProfileSession> {
+        Self::validate_profile_name(&profile.name)?;
+
+        let base_agent_path = self.profile_agent_path(&profile.name);
+        if !base_agent_path.exists() {
+            anyhow::bail!(
+                "Profile agent file not found at {}",
+                base_agent_path.display()
+            );
+        }
+
+        let agent_name = format!("{}_{}", profile.name, session_key);
+        let agents_dir = self.workspace_root.join(".opencode").join("agents");
+        let session_agent_path = agents_dir.join(format!("{}.md", agent_name));
+
+        // 1. Read base agent markdown and patch frontmatter
+        let mut agent_content = std::fs::read_to_string(&base_agent_path)?;
+        agent_content = patch_agent_frontmatter(&agent_content, &agent_name);
+        std::fs::create_dir_all(&agents_dir)?;
+        std::fs::write(&session_agent_path, agent_content)?;
+
+        // 2. Read workspace opencode.json with lossless restore capability
+        let (mut config, original_bytes) = self.read_workspace_config()?;
+        let original_config = config.clone();
+
+        // 3. Patch `agent`
+        if config.get("agent").is_none() {
+            config["agent"] = serde_json::json!({});
+        }
+        if let Some(agent_obj) = config["agent"].as_object_mut() {
+            agent_obj.insert(
+                agent_name.clone(),
+                serde_json::json!({
+                    "mode": "primary",
+                    "description": format!("Session agent for {} profile", profile.name),
+                }),
+            );
+        }
+
+        // 4. Patch `permission -> skill`
+        if config.get("permission").is_none() {
+            config["permission"] = serde_json::json!({});
+        }
+        if config["permission"].get("skill").is_none() {
+            config["permission"]["skill"] = serde_json::json!({});
+        }
+        if let Some(skill_perm) = config["permission"]["skill"].as_object_mut() {
+            for skill in &profile.skills {
+                skill_perm.insert(skill.clone(), serde_json::json!("allow"));
+            }
+            skill_perm.insert("*".to_string(), serde_json::json!("deny"));
+        }
+
+        // 5. Patch `mcp` entries
+        for mcp_name in &profile.mcps {
+            if config.get("mcp").is_none() {
+                config["mcp"] = serde_json::json!({});
+            }
+            if let Some(mcp_obj) = config["mcp"].as_object_mut() {
+                if let Some(entry) = mcp_obj.get_mut(mcp_name) {
+                    if let Some(e) = entry.as_object_mut() {
+                        e.insert("enabled".to_string(), serde_json::json!(true));
+                    }
+                }
+            }
+        }
+
+        self.write_workspace_config(&config)?;
+
+        let process = match std::process::Command::new("opencode")
+            .current_dir(&self.workspace_root)
+            .spawn()
+        {
+            Ok(p) => p,
+            Err(e) => {
+                // Roll back patches before returning error (PRD #9)
+                let _ = std::fs::remove_file(&session_agent_path);
+                self.write_workspace_config(&original_config)?;
+                let agents = self.workspace_root.join(".opencode").join("agents");
+                if agents.exists() && agents.read_dir()?.next().is_none() {
+                    let _ = std::fs::remove_dir(&agents);
+                }
+                let opencode = self.workspace_root.join(".opencode");
+                if opencode.exists() && opencode.read_dir()?.next().is_none() {
+                    let _ = std::fs::remove_dir(&opencode);
+                }
+                return Err(e).with_context(|| "Failed to start opencode CLI");
+            }
+        };
+
+        let cleanup_path = session_agent_path;
+        let self_workspace = self.workspace_root.clone();
+        let cleanup_original = original_bytes;
+
+        let cleanup = Box::new(move || {
+            // Remove session agent file
+            let _ = std::fs::remove_file(&cleanup_path);
+
+            // Restore original opencode.json bytes (lossless: preserves comments/formatting)
+            if let Some(bytes) = cleanup_original {
+                let path = self_workspace.join("opencode.json");
+                let _ = std::fs::write(&path, bytes);
+            } else {
+                // No original file existed; delete if present
+                let path = self_workspace.join("opencode.json");
+                if path.exists() {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
+
+            // Prune .opencode/agents if empty
+            let agents = self_workspace.join(".opencode").join("agents");
+            if agents.exists() && agents.read_dir()?.next().is_none() {
+                let _ = std::fs::remove_dir(&agents);
+            }
+
+            // Prune .opencode if empty
+            let opencode = self_workspace.join(".opencode");
+            if opencode.exists() && opencode.read_dir()?.next().is_none() {
+                let _ = std::fs::remove_dir(&opencode);
+            }
+
+            Ok(())
+        });
+
+        Ok(crate::app::ports::ProfileSession { process, cleanup })
+    }
+}
+
+/// Patch frontmatter in an agent markdown to set the correct name and mode.
+fn patch_agent_frontmatter(content: &str, agent_name: &str) -> String {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut in_frontmatter = false;
+    let mut frontmatter_started = false;
+    let mut result = Vec::new();
+    let mut name_set = false;
+    let mut mode_set = false;
+
+    for line in &lines {
+        if *line == "---" {
+            if !frontmatter_started {
+                frontmatter_started = true;
+                in_frontmatter = true;
+                result.push(line.to_string());
+                continue;
+            } else if in_frontmatter {
+                in_frontmatter = false;
+                if !name_set {
+                    result.push(format!("name: {}", agent_name));
+                }
+                if !mode_set {
+                    result.push("mode: primary".to_string());
+                }
+                result.push(line.to_string());
+                continue;
+            }
+        }
+
+        if in_frontmatter {
+            if line.starts_with("name:") {
+                result.push(format!("name: {}", agent_name));
+                name_set = true;
+                continue;
+            }
+            if line.starts_with("mode:") {
+                result.push("mode: primary".to_string());
+                mode_set = true;
+                continue;
+            }
+        }
+
+        result.push(line.to_string());
+    }
+
+    // If no frontmatter at all, prepend one
+    if !frontmatter_started {
+        result.insert(0, "---".to_string());
+        result.insert(1, format!("name: {}", agent_name));
+        result.insert(2, "mode: primary".to_string());
+        result.insert(3, "---".to_string());
+    }
+
+    result.join("\n") + "\n"
 }
 
 // ---------------------------------------------------------------------------

@@ -54,6 +54,17 @@ fn default_version() -> u32 {
     1
 }
 
+/// Profile definition stored in config.toml.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Profile {
+    pub name: String,
+    pub provider_id: String,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub mcps: Vec<String>,
+}
+
 /// Full config.toml schema — one instance per scope.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfigFile {
@@ -68,6 +79,8 @@ pub struct ConfigFile {
     pub vault_defs: HashMap<String, VaultSection>,
     #[serde(default)]
     pub provider_roots: HashMap<String, String>,
+    #[serde(default)]
+    pub profiles: Vec<Profile>,
 }
 
 impl Default for ConfigFile {
@@ -78,6 +91,7 @@ impl Default for ConfigFile {
             providers: Vec::new(),
             vault_defs: HashMap::new(),
             provider_roots: HashMap::new(),
+            profiles: Vec::new(),
         }
     }
 }
@@ -152,8 +166,16 @@ impl ConfigFile {
         }
     }
 
-    /// Validate the configuration for common errors, such as stray keys in vault_defs
-    /// resulting from serde(flatten).
+    pub fn find_profile(&self, name: &str) -> Option<&Profile> {
+        self.profiles.iter().find(|p| p.name == name)
+    }
+
+    pub fn remove_profile(&mut self, name: &str) -> bool {
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.name != name);
+        self.profiles.len() < before
+    }
+
     pub fn validate(&self) -> anyhow::Result<()> {
         for (id, section) in &self.vault_defs {
             if section.vault.is_none() && section.skills.is_none() && section.instructions.is_none()
@@ -164,6 +186,24 @@ impl ConfigFile {
                 );
             }
         }
+
+        for profile in &self.profiles {
+            if profile.name.is_empty()
+                || profile.name.contains('/')
+                || profile.name.contains('\\')
+                || profile.name.contains('\u{0000}')
+                || profile.name.contains(':')
+                || profile.name == "."
+                || profile.name == ".."
+                || profile.name.starts_with("..")
+            {
+                anyhow::bail!(
+                    "Profile '{}' contains invalid filesystem characters",
+                    profile.name
+                );
+            }
+        }
+
         Ok(())
     }
 }
@@ -278,5 +318,54 @@ type = "clawhub"
             loaded.provider_roots.get("opencode"),
             Some(&".agents".to_string())
         );
+    }
+
+    #[test]
+    fn profile_toml_round_trip() {
+        let mut config = ConfigFile::default();
+        config.profiles.push(Profile {
+            name: "opencode-dev".to_string(),
+            provider_id: "opencode".to_string(),
+            skills: vec!["skill-a".to_string(), "skill-b".to_string()],
+            mcps: vec!["mcp-server".to_string()],
+        });
+        let toml_str = toml::to_string(&config).unwrap();
+        assert!(toml_str.contains("opencode-dev"));
+        assert!(toml_str.contains("opencode"));
+
+        let loaded: ConfigFile = toml::from_str(&toml_str).unwrap();
+        assert_eq!(loaded.profiles.len(), 1);
+        let p = &loaded.profiles[0];
+        assert_eq!(p.name, "opencode-dev");
+        assert_eq!(p.provider_id, "opencode");
+        assert_eq!(p.skills, vec!["skill-a", "skill-b"]);
+        assert_eq!(p.mcps, vec!["mcp-server"]);
+    }
+
+    #[test]
+    fn find_profile_returns_some() {
+        let mut config = ConfigFile::default();
+        config.profiles.push(Profile {
+            name: "test".to_string(),
+            provider_id: "opencode".to_string(),
+            skills: vec![],
+            mcps: vec![],
+        });
+        assert!(config.find_profile("test").is_some());
+        assert!(config.find_profile("missing").is_none());
+    }
+
+    #[test]
+    fn remove_profile_deletes() {
+        let mut config = ConfigFile::default();
+        config.profiles.push(Profile {
+            name: "a".to_string(),
+            provider_id: "opencode".to_string(),
+            skills: vec![],
+            mcps: vec![],
+        });
+        assert!(config.remove_profile("a"));
+        assert!(!config.remove_profile("a"));
+        assert!(config.profiles.is_empty());
     }
 }

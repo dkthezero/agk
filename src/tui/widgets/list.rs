@@ -1,4 +1,4 @@
-use crate::domain::asset::{AssetKind, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::domain::asset::{AssetKind, ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
 use crate::domain::config::ConfigFile;
 use ratatui::{
     layout::Rect,
@@ -251,6 +251,35 @@ pub fn render_providers(
         .highlight_symbol("> ");
     let mut state = ListState::default();
     if !providers.is_empty() {
+        state.select(Some(selected));
+    }
+    frame.render_stateful_widget(list, area, &mut state);
+}
+
+pub fn render_profiles(frame: &mut Frame, area: Rect, profiles: &[ProfileEntry], selected: usize) {
+    let block = Block::default().borders(Borders::ALL).title("Profiles");
+    if profiles.is_empty() {
+        let items = vec![ListItem::new(Line::from(
+            "  No profiles. Press F2 to add one.",
+        ))];
+        frame.render_widget(List::new(items).block(block), area);
+        return;
+    }
+    let items: Vec<ListItem> = profiles
+        .iter()
+        .map(|p| ListItem::new(Line::from(format!("{} ({})", p.name, p.provider_id))))
+        .collect();
+    let list = List::new(items)
+        .block(block)
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+    let mut state = ListState::default();
+    if !profiles.is_empty() {
         state.select(Some(selected));
     }
     frame.render_stateful_widget(list, area, &mut state);
