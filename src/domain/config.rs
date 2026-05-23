@@ -176,8 +176,6 @@ impl ConfigFile {
         self.profiles.len() < before
     }
 
-    /// Validate the configuration for common errors, such as stray keys in vault_defs
-    /// resulting from serde(flatten).
     pub fn validate(&self) -> anyhow::Result<()> {
         for (id, section) in &self.vault_defs {
             if section.vault.is_none() && section.skills.is_none() && section.instructions.is_none()
@@ -188,6 +186,24 @@ impl ConfigFile {
                 );
             }
         }
+
+        for profile in &self.profiles {
+            if profile.name.is_empty()
+                || profile.name.contains('/')
+                || profile.name.contains('\\')
+                || profile.name.contains('\u{0000}')
+                || profile.name.contains(':')
+                || profile.name == "."
+                || profile.name == ".."
+                || profile.name.starts_with("..")
+            {
+                anyhow::bail!(
+                    "Profile '{}' contains invalid filesystem characters",
+                    profile.name
+                );
+            }
+        }
+
         Ok(())
     }
 }

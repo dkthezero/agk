@@ -301,7 +301,6 @@ impl AppState {
                 | ListMode::ProfileWizardSelectSkills { .. }
                 | ListMode::ProfileWizardSelectMcps { .. }
                 | ListMode::ProfileWizardConfirmCreate
-                | ListMode::ConfirmDeleteProfile
         )
     }
 }

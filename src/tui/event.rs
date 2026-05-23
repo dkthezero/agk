@@ -1676,6 +1676,15 @@ fn handle_open_location(
         return Ok(());
     };
 
+    if pkg.is_remote {
+        state.status_line = "Only local packages can be opened".to_string();
+        return Ok(());
+    }
+    if pkg.path.as_os_str().is_empty() {
+        state.status_line = "Selected package has no local path".to_string();
+        return Ok(());
+    }
+
     let path = &pkg.path;
     let result = if in_terminal {
         crate::domain::paths::open_terminal(path)

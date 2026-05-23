@@ -247,17 +247,47 @@ impl OpenCodeProvider {
         self.workspace_root.join("opencode.json")
     }
 
-    /// Read an existing workspace `opencode.json` or return an empty object.
-    fn read_workspace_config(&self) -> Result<serde_json::Value> {
+    /// Validate profile name is safe for filesystem use.
+    fn validate_profile_name(name: &str) -> Result<()> {
+        if name.is_empty()
+            || name.contains('/')
+            || name.contains('\\')
+            || name.contains('\u{0000}')
+            || name.contains(':')
+            || name == "."
+            || name == ".."
+            || name.starts_with("..")
+        {
+            anyhow::bail!("Profile name contains invalid characters: {}", name);
+        }
+        Ok(())
+    }
+
+    /// Read workspace `opencode.json`.
+    /// Returns (parsed value, original file bytes for lossless restore).
+    /// Errors on parse failure or non-object root instead of silently defaulting.
+    fn read_workspace_config(&self) -> Result<(serde_json::Value, Option<Vec<u8>>)> {
         let path = self.workspace_opencode_json();
         if !path.exists() {
-            return Ok(serde_json::json!({}));
+            return Ok((serde_json::json!({}), None));
         }
         let content = std::fs::read_to_string(&path)?;
         let cleaned = strip_jsonc_comments(&content);
-        let value: serde_json::Value =
-            serde_json::from_str(&cleaned).unwrap_or_else(|_| serde_json::json!({}));
-        Ok(value)
+        let value: serde_json::Value = serde_json::from_str(&cleaned).with_context(|| {
+            format!(
+                "Failed to parse workspace opencode.json at {}",
+                path.display()
+            )
+        })?;
+        if !value.is_object() {
+            anyhow::bail!(
+                "Workspace opencode.json root must be an object, got {}",
+                serde_json::to_string(&value).unwrap_or_else(|_| "non-serializable".into())
+            );
+        }
+        // Preserve original bytes for lossless restore (preserves comments/formatting)
+        let original_bytes = std::fs::read(&path).ok();
+        Ok((value, original_bytes))
     }
 
     /// Write workspace `opencode.json` or delete it if empty.
@@ -282,6 +312,8 @@ impl OpenCodeProvider {
         profile: &crate::domain::config::Profile,
         session_key: &str,
     ) -> Result<crate::app::ports::ProfileSession> {
+        Self::validate_profile_name(&profile.name)?;
+
         let base_agent_path = self.profile_agent_path(&profile.name);
         if !base_agent_path.exists() {
             anyhow::bail!(
@@ -300,8 +332,8 @@ impl OpenCodeProvider {
         std::fs::create_dir_all(&agents_dir)?;
         std::fs::write(&session_agent_path, agent_content)?;
 
-        // 2. Read/create workspace opencode.json and remember original snapshot
-        let mut config = self.read_workspace_config()?;
+        // 2. Read workspace opencode.json with lossless restore capability
+        let (mut config, original_bytes) = self.read_workspace_config()?;
         let original_config = config.clone();
 
         // 3. Patch `agent`
@@ -343,8 +375,6 @@ impl OpenCodeProvider {
                         e.insert("enabled".to_string(), serde_json::json!(true));
                     }
                 }
-                // If the entry does not exist, we cannot synthesize it from
-                // profile data alone (needs command/url etc). Skip.
             }
         }
 
@@ -373,24 +403,32 @@ impl OpenCodeProvider {
 
         let cleanup_path = session_agent_path;
         let self_workspace = self.workspace_root.clone();
-        let cleanup_original = original_config;
+        let cleanup_original = original_bytes;
 
         let cleanup = Box::new(move || {
             // Remove session agent file
             let _ = std::fs::remove_file(&cleanup_path);
 
-            // Restore original opencode.json
-            let provider = OpenCodeProvider::new(self_workspace);
-            let _ = provider.write_workspace_config(&cleanup_original);
+            // Restore original opencode.json bytes (lossless: preserves comments/formatting)
+            if let Some(bytes) = cleanup_original {
+                let path = self_workspace.join("opencode.json");
+                let _ = std::fs::write(&path, bytes);
+            } else {
+                // No original file existed; delete if present
+                let path = self_workspace.join("opencode.json");
+                if path.exists() {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
 
             // Prune .opencode/agents if empty
-            let agents = provider.workspace_root.join(".opencode").join("agents");
+            let agents = self_workspace.join(".opencode").join("agents");
             if agents.exists() && agents.read_dir()?.next().is_none() {
                 let _ = std::fs::remove_dir(&agents);
             }
 
             // Prune .opencode if empty
-            let opencode = provider.workspace_root.join(".opencode");
+            let opencode = self_workspace.join(".opencode");
             if opencode.exists() && opencode.read_dir()?.next().is_none() {
                 let _ = std::fs::remove_dir(&opencode);
             }

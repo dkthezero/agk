@@ -131,6 +131,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             | ListMode::ConfirmClawHubInstall
             | ListMode::ConfirmDetachVault
             | ListMode::ConfirmDeactivateLastProvider
+            | ListMode::ConfirmDeleteProfile
     ) {
         ""
     } else {

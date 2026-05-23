@@ -720,12 +720,12 @@ pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32>
         })?;
 
     let session_key = format!(
-        "{:06}",
+        "{:06}{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis()
-            % 1_000_000
+            .as_millis(),
+        std::process::id()
     );
     let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
 
