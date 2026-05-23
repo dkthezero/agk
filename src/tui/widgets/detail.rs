@@ -1,4 +1,4 @@
-use crate::domain::asset::{ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::domain::asset::{ProviderEntry, ScannedPackage, VaultEntry};
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
@@ -381,34 +381,4 @@ fn provider_scope_paths(id: &str, scope: crate::domain::scope::Scope) -> Vec<(St
             ]
         }
     }
-}
-
-pub fn render_profile_detail(frame: &mut Frame, area: Rect, profile: Option<&ProfileEntry>) {
-    let block = Block::default().borders(Borders::ALL).title("Detail");
-    let lines: Vec<Line> = match profile {
-        None => vec![Line::from("  No profile selected")],
-        Some(p) => {
-            let label = |s: &str| Span::styled(s.to_string(), Style::default().fg(Color::Yellow));
-            let mut lines = vec![
-                Line::from(vec![label("Name:     "), Span::raw(p.name.clone())]),
-                Line::from(vec![label("Provider: "), Span::raw(p.provider_id.clone())]),
-            ];
-            if !p.skills.is_empty() {
-                lines.push(Line::from(Span::raw("")));
-                lines.push(Line::from(vec![
-                    label("Skills:   "),
-                    Span::raw(p.skills.join(", ")),
-                ]));
-            }
-            if !p.mcps.is_empty() {
-                lines.push(Line::from(Span::raw("")));
-                lines.push(Line::from(vec![
-                    label("MCPs:     "),
-                    Span::raw(p.mcps.join(", ")),
-                ]));
-            }
-            lines
-        }
-    };
-    frame.render_widget(Paragraph::new(lines).block(block), area);
 }

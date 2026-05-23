@@ -69,15 +69,6 @@ pub struct ProviderEntry {
     pub active: bool,
 }
 
-/// Display-only struct for the Profiles tab.
-#[derive(Debug, Clone)]
-pub struct ProfileEntry {
-    pub name: String,
-    pub provider_id: String,
-    pub skills: Vec<String>,
-    pub mcps: Vec<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -81,27 +81,6 @@ pub trait ProviderPort: Send + Sync {
     fn available_config_roots(&self) -> Vec<(String, String)> {
         vec![]
     }
-
-    /// Return true if this provider supports profile sessions.
-    fn supports_profiles(&self) -> bool {
-        false
-    }
-
-    /// Start a profile session. Only called if supports_profiles() is true.
-    fn start_profile_session(
-        &self,
-        _profile: &crate::domain::config::Profile,
-        _session_key: &str,
-        _workspace_root: &Path,
-    ) -> Result<ProfileSession> {
-        anyhow::bail!("Profile sessions not supported by this provider")
-    }
-}
-
-/// Handle for a running profile session.
-pub struct ProfileSession {
-    pub process: std::process::Child,
-    pub cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
 }
 
 /// Extension trait for providers that support MCP configuration.

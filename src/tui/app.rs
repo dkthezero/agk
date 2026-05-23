@@ -1,4 +1,4 @@
-use crate::domain::asset::{AssetKind, ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::domain::asset::{AssetKind, ProviderEntry, ScannedPackage, VaultEntry};
 use crate::domain::config::{AssetKey, ConfigFile};
 use crate::domain::scope::Scope;
 use std::collections::{HashMap, HashSet};
@@ -10,7 +10,6 @@ pub enum TabKind {
     Provider,
     Mcp,
     Analytics,
-    Profile,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,20 +35,6 @@ pub enum ListMode {
         options: Vec<(String, String)>,
         selected: usize,
     },
-    /// Profile wizard modal sub-steps
-    ProfileWizardName,
-    ProfileWizardSelectSkills {
-        options: Vec<String>,
-        checked: Vec<bool>,
-        selected: usize,
-    },
-    ProfileWizardSelectMcps {
-        options: Vec<String>,
-        checked: Vec<bool>,
-        selected: usize,
-    },
-    ProfileWizardConfirmCreate,
-    ConfirmDeleteProfile,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -82,7 +67,6 @@ pub struct AppState {
     pub tab_kinds: Vec<TabKind>,
     pub vault_entries: Vec<VaultEntry>,
     pub provider_entries: Vec<ProviderEntry>,
-    pub profile_entries: Vec<ProfileEntry>,
     pub active_tasks: HashMap<usize, Progress>,
     pub latest_task_id: Option<usize>,
     pub pending_detach_vault: Option<String>,
@@ -93,7 +77,6 @@ pub struct AppState {
     pub pending_vault_path: String,
     pub pending_vault_local_path: String,
     pub pending_deactivate_provider_id: String,
-    pub pending_delete_profile: Option<String>,
     pub esc_pressed_once: bool,
     pub remote_packages: Vec<ScannedPackage>,
     pub clawhub_search_task_id: Option<usize>,
@@ -107,13 +90,6 @@ pub struct AppState {
     pub pending_mcp_args: String,
     pub pending_mcp_transport: String,
     pub pending_mcp_description: String,
-    // Profile wizard pending fields (for modal)
-    pub pending_profile_name: String,
-    pub pending_profile_provider: String,
-    pub pending_profile_skills: Vec<String>,
-    pub pending_profile_mcps: Vec<String>,
-    pub pending_profile_skill_options: Vec<String>,
-    pub pending_profile_mcp_options: Vec<String>,
 }
 
 impl AppState {
@@ -138,7 +114,6 @@ impl AppState {
             tab_kinds: Vec::new(),
             vault_entries: Vec::new(),
             provider_entries: Vec::new(),
-            profile_entries: Vec::new(),
             active_tasks: HashMap::new(),
             latest_task_id: None,
             pending_detach_vault: None,
@@ -149,7 +124,6 @@ impl AppState {
             pending_vault_path: String::new(),
             pending_vault_local_path: String::new(),
             pending_deactivate_provider_id: String::new(),
-            pending_delete_profile: None,
             esc_pressed_once: false,
             remote_packages: Vec::new(),
             clawhub_search_task_id: None,
@@ -162,13 +136,6 @@ impl AppState {
             pending_mcp_args: String::new(),
             pending_mcp_transport: String::new(),
             pending_mcp_description: String::new(),
-            // Profile wizard pending fields
-            pending_profile_name: String::new(),
-            pending_profile_provider: String::new(),
-            pending_profile_skills: Vec::new(),
-            pending_profile_mcps: Vec::new(),
-            pending_profile_skill_options: Vec::new(),
-            pending_profile_mcp_options: Vec::new(),
         }
     }
 
@@ -207,7 +174,6 @@ impl AppState {
             Some(TabKind::Vault) => self.vault_entries.len(),
             Some(TabKind::Provider) => self.provider_entries.len(),
             Some(TabKind::Mcp) => self.mcp_state.servers_list().len(),
-            Some(TabKind::Profile) => self.profile_entries.len(),
             _ => self.filtered_packages().len(),
         }
     }
@@ -291,17 +257,6 @@ impl AppState {
                 | ListMode::RegisterMcpStepArgs
                 | ListMode::RegisterMcpStepTransport
                 | ListMode::RegisterMcpStepDescription
-        )
-    }
-
-    pub fn is_profile_wizard_mode(&self) -> bool {
-        matches!(
-            self.list_mode,
-            ListMode::ProfileWizardName
-                | ListMode::ProfileWizardSelectSkills { .. }
-                | ListMode::ProfileWizardSelectMcps { .. }
-                | ListMode::ProfileWizardConfirmCreate
-                | ListMode::ConfirmDeleteProfile
         )
     }
 }

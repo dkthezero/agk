@@ -106,16 +106,6 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             );
             mcp::render::render_detail(frame, detail_area, &state.mcp_state, state.selected_index);
         }
-        TabKind::Profile => {
-            list::render_profiles(
-                frame,
-                layout.list,
-                &state.profile_entries,
-                state.selected_index,
-            );
-            let selected_profile = state.profile_entries.get(state.selected_index);
-            detail::render_profile_detail(frame, layout.detail, selected_profile);
-        }
         TabKind::Analytics => {
             // Telemetry tab is hidden from the UI but the data structure still exists
             // so the match stays exhaustive. Nothing renders.
@@ -146,9 +136,6 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             }
             TabKind::Vault => {
                 "[↑/↓] Move  [F2] Attach New  [Space] Toggle  [F4] Refresh  [Esc]x2 Quit"
-            }
-            TabKind::Profile => {
-                "[↑/↓] Move  [F2] Add Profile  [Delete] Remove  [Esc]x2 Quit"
             }
             TabKind::Analytics => "",
         }
@@ -241,14 +228,6 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 &state.prompt_buffer,
             );
         }
-        ListMode::ProfileWizardName => {
-            modal::render_input_modal(
-                frame,
-                "Add Profile",
-                "Profile name (e.g. opencode-dev):",
-                &state.prompt_buffer,
-            );
-        }
         ListMode::ConfirmMcpTest => {
             let msg = format!(
                 "WARNING: This will execute '{} {}' on your machine.\nProceed?",
@@ -291,19 +270,6 @@ This will remove all installed skills and leave no active provider.",
             modal::render_confirm_modal(
                 frame,
                 "Deactivate Last Provider",
-                &msg,
-                "[Enter] Confirm  [Esc] Cancel",
-            );
-        }
-        ListMode::ConfirmDeleteProfile => {
-            let msg = format!(
-                "Delete profile '{}'?
-This will remove it from the configuration.",
-                state.pending_delete_profile.as_deref().unwrap_or("")
-            );
-            modal::render_confirm_modal(
-                frame,
-                "Delete Profile",
                 &msg,
                 "[Enter] Confirm  [Esc] Cancel",
             );

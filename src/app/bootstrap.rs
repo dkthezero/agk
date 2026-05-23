@@ -4,7 +4,7 @@
 //! import from `infra`.
 
 use crate::app::registry::Registry;
-use crate::domain::asset::{ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::domain::asset::{ProviderEntry, ScannedPackage, VaultEntry};
 use crate::domain::config::ConfigFile;
 use crate::infra::config::toml_store::TomlConfigStore;
 use crate::infra::feature::instruction::InstructionFeatureSet;
@@ -33,13 +33,12 @@ pub fn build_with_store(
     let mut registry = Registry::new();
 
     // Feature sets — order defines tab order
-    // Data: [0] Skills, [1] MCP, [2] Instructions, [3] Providers, [4] Profiles, [5] Vault
-    // Rendered: [1] Skills [2] MCP [3] Instructions [4] Providers [5] Profiles    [0] Vault
+    // Data: [0] Skills, [1] MCP, [2] Instructions, [3] Providers, [4] Vault
+    // Rendered: [1] Skills [2] MCP [3] Instructions [4] Providers    [0] Vault
     registry.register_feature_set(Box::new(SkillFeatureSet));
     registry.register_feature_set(Box::new(StubFeatureSet::new("mcp", "MCP Servers", "")));
     registry.register_feature_set(Box::new(InstructionFeatureSet));
     registry.register_feature_set(Box::new(StubFeatureSet::new("provider", "Providers", "")));
-    registry.register_feature_set(Box::new(StubFeatureSet::new("profile", "Profiles", "")));
     registry.register_feature_set(Box::new(StubFeatureSet::new("vault", "Vaults", "")));
 
     // Extract dynamic vaults from configurations
@@ -320,20 +319,6 @@ pub fn build_provider_entries(config: &ConfigFile, registry: &Registry) -> Vec<P
         .collect()
 }
 
-pub fn build_profile_entries(config: &ConfigFile) -> Vec<ProfileEntry> {
-    config
-        .profiles
-        .iter()
-        .cloned()
-        .map(|p| ProfileEntry {
-            name: p.name,
-            provider_id: p.provider_id,
-            skills: p.skills,
-            mcps: p.mcps,
-        })
-        .collect()
-}
-
 pub fn build_tab_kinds(registry: &Registry) -> Vec<TabKind> {
     registry
         .feature_sets
@@ -342,7 +327,6 @@ pub fn build_tab_kinds(registry: &Registry) -> Vec<TabKind> {
             "vault" => TabKind::Vault,
             "provider" => TabKind::Provider,
             "mcp" => TabKind::Mcp,
-            "profile" => TabKind::Profile,
             _ => TabKind::Asset,
         })
         .collect()
@@ -359,10 +343,10 @@ mod tests {
     }
 
     #[test]
-    fn bootstrap_produces_six_tabs() {
+    fn bootstrap_produces_five_tabs() {
         let dir = tempfile::tempdir().unwrap();
         let (registry, _, _store) = build(dir.path().to_path_buf()).unwrap();
-        assert_eq!(registry.feature_sets.len(), 6);
+        assert_eq!(registry.feature_sets.len(), 5);
     }
 
     #[test]

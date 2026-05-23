@@ -58,7 +58,6 @@ async fn main() -> Result<()> {
     );
     let provider_entries =
         app::bootstrap::build_provider_entries(&active_config_for_entries, &registry);
-    let profile_entries = app::bootstrap::build_profile_entries(&active_config_for_entries);
     let tab_kinds = app::bootstrap::build_tab_kinds(&registry);
 
     let packages: HashMap<usize, Vec<_>> = scan.packages_by_tab.into_iter().enumerate().collect();
@@ -67,7 +66,6 @@ async fn main() -> Result<()> {
     state.tab_kinds = tab_kinds;
     state.vault_entries = vault_entries;
     state.provider_entries = provider_entries;
-    state.profile_entries = profile_entries;
 
     // Load both scope configs into AppState
     if let Ok(global_config) = store.load(domain::scope::Scope::Global) {
@@ -222,8 +220,6 @@ where
                         &active_config_for_entries,
                         &ctx.registry,
                     );
-                    state.profile_entries =
-                        crate::app::bootstrap::build_profile_entries(&active_config_for_entries);
                     state.packages = scan.packages_by_tab.into_iter().enumerate().collect();
                 }
 

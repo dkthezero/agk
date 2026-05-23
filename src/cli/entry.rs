@@ -93,13 +93,6 @@ pub enum Commands {
         #[command(subcommand)]
         command: TelemetryCommands,
     },
-
-    /// Launch a profile session
-    #[command(visible_alias = "p")]
-    Profile {
-        /// Profile name
-        name: String,
-    },
 }
 
 #[derive(Subcommand, Debug)]

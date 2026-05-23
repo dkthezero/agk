@@ -689,54 +689,6 @@ fn pack_tarball(
 }
 
 // ---------------------------------------------------------------------------
-// Command: profile start
-// ---------------------------------------------------------------------------
-
-pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32> {
-    let (registry, _scan, store) = bootstrap::build(workspace.to_path_buf())?;
-    let config = store.load(Scope::Workspace)?;
-    let profile = config
-        .find_profile(name)
-        .cloned()
-        .or_else(|| store.load(Scope::Global).ok()?.find_profile(name).cloned())
-        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", name))?;
-
-    let provider = registry
-        .providers
-        .iter()
-        .find(|p| p.id() == profile.provider_id)
-        .and_then(|p| {
-            if p.supports_profiles() {
-                Some(p.as_ref())
-            } else {
-                None
-            }
-        })
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Provider '{}' does not support profiles",
-                profile.provider_id
-            )
-        })?;
-
-    let session_key = format!(
-        "{:06}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis()
-            % 1_000_000
-    );
-    let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
-
-    let exit_status = session.process.wait()?;
-
-    (session.cleanup)()?;
-
-    Ok(if exit_status.success() { 0 } else { 1 })
-}
-
-// ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
 
@@ -1011,8 +963,6 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                 Ok(EXIT_SUCCESS)
             }
         },
-
-        Some(Commands::Profile { ref name }) => run_profile_start(name, workspace),
 
         None => {
             // No subcommand — fall through to TUI in main.rs
