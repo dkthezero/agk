@@ -98,6 +98,7 @@ pub fn handle(
                 | ListMode::ConfirmClawHubInstall
                 | ListMode::ConfirmDetachVault
                 | ListMode::ConfirmDeactivateLastProvider
+                | ListMode::ConfirmDeleteProfile
         );
 
         match &key.code {
@@ -110,6 +111,7 @@ pub fn handle(
                 ListMode::ConfirmDeactivateLastProvider => {
                     return handle_deactivate_last_provider_confirm(state, ctx)
                 }
+                ListMode::ConfirmDeleteProfile => return handle_delete_profile_confirm(state, ctx),
                 _ => {}
             },
             KeyCode::Esc if state.list_mode == ListMode::ConfirmMcpTest => {
@@ -128,12 +130,18 @@ pub fn handle(
             KeyCode::Esc if state.list_mode == ListMode::ConfirmDeactivateLastProvider => {
                 return handle_deactivate_last_provider_cancel(state);
             }
+            KeyCode::Esc if state.list_mode == ListMode::ConfirmDeleteProfile => {
+                state.list_mode = ListMode::Normal;
+                state.pending_delete_profile = None;
+                state.status_line = "Cancelled profile deletion".to_string();
+                return Ok(ControlFlow::Continue);
+            }
             KeyCode::Char('0') if state.list_mode == ListMode::Normal => {
                 // [0] is always the right-aligned Vault tab (last index)
                 let vault_idx = state.tab_names.len().saturating_sub(1);
                 apply_tab_switch(state, vault_idx, state.tab_names.len());
             }
-            KeyCode::Char(c @ '1'..='4') if state.list_mode == ListMode::Normal => {
+            KeyCode::Char(c @ '1'..='5') if state.list_mode == ListMode::Normal => {
                 let idx = (*c as usize) - ('1' as usize);
                 apply_tab_switch(state, idx, state.tab_names.len());
             }
@@ -141,19 +149,26 @@ pub fn handle(
                 handle_navigation(state, &key.code);
             }
             KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Enter
-                if state.is_attach_vault_mode() || state.is_register_mcp_mode() =>
+                if state.is_attach_vault_mode()
+                    || state.is_register_mcp_mode()
+                    || state.is_profile_wizard_mode() =>
             {
                 if state.is_attach_vault_mode() {
                     handle_attach_vault_input(state, ctx, &key.code)?;
-                } else {
+                } else if state.is_register_mcp_mode() {
                     handle_register_mcp_input(state, ctx, &key.code)?;
+                } else {
+                    handle_profile_wizard_input(state, ctx, &key.code)?;
                 }
             }
             KeyCode::Esc => {
                 return handle_esc(state);
             }
             KeyCode::Backspace => {
-                if state.is_attach_vault_mode() || state.is_register_mcp_mode() {
+                if state.is_attach_vault_mode()
+                    || state.is_register_mcp_mode()
+                    || state.is_profile_wizard_mode()
+                {
                     state.prompt_buffer.pop();
                 } else {
                     handle_backspace(state);
@@ -177,7 +192,20 @@ pub fn handle(
                 apply_scope_toggle(state);
                 let _ = ctx.tx.send(AppEvent::TriggerReload);
             }
+            KeyCode::Delete if state.list_mode == ListMode::Normal => {
+                let active_kind = state.tab_kinds.get(state.active_tab).copied();
+                if active_kind == Some(crate::tui::app::TabKind::Profile) {
+                    handle_delete_profile(state, ctx)?;
+                }
+            }
             KeyCode::Char(c) => {
+                if state.is_profile_wizard_mode() {
+                    state.list_mode = ListMode::Normal;
+                    state.prompt_buffer.clear();
+                    state.status_line = "Cancelled profile creation".to_string();
+                    return Ok(ControlFlow::Continue);
+                }
+
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();
                 if active_kind != Some(crate::tui::app::TabKind::Vault) {
                     apply_search_char(state, *c);
@@ -612,6 +640,82 @@ fn handle_register_mcp_input(
             }
             _ => {}
         },
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_profile_wizard_input(
+    state: &mut AppState,
+    ctx: &EventContext,
+    code: &KeyCode,
+) -> Result<()> {
+    match code {
+        KeyCode::Char(c) => {
+            state.prompt_buffer.push(*c);
+        }
+        KeyCode::Backspace => {
+            state.prompt_buffer.pop();
+        }
+        KeyCode::Enter => {
+            let name = std::mem::take(&mut state.prompt_buffer).trim().to_string();
+            if name.is_empty() {
+                state.list_mode = ListMode::Normal;
+                state.status_line = "Cancelled — name required".to_string();
+                return Ok(());
+            }
+
+            // Check if profile already exists
+            let config = state.active_config().clone();
+            if config.find_profile(&name).is_some() {
+                state.list_mode = ListMode::Normal;
+                state.status_line = format!("Profile '{}' already exists", name);
+                return Ok(());
+            }
+
+            // Create new profile with defaults (opencode provider)
+            let mut new_config = config.clone();
+            new_config.profiles.push(crate::domain::config::Profile {
+                name: name.clone(),
+                provider_id: "opencode".to_string(),
+                skills: vec![],
+                mcps: vec![],
+            });
+
+            let scope = state.active_scope;
+            let store = ctx.store.clone();
+            let tx = ctx.tx.clone();
+            let id =
+                crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+            tokio::task::spawn_blocking(move || {
+                let _ = tx.send(AppEvent::TaskStarted {
+                    id,
+                    name: format!("Creating profile '{}'", name),
+                });
+                match store.save(scope, &new_config) {
+                    Ok(()) => {
+                        let _ = tx.send(AppEvent::TriggerReload);
+                        let _ = tx.send(AppEvent::TaskCompleted {
+                            id,
+                            message: format!(
+                                "Profile '{}' created. Run `opencode agent create` to generate agent file.",
+                                name
+                            ),
+                        });
+                    }
+                    Err(e) => {
+                        let _ = tx.send(AppEvent::TaskFailed {
+                            id,
+                            error: format!("Failed to save profile: {}", e),
+                        });
+                    }
+                }
+            });
+
+            state.list_mode = ListMode::Normal;
+            state.status_line.clear();
+        }
         _ => {}
     }
     Ok(())
@@ -1335,10 +1439,17 @@ fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -> Re
                 .iter()
                 .position(|n| n == "MCP Servers")
                 .unwrap_or(1);
+            let profile_idx = state
+                .tab_names
+                .iter()
+                .position(|n| n == "Profiles")
+                .unwrap_or(4);
             if state.active_tab == vaults_idx {
                 apply_enter_attach_vault(state);
             } else if state.active_tab == mcp_idx {
                 apply_enter_register_mcp(state);
+            } else if state.active_tab == profile_idx {
+                apply_enter_add_profile(state);
             }
             Ok(())
         }
@@ -1460,6 +1571,81 @@ pub fn apply_enter_register_mcp(state: &mut AppState) {
     state.pending_mcp_transport = "stdio".to_string();
     state.pending_mcp_description.clear();
     state.status_line.clear();
+}
+
+pub fn apply_enter_add_profile(state: &mut AppState) {
+    state.list_mode = ListMode::ProfileWizardName;
+    state.prompt_buffer = String::new();
+    state.status_line = "Profile name: ".to_string();
+}
+
+fn handle_delete_profile(state: &mut AppState, _ctx: &EventContext) -> Result<ControlFlow> {
+    let filtered_len = state.profile_entries.len();
+    if filtered_len == 0 || state.selected_index >= filtered_len {
+        state.status_line = "No profile selected to delete".to_string();
+        return Ok(ControlFlow::Continue);
+    }
+    let name = state.profile_entries[state.selected_index].name.clone();
+    state.pending_delete_profile = Some(name.clone());
+    state.list_mode = ListMode::ConfirmDeleteProfile;
+    Ok(ControlFlow::Continue)
+}
+
+fn handle_delete_profile_confirm(state: &mut AppState, ctx: &EventContext) -> Result<ControlFlow> {
+    let name = match state.pending_delete_profile.take() {
+        Some(n) => n,
+        None => {
+            state.list_mode = ListMode::Normal;
+            return Ok(ControlFlow::Continue);
+        }
+    };
+
+    let scope = state.active_scope;
+    let store = ctx.store.clone();
+    let tx = ctx.tx.clone();
+    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+    tokio::task::spawn_blocking(move || {
+        let _ = tx.send(AppEvent::TaskStarted {
+            id,
+            name: format!("Deleting profile '{}'", &name),
+        });
+        match store.load(scope) {
+            Ok(mut config) => {
+                if config.remove_profile(&name) {
+                    match store.save(scope, &config) {
+                        Ok(()) => {
+                            let _ = tx.send(AppEvent::TriggerReload);
+                            let _ = tx.send(AppEvent::TaskCompleted {
+                                id,
+                                message: format!("Profile '{}' deleted", &name),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = tx.send(AppEvent::TaskFailed {
+                                id,
+                                error: format!("Failed to save config: {}", e),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = tx.send(AppEvent::TaskFailed {
+                        id,
+                        error: format!("Profile '{}' not found", &name),
+                    });
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(AppEvent::TaskFailed {
+                    id,
+                    error: format!("Failed to load config: {}", e),
+                });
+            }
+        }
+    });
+
+    state.list_mode = ListMode::Normal;
+    Ok(ControlFlow::Continue)
 }
 
 fn parse_github_url(url: &str) -> Option<(String, String)> {
