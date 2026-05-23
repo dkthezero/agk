@@ -177,6 +177,12 @@ pub fn handle(
                 apply_scope_toggle(state);
                 let _ = ctx.tx.send(AppEvent::TriggerReload);
             }
+            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                handle_open_location(state, ctx, false)?;
+            }
+            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                handle_open_location(state, ctx, true)?;
+            }
             KeyCode::Char(c) => {
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();
                 if active_kind != Some(crate::tui::app::TabKind::Vault) {
@@ -1308,6 +1314,59 @@ fn handle_enter(state: &mut AppState, ctx: &EventContext) -> Result<()> {
                     }
                 }
             }
+        }
+    }
+    Ok(())
+}
+
+fn handle_open_location(
+    state: &mut AppState,
+    _ctx: &EventContext,
+    in_terminal: bool,
+) -> Result<()> {
+    let active_kind = state
+        .tab_kinds
+        .get(state.active_tab)
+        .copied()
+        .unwrap_or(crate::tui::app::TabKind::Asset);
+
+    if active_kind != crate::tui::app::TabKind::Asset {
+        state.status_line = "Ctrl+O/T only works in Skills/Instructions tab".to_string();
+        return Ok(());
+    }
+
+    let filtered = state.filtered_packages();
+    let Some(pkg) = filtered.get(state.selected_index).copied() else {
+        state.status_line = "No item selected".to_string();
+        return Ok(());
+    };
+
+    if pkg.is_remote {
+        state.status_line = "Only local packages can be opened".to_string();
+        return Ok(());
+    }
+    if pkg.path.as_os_str().is_empty() {
+        state.status_line = "Selected package has no local path".to_string();
+        return Ok(());
+    }
+
+    let path = &pkg.path;
+    let result = if in_terminal {
+        crate::domain::paths::open_terminal(path)
+    } else {
+        crate::domain::paths::open_file_manager(path)
+    };
+
+    match result {
+        Ok(()) => {
+            state.status_line = if in_terminal {
+                format!("Opening terminal at {}", path.display())
+            } else {
+                format!("Opening {} in file manager", path.display())
+            };
+        }
+        Err(e) => {
+            state.status_line = format!("Failed to open: {}", e);
         }
     }
     Ok(())

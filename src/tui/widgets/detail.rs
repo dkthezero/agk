@@ -2,8 +2,8 @@ use crate::domain::asset::{ProviderEntry, ScannedPackage, VaultEntry};
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    text::{Line, Span, Text},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
 
@@ -40,8 +40,9 @@ fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
     result
 }
 
-/// Render a labelled text block that wraps to multiple lines.
-/// The first line shows `label_span` + first chunk, subsequent lines are indented.
+/// Render a labelled text block that wraps to multiple lines for display inside
+/// a `Paragraph::wrap(...)`. The first line shows `label_span` + first chunk,
+/// subsequent lines are indented.
 fn push_wrapped_block<'a>(
     lines: &mut Vec<Line<'a>>,
     label_span: Span<'a>,
@@ -79,10 +80,10 @@ pub fn render(
     let block = Block::default().borders(Borders::ALL).title("Detail");
 
     if is_stub {
-        frame.render_widget(
-            Paragraph::new(Line::from("  [STUB] Not yet implemented")).block(block),
-            area,
-        );
+        let paragraph = Paragraph::new(Text::from("  [STUB] Not yet implemented"))
+            .block(block)
+            .wrap(Wrap { trim: false });
+        frame.render_widget(paragraph, area);
         return;
     }
 
@@ -94,7 +95,7 @@ pub fn render(
         None => vec![Line::from("  No item selected")],
         Some(pkg) => {
             let label = |s: &str| Span::styled(s.to_string(), Style::default().fg(Color::Yellow));
-            let mut lines = vec![
+            let mut lines: Vec<Line> = vec![
                 Line::from(vec![
                     label("Name:     "),
                     Span::raw(pkg.identity.name.clone()),
@@ -171,7 +172,12 @@ pub fn render(
         }
     };
 
-    frame.render_widget(Paragraph::new(lines).block(block), area);
+    frame.render_widget(
+        Paragraph::new(Text::from(lines))
+            .block(block)
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEntry>) {
@@ -207,7 +213,12 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
             ]
         }
     };
-    frame.render_widget(Paragraph::new(lines).block(block), area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 pub fn render_provider_detail(
@@ -239,7 +250,12 @@ pub fn render_provider_detail(
             lines
         }
     };
-    frame.render_widget(Paragraph::new(lines).block(block), area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 /// Return scoped install/config paths for a provider id.
