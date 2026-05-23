@@ -7,6 +7,9 @@ use crate::domain::identity::AssetIdentity;
 use crate::domain::scope::Scope;
 use anyhow::{Context, Result};
 
+#[cfg(test)]
+mod commands_tests;
+
 // ---------------------------------------------------------------------------
 // Output formatting
 // ---------------------------------------------------------------------------
@@ -120,6 +123,16 @@ fn find_package_by_full_identity(
         }
     }
     Ok(None)
+}
+
+fn generate_profile_session_key() -> String {
+    static NEXT_SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let nonce = NEXT_SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{}-{}-{}", nanos, std::process::id(), nonce)
 }
 
 // ---------------------------------------------------------------------------
@@ -719,14 +732,7 @@ pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32>
             )
         })?;
 
-    let session_key = format!(
-        "{:06}{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis(),
-        std::process::id()
-    );
+    let session_key = generate_profile_session_key();
     let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
 
     let exit_status = session.process.wait()?;
@@ -841,6 +847,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                                 }
                             }
                         }
+
                         Ok(EXIT_SUCCESS)
                     }
                     Err(e) => {
