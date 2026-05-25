@@ -101,12 +101,14 @@ pub trait ProviderPort: Send + Sync {
 }
 ```
 
-### `ProviderPort` extension for wizard stepsnn`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
+### `ProviderPort` extension for wizard steps
+
+`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
 
 ```rust
 /// Steps that a provider wants the user to walk through when creating a profile.
-```
-
+/// Each step is a static description (what to show). Mutable UI state lives in
+/// `WizardState`, not in the step itself.
 ```
 
 ### `WizardStep` enum (TUI-generic)

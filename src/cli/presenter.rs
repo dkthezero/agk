@@ -5,7 +5,7 @@ use serde::Serialize;
 /// CLI presenter: implements [`CoreEventSink`] and formats output as either
 /// human-readable text or structured JSON (depending on `--json` flag).
 ///
-/// Quiet mode suppresses all non-error output.
+/// Quiet mode suppresses non-error output; errors are still written to stderr.
 pub struct CliPresenter {
     mode: OutputMode,
     /// Accumulated events for JSON batch output.
@@ -51,15 +51,13 @@ impl CliPresenter {
     }
 
     fn print(&self, msg: &str) {
-        if !matches!(self.mode, OutputMode::Quiet) {
+        if matches!(self.mode, OutputMode::Normal) {
             println!("{}", msg);
         }
     }
 
     fn eprint(&self, msg: &str) {
-        if !matches!(self.mode, OutputMode::Quiet) {
-            eprintln!("{}", msg);
-        }
+        eprintln!("{}", msg);
     }
 
     fn print_json_event(&self, event: &CoreEvent) {
@@ -74,7 +72,6 @@ impl CliPresenter {
 
 impl CoreEventSink for CliPresenter {
     fn on_event(&mut self, event: CoreEvent) {
-        self.print_json_event(&event);
         match &event {
             CoreEvent::TaskStarted { id, name } => {
                 self.print(&format!("[{}] Starting: {}", id, name));

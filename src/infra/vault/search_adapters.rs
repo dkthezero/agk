@@ -16,14 +16,13 @@ impl ClawHubSearchAdapter {
 }
 
 #[async_trait::async_trait]
-#[async_trait::async_trait]
 impl VaultSearchPort for ClawHubSearchAdapter {
     fn vault_id(&self) -> &str {
         &self.vault_id
     }
 
     async fn search(&self, query: &str) -> Result<Vec<ScannedPackage>> {
-        let packages = crate::infra::vault::clawhub::cli_search(query).unwrap_or_default();
+        let packages = crate::infra::vault::clawhub::cli_search(query)?;
         Ok(packages)
     }
 }

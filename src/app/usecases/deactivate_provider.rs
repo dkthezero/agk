@@ -17,7 +17,7 @@ pub fn run(
     provider: &dyn ProviderPort,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
-    let mut config = store.load(scope).unwrap_or_default();
+    let mut config = store.load(scope)?;
     if !config.providers.contains(&provider_id) {
         sink.on_error(format!("Provider '{}' already deactivated", provider_id));
         return Ok(CoreOutcome::Ok);

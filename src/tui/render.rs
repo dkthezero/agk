@@ -200,7 +200,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Enter local path or GitHub URL:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultBranch => {
@@ -209,7 +209,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Branch (default: main):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultPath => {
@@ -218,7 +218,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Subfolder (default: skills/):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultName => {
@@ -227,7 +227,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Vault name:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepName => {
@@ -236,7 +236,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Name:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepCommand => {
@@ -245,7 +245,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Command to run (e.g. npx, python):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepArgs => {
@@ -254,7 +254,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Arguments (space-separated, optional):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepTransport => {
@@ -263,7 +263,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Transport (stdio/sse), default stdio:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepDescription => {
@@ -272,7 +272,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Description (optional):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::ProfileWizard => {

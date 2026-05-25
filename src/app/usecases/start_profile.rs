@@ -79,6 +79,8 @@ pub fn run(
             id: id.clone(),
             session_key: session_key.clone(),
         });
+        // Wait for process exit then clean up.
+        let _ = session.wait_and_cleanup();
         Ok(CoreOutcome::Ok)
     }
 }

@@ -263,7 +263,28 @@ pub trait ProfileRuntimePort: Send + Sync {
 /// Handle for a running profile session.
 pub struct ProfileSession {
     pub process: std::process::Child,
-    pub cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
+    cleanup: Option<Box<dyn FnOnce() -> Result<()> + Send>>,
+}
+
+impl ProfileSession {
+    pub fn new(
+        process: std::process::Child,
+        cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
+    ) -> Self {
+        Self {
+            process,
+            cleanup: Some(cleanup),
+        }
+    }
+
+    /// Block until the child process exits, then run the cleanup closure.
+    pub fn wait_and_cleanup(mut self) -> Result<std::process::ExitStatus> {
+        let status = self.process.wait()?;
+        if let Some(cleanup) = self.cleanup.take() {
+            cleanup()?;
+        }
+        Ok(status)
+    }
 }
 
 /// Extension trait for providers that support MCP configuration.

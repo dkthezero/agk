@@ -54,11 +54,20 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 } else {
                     description.clone().unwrap_or_default()
                 };
-                let input = CreateProfileInput::new(
+                let mut input = CreateProfileInput::new(
                     ProfileId::new(name.clone()),
                     crate::domain::profile::ProviderId::new(provider.clone()),
                     scope.into_domain_scope(),
                 );
+                input.description = desc;
+                input.skill_refs = skills
+                    .iter()
+                    .map(|s| crate::domain::profile::SkillId::new(s))
+                    .collect();
+                input.mcp_refs = mcps
+                    .iter()
+                    .map(|m| crate::domain::profile::McpServerId::new(m))
+                    .collect();
                 Ok(CoreCommand::CreateProfile { input })
             }
         },
@@ -92,7 +101,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                                 .collect()
                         })
                         .unwrap_or_default(),
-                    transport: crate::domain::mcp::McpTransport::Stdio,
+                    transport: match transport.as_str() {
+                        "sse" => crate::domain::mcp::McpTransport::Sse {
+                            url: "http://localhost:3000".to_string(),
+                        },
+                        _ => crate::domain::mcp::McpTransport::Stdio,
+                    },
                     description: description.clone(),
                     test_after: !no_test,
                 },

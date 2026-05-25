@@ -5,11 +5,15 @@ use anyhow::Result;
 
 /// Concrete [`McpRegistryPort`] adapter that delegates to the existing
 /// `infra::mcp` implementation.
-pub struct InfraMcpRegistryAdapter;
+pub struct InfraMcpRegistryAdapter {
+    workspace_root: std::path::PathBuf,
+}
 
 impl InfraMcpRegistryAdapter {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(workspace_root: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            workspace_root: workspace_root.into(),
+        }
     }
 }
 
@@ -37,12 +41,12 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
     }
 
     fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()> {
-        let providers = self.build_providers(std::path::Path::new("."));
+        let providers = self.build_providers(&self.workspace_root);
         crate::infra::mcp::enable(name, provider_id, scope, &providers)
     }
 
     fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()> {
-        let providers = self.build_providers(std::path::Path::new("."));
+        let providers = self.build_providers(&self.workspace_root);
         crate::infra::mcp::disable(name, provider_id, scope, &providers)
     }
 }

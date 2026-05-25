@@ -324,7 +324,7 @@ impl ProfileRuntimePort for OpenCodeProvider {
             Ok(())
         });
 
-        Ok(crate::app::ports::ProfileSession { process, cleanup })
+        Ok(crate::app::ports::ProfileSession::new(process, cleanup))
     }
 }
 impl McpProvider for OpenCodeProvider {
@@ -619,7 +619,7 @@ impl OpenCodeProvider {
             Ok(())
         });
 
-        Ok(crate::app::ports::ProfileSession { process, cleanup })
+        Ok(crate::app::ports::ProfileSession::new(process, cleanup))
     }
 }
 

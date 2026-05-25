@@ -689,22 +689,15 @@ fn handle_profile_wizard_input(
     match current_step {
         WizardStep::TextInput { .. } | WizardStep::QuestionAnswer { .. } => match code {
             KeyCode::Char(c) => {
-                let is_shift_enter =
-                    matches!(c, 'J' | 'j') && key.modifiers.contains(KeyModifiers::SHIFT);
-                if is_shift_enter {
-                    ws.prompt_buffer.push('\n');
-                    ws.cursor_pos += 1;
-                } else {
-                    // Insert at the char position (not byte) to handle multi-byte UTF-8 safely.
-                    let byte_idx = ws
-                        .prompt_buffer
-                        .char_indices()
-                        .nth(ws.cursor_pos)
-                        .map(|(i, _)| i)
-                        .unwrap_or(ws.prompt_buffer.len());
-                    ws.prompt_buffer.insert(byte_idx, *c);
-                    ws.cursor_pos += 1;
-                }
+                // Insert at the char position (not byte) to handle multi-byte UTF-8 safely.
+                let byte_idx = ws
+                    .prompt_buffer
+                    .char_indices()
+                    .nth(ws.cursor_pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(ws.prompt_buffer.len());
+                ws.prompt_buffer.insert(byte_idx, *c);
+                ws.cursor_pos += 1;
             }
             KeyCode::Backspace => {
                 if ws.cursor_pos > 0 {
