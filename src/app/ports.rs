@@ -37,6 +37,41 @@ pub trait VaultPort: Send + Sync {
     fn list_packages(&self, feature: &dyn FeatureSetPort) -> Result<Vec<ScannedPackage>>;
 }
 
+/// Port for searching remote vaults (e.g. ClawHub).
+#[async_trait::async_trait]
+pub trait VaultSearchPort: Send + Sync {
+    fn vault_id(&self) -> &str;
+    async fn search(&self, query: &str) -> Result<Vec<ScannedPackage>>;
+}
+
+/// Port for MCP registry operations.
+pub trait McpRegistryPort: Send + Sync {
+    fn register(
+        &self,
+        name: &str,
+        command: &str,
+        args: Option<&str>,
+        env: Option<&str>,
+        transport: &str,
+        description: Option<&str>,
+    ) -> Result<crate::domain::mcp::McpServer>;
+
+    fn test_server(&self, name: &str) -> Result<()>;
+    fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
+    fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+    fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+}
+
+/// Port for running external processes.
+pub trait ProcessRunnerPort: Send + Sync {
+    fn run(
+        &self,
+        command: &str,
+        args: &[String],
+        current_dir: &std::path::Path,
+    ) -> Result<std::process::ExitStatus>;
+}
+
 pub trait ConfigStorePort: Send + Sync {
     fn load(&self, scope: Scope) -> Result<ConfigFile>;
     fn save(&self, scope: Scope, config: &ConfigFile) -> Result<()>;

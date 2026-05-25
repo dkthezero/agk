@@ -4,6 +4,7 @@ pub(crate) mod command_mapper;
 pub(crate) mod event;
 pub(crate) mod intent;
 pub(crate) mod layout;
+pub(crate) mod presenter;
 pub(crate) mod reducer;
 pub(crate) mod render;
 pub(crate) mod widgets;
