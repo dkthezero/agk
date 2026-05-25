@@ -126,6 +126,14 @@ pub struct LaunchPlan {
     pub files_to_write: Vec<std::path::PathBuf>,
     /// Whether provider config restoration is required after the session.
     pub restore_required: bool,
+
+    // --- Provider-specific concrete plan details ---
+    /// Path to the base agent markdown that will be copied for this session.
+    pub agent_markdown_source: std::path::PathBuf,
+    /// Patched provider configuration (e.g. opencode.json) to be written.
+    pub patched_provider_config: Option<serde_json::Value>,
+    /// Original provider configuration bytes for lossless restoration.
+    pub original_provider_config_bytes: Option<Vec<u8>>,
 }
 
 /// Snapshot of the workspace configuration and scan results.

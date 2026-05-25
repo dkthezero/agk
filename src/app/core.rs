@@ -1,7 +1,8 @@
 use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
-use crate::app::ports::{ConfigStorePort, McpRegistryPort, VaultSearchPort};
+use crate::app::ports::{ConfigStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort};
 use crate::app::registry::Registry;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Central façade through which all TUI and CLI commands enter the application
@@ -18,6 +19,8 @@ pub struct AgkCore {
     mcp_registry: Arc<dyn McpRegistryPort>,
     vault_search: Arc<dyn VaultSearchPort>,
     registry: Arc<Registry>,
+    /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
+    runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
 }
 
 impl AgkCore {
@@ -26,12 +29,14 @@ impl AgkCore {
         mcp_registry: Arc<dyn McpRegistryPort>,
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
+        runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
     ) -> Self {
         Self {
             store,
             mcp_registry,
             vault_search,
             registry,
+            runtime_ports,
         }
     }
 
@@ -49,7 +54,14 @@ impl AgkCore {
                 crate::app::usecases::create_profile::run(input, sink)
             }
             CoreCommand::StartProfile { id, scope, dry_run } => {
-                crate::app::usecases::start_profile::run(id, *scope, *dry_run, sink)
+                crate::app::usecases::start_profile::run(
+                    id,
+                    *scope,
+                    *dry_run,
+                    self.store.as_ref(),
+                    &self.runtime_ports,
+                    sink,
+                )
             }
 
             // ===============================================================
@@ -209,6 +221,7 @@ mod tests {
             Arc::new(FakeMcp),
             Arc::new(FakeVaultSearch),
             Arc::new(crate::app::registry::Registry::new()),
+            HashMap::new(),
         )
     }
 

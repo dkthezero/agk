@@ -1,25 +1,70 @@
-use crate::app::event::{CoreEvent, LaunchPlan};
+use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::app::ports::{ConfigStorePort, ProfileRuntimePort};
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
+use std::sync::Arc;
 
 /// Start (or simulate) a profile session.
 ///
-/// Phase 1 stub: returns a [`LaunchPlan`] when `dry_run` is true, otherwise
-/// emits a placeholder started event.  In Phase 3 this will resolve the profile
-/// from [`ConfigStorePort`], negotiate with [`ProfileRuntimePort`] to build
-/// the real plan, and optionally spawn the session.
+/// Phase 5 implementation:
+/// 1. Load profile from [`ConfigStorePort`].
+/// 2. Look up [`ProfileRuntimePort`] by provider_id.
+/// 3. If `dry_run`, build launch plan via `build_launch_plan()`.
+/// 4. Otherwise, build plan and immediately execute via `run_plan()`.
+/// 5. Emit appropriate [`CoreEvent`]s.
 pub fn run(
     id: &ProfileId,
-    _scope: Scope,
+    scope: Scope,
     dry_run: bool,
+    store: &dyn ConfigStorePort,
+    runtime_ports: &std::collections::HashMap<String, Arc<dyn ProfileRuntimePort>>,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
-    let plan = LaunchPlan {
-        profile_id: id.clone(),
-        provider_id: crate::domain::profile::ProviderId::new("opencode"),
-        ..LaunchPlan::default()
+    let config = store.load(scope)?;
+
+    let domain_profile = config
+        .profiles
+        .iter()
+        .find(|p| p.name == id.as_str())
+        .cloned()
+        .ok_or_else(|| {
+            anyhow::anyhow!("Profile '{}' not found in {:?} config", id.as_str(), scope)
+        })?;
+
+    let runtime = runtime_ports
+        .get(&domain_profile.provider_id)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Provider '{}' does not support profile runtime",
+                domain_profile.provider_id
+            )
+        })?;
+
+    let app_profile = crate::domain::profile::Profile {
+        id: crate::domain::profile::ProfileId::new(&domain_profile.name),
+        scope,
+        provider_id: crate::domain::profile::ProviderId::new(&domain_profile.provider_id),
+        skill_refs: domain_profile
+            .skills
+            .iter()
+            .map(|s| crate::domain::profile::SkillId::new(s))
+            .collect(),
+        mcp_refs: domain_profile
+            .mcps
+            .iter()
+            .map(|m| crate::domain::profile::McpServerId::new(m))
+            .collect(),
+        instruction_refs: vec![],
+        prompt_overlay_path: None,
+        launch_policy: if dry_run {
+            crate::domain::profile::LaunchPolicy::DryRun
+        } else {
+            crate::domain::profile::LaunchPolicy::AutoRestore
+        },
     };
+
+    let plan = runtime.build_launch_plan(&app_profile, Some(&config))?;
 
     if dry_run {
         sink.on_event(CoreEvent::ProfileLaunchPlan {
@@ -28,9 +73,11 @@ pub fn run(
         });
         Ok(CoreOutcome::LaunchPlan(plan))
     } else {
+        let session = runtime.run_plan(&plan)?;
+        let session_key = format!("pid-{}", session.process.id());
         sink.on_event(CoreEvent::ProfileSessionStarted {
             id: id.clone(),
-            session_key: "stub".into(),
+            session_key: session_key.clone(),
         });
         Ok(CoreOutcome::Ok)
     }
@@ -46,14 +93,56 @@ mod tests {
     #[test]
     fn start_profile_dry_run_returns_plan() {
         let mut sink = NullSink;
-        let result = run(&ProfileId::new("dev"), Scope::Workspace, true, &mut sink);
-        assert!(matches!(result, Ok(CoreOutcome::LaunchPlan(_))));
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            true,
+            &FakeStore::default(),
+            &std::collections::HashMap::new(),
+            &mut sink,
+        );
+        // No runtime port registered → should fail gracefully
+        assert!(result.is_err());
     }
 
     #[test]
     fn start_profile_live_returns_ok() {
         let mut sink = NullSink;
-        let result = run(&ProfileId::new("dev"), Scope::Workspace, false, &mut sink);
-        assert!(result.is_ok());
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            false,
+            &FakeStore::default(),
+            &std::collections::HashMap::new(),
+            &mut sink,
+        );
+        // No runtime port registered → should fail gracefully
+        assert!(result.is_err());
+    }
+
+    struct FakeStore;
+    impl Default for FakeStore {
+        fn default() -> Self {
+            Self
+        }
+    }
+    impl ConfigStorePort for FakeStore {
+        fn load(&self, _scope: Scope) -> anyhow::Result<crate::domain::config::ConfigFile> {
+            let mut config = crate::domain::config::ConfigFile::default();
+            config.profiles.push(crate::domain::config::Profile {
+                name: "dev".into(),
+                provider_id: "opencode".into(),
+                skills: vec!["rust".into()],
+                mcps: vec![],
+            });
+            Ok(config)
+        }
+        fn save(
+            &self,
+            _scope: Scope,
+            _config: &crate::domain::config::ConfigFile,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 }

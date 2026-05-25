@@ -243,6 +243,23 @@ impl WizardState {
     }
 }
 
+/// Port for building and executing profile launch plans.
+/// Implemented by provider adapters that support profile sessions.
+pub trait ProfileRuntimePort: Send + Sync {
+    fn provider_id(&self) -> &str;
+
+    /// Build a deterministic launch plan without modifying filesystem state.
+    fn build_launch_plan(
+        &self,
+        profile: &crate::domain::profile::Profile,
+        config: Option<&ConfigFile>,
+    ) -> Result<crate::app::event::LaunchPlan>;
+
+    /// Execute a previously-built launch plan, returning a handle that
+    /// includes a cleanup closure for restoring provider state.
+    fn run_plan(&self, plan: &crate::app::event::LaunchPlan) -> Result<ProfileSession>;
+}
+
 /// Handle for a running profile session.
 pub struct ProfileSession {
     pub process: std::process::Child,
