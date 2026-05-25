@@ -740,9 +740,7 @@ pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32>
     let session_key = generate_profile_session_key();
     let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
 
-    let exit_status = session.process.wait()?;
-
-    (session.cleanup)()?;
+    let exit_status = session.wait_and_cleanup()?;
 
     Ok(if exit_status.success() { 0 } else { 1 })
 }
@@ -1163,7 +1161,10 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
         },
 
         Some(Commands::Profile { command }) => match command {
-            ProfileCommands::Start { ref name } => run_profile_start(name, workspace),
+            ProfileCommands::Start {
+                ref name,
+                dry_run: _,
+            } => run_profile_start(name, workspace),
             ProfileCommands::Create {
                 ref name,
                 provider,
@@ -1172,6 +1173,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                 ref description,
                 ref description_file,
                 scope,
+                dry_run: _,
             } => run_profile_create(
                 name,
                 provider.as_str(),

@@ -93,6 +93,22 @@ Profiles obey the existing scoped-config system:
 - **Global profiles** are stored in `~/.config/agk/config.toml` and are available everywhere.
 - The TUI scope toggle (`Tab` key) switches between workspace and global profiles.
 
+### Dry-run mode (Phase 5)
+
+```
+agk profile start <name> --dry-run
+agk profile create <name> ... --dry-run
+```
+
+When `--dry-run` is passed:
+1. The profile config is loaded and validated.
+2. A `LaunchPlan` is built via `ProfileRuntimePort::build_launch_plan()`.
+3. The plan is returned (and optionally emitted as JSON with `--json`) without executing.
+4. No filesystem modifications, no process spawning.
+5. The plan includes: `agent_markdown_source`, `patched_provider_config`, `original_provider_config_bytes`, `skills`, `mcps`.
+
+This allows CI pipelines and user scripts to preview exactly what a profile session will do before committing side effects.
+
 ## Functional Requirements
 
 1. Profile shall bundle: `name`, `provider_id`, `skills: Vec<String>`, `mcps: Vec<String>`, `agent_file: PathBuf`.

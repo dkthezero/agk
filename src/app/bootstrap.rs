@@ -4,14 +4,15 @@
 //! import from `infra`.
 
 use crate::app::registry::Registry;
-use crate::domain::asset::{ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::app::snapshot::{ProfileEntry, ProviderEntry, VaultEntry};
+use crate::app::tab_kind::TabKind;
+use crate::domain::asset::ScannedPackage;
 use crate::domain::config::ConfigFile;
 use crate::infra::config::toml_store::TomlConfigStore;
 use crate::infra::feature::instruction::InstructionFeatureSet;
 use crate::infra::feature::skill::SkillFeatureSet;
 use crate::infra::feature::stub::StubFeatureSet;
 use crate::infra::vault::local::LocalVaultAdapter;
-use crate::tui::app::TabKind;
 use anyhow::Result;
 use std::path::PathBuf;
 

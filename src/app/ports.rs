@@ -37,6 +37,41 @@ pub trait VaultPort: Send + Sync {
     fn list_packages(&self, feature: &dyn FeatureSetPort) -> Result<Vec<ScannedPackage>>;
 }
 
+/// Port for searching remote vaults (e.g. ClawHub).
+#[async_trait::async_trait]
+pub trait VaultSearchPort: Send + Sync {
+    fn vault_id(&self) -> &str;
+    async fn search(&self, query: &str) -> Result<Vec<ScannedPackage>>;
+}
+
+/// Port for MCP registry operations.
+pub trait McpRegistryPort: Send + Sync {
+    fn register(
+        &self,
+        name: &str,
+        command: &str,
+        args: Option<&str>,
+        env: Option<&str>,
+        transport: &str,
+        description: Option<&str>,
+    ) -> Result<crate::domain::mcp::McpServer>;
+
+    fn test_server(&self, name: &str) -> Result<()>;
+    fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
+    fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+    fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+}
+
+/// Port for running external processes.
+pub trait ProcessRunnerPort: Send + Sync {
+    fn run(
+        &self,
+        command: &str,
+        args: &[String],
+        current_dir: &std::path::Path,
+    ) -> Result<std::process::ExitStatus>;
+}
+
 pub trait ConfigStorePort: Send + Sync {
     fn load(&self, scope: Scope) -> Result<ConfigFile>;
     fn save(&self, scope: Scope, config: &ConfigFile) -> Result<()>;
@@ -208,10 +243,48 @@ impl WizardState {
     }
 }
 
+/// Port for building and executing profile launch plans.
+/// Implemented by provider adapters that support profile sessions.
+pub trait ProfileRuntimePort: Send + Sync {
+    fn provider_id(&self) -> &str;
+
+    /// Build a deterministic launch plan without modifying filesystem state.
+    fn build_launch_plan(
+        &self,
+        profile: &crate::domain::profile::Profile,
+        config: Option<&ConfigFile>,
+    ) -> Result<crate::app::event::LaunchPlan>;
+
+    /// Execute a previously-built launch plan, returning a handle that
+    /// includes a cleanup closure for restoring provider state.
+    fn run_plan(&self, plan: &crate::app::event::LaunchPlan) -> Result<ProfileSession>;
+}
+
 /// Handle for a running profile session.
 pub struct ProfileSession {
     pub process: std::process::Child,
-    pub cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
+    cleanup: Option<Box<dyn FnOnce() -> Result<()> + Send>>,
+}
+
+impl ProfileSession {
+    pub fn new(
+        process: std::process::Child,
+        cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
+    ) -> Self {
+        Self {
+            process,
+            cleanup: Some(cleanup),
+        }
+    }
+
+    /// Block until the child process exits, then run the cleanup closure.
+    pub fn wait_and_cleanup(mut self) -> Result<std::process::ExitStatus> {
+        let status = self.process.wait()?;
+        if let Some(cleanup) = self.cleanup.take() {
+            cleanup()?;
+        }
+        Ok(status)
+    }
 }
 
 /// Extension trait for providers that support MCP configuration.

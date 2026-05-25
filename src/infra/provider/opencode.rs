@@ -1,4 +1,5 @@
-use crate::app::ports::{McpProvider, ProviderPort};
+use crate::app::event::LaunchPlan;
+use crate::app::ports::{McpProvider, ProfileRuntimePort, ProviderPort};
 use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::identity::AssetIdentity;
 use crate::domain::mcp::{McpServer, McpTransport};
@@ -185,6 +186,145 @@ impl ProviderPort for OpenCodeProvider {
                 title: "Review & Confirm".into(),
             },
         ]
+    }
+}
+impl ProfileRuntimePort for OpenCodeProvider {
+    fn provider_id(&self) -> &str {
+        "opencode"
+    }
+
+    fn build_launch_plan(
+        &self,
+        profile: &crate::domain::profile::Profile,
+        _config: Option<&crate::domain::config::ConfigFile>,
+    ) -> Result<crate::app::event::LaunchPlan> {
+        let name = profile.id.as_str();
+        let base_agent_path = self.profile_agent_path(name);
+        if !base_agent_path.exists() {
+            anyhow::bail!(
+                "Profile agent file not found at {}",
+                base_agent_path.display()
+            );
+        }
+
+        let (current_config, original_bytes) = self.read_workspace_config()?;
+        let mut plan_config = current_config.clone();
+
+        // Patch agent entry
+        if plan_config.get("agent").is_none() {
+            plan_config["agent"] = serde_json::json!({});
+        }
+        if let Some(agent_obj) = plan_config["agent"].as_object_mut() {
+            agent_obj.insert(
+                name.to_string(),
+                serde_json::json!({
+                    "mode": "primary",
+                    "description": format!("Session agent for {} profile", name),
+                }),
+            );
+        }
+
+        // Patch permission -> skill
+        if plan_config.get("permission").is_none() {
+            plan_config["permission"] = serde_json::json!({});
+        }
+        if plan_config["permission"].get("skill").is_none() {
+            plan_config["permission"]["skill"] = serde_json::json!({});
+        }
+        if let Some(skill_perm) = plan_config["permission"]["skill"].as_object_mut() {
+            for skill in &profile.skill_refs {
+                skill_perm.insert(skill.0.clone(), serde_json::json!("allow"));
+            }
+            skill_perm.insert("*".to_string(), serde_json::json!("deny"));
+        }
+
+        // Patch mcp entries
+        for mcp in &profile.mcp_refs {
+            if plan_config.get("mcp").is_none() {
+                plan_config["mcp"] = serde_json::json!({});
+            }
+            if let Some(mcp_obj) = plan_config["mcp"].as_object_mut() {
+                if let Some(entry) = mcp_obj.get_mut(&mcp.0) {
+                    if let Some(e) = entry.as_object_mut() {
+                        e.insert("enabled".to_string(), serde_json::json!(true));
+                    }
+                }
+            }
+        }
+
+        Ok(crate::app::event::LaunchPlan {
+            profile_id: profile.id.clone(),
+            provider_id: crate::domain::profile::ProviderId::new("opencode"),
+            agent_markdown_source: base_agent_path,
+            patched_provider_config: Some(plan_config),
+            original_provider_config_bytes: original_bytes,
+            ..LaunchPlan::default()
+        })
+    }
+
+    fn run_plan(
+        &self,
+        plan: &crate::app::event::LaunchPlan,
+    ) -> Result<crate::app::ports::ProfileSession> {
+        let session_key = format!(
+            "{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        );
+        let agent_name = format!("{}_{}", plan.profile_id.as_str(), session_key);
+        let agents_dir = self.workspace_root.join(".opencode").join("agents");
+        let session_agent_path = agents_dir.join(format!("{}.md", agent_name));
+
+        // 1. Write patched agent markdown
+        let mut agent_content = std::fs::read_to_string(&plan.agent_markdown_source)?;
+        agent_content = patch_agent_frontmatter(&agent_content, &agent_name);
+        std::fs::create_dir_all(&agents_dir)?;
+        std::fs::write(&session_agent_path, agent_content)?;
+
+        // 2. Write patched opencode.json (or restore if plan fails)
+        let original_bytes = plan.original_provider_config_bytes.clone();
+        if let Some(ref value) = plan.patched_provider_config {
+            self.write_workspace_config(value)?;
+        }
+
+        // 3. Spawn opencode process
+        let process = std::process::Command::new("opencode")
+            .current_dir(&self.workspace_root)
+            .arg("--agent")
+            .arg(&agent_name)
+            .spawn()
+            .with_context(|| "Failed to start opencode CLI")?;
+
+        let cleanup_path = session_agent_path.clone();
+        let self_workspace = self.workspace_root.clone();
+        let cleanup_original = original_bytes;
+
+        let cleanup = Box::new(move || {
+            let _ = std::fs::remove_file(&cleanup_path);
+            if let Some(bytes) = cleanup_original {
+                let path = self_workspace.join("opencode.json");
+                let _ = std::fs::write(&path, bytes);
+            } else {
+                let path = self_workspace.join("opencode.json");
+                if path.exists() {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
+            let agents = self_workspace.join(".opencode").join("agents");
+            if agents.exists() && agents.read_dir()?.next().is_none() {
+                let _ = std::fs::remove_dir(&agents);
+            }
+            let opencode = self_workspace.join(".opencode");
+            if opencode.exists() && opencode.read_dir()?.next().is_none() {
+                let _ = std::fs::remove_dir(&opencode);
+            }
+            Ok(())
+        });
+
+        Ok(crate::app::ports::ProfileSession::new(process, cleanup))
     }
 }
 impl McpProvider for OpenCodeProvider {
@@ -479,7 +619,7 @@ impl OpenCodeProvider {
             Ok(())
         });
 
-        Ok(crate::app::ports::ProfileSession { process, cleanup })
+        Ok(crate::app::ports::ProfileSession::new(process, cleanup))
     }
 }
 
@@ -857,5 +997,67 @@ mod tests {
             claude.provider_root(&Scope::Workspace, Some(&config)),
             dir.path().join(".agents")
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // ProfileRuntimePort tests
+    // -----------------------------------------------------------------------
+    #[test]
+    fn profile_runtime_builds_launch_plan_with_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = OpenCodeProvider::new(dir.path().to_path_buf());
+
+        // Create profile agent markdown
+        let profile_name = "dev";
+        let agent_dir = dir.path().join(".agk").join("profiles").join(profile_name);
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        std::fs::write(
+            agent_dir.join("agent.md"),
+            "---\nname: dev\n---\nTest agent",
+        )
+        .unwrap();
+
+        let profile = crate::domain::profile::Profile {
+            id: crate::domain::profile::ProfileId::new(profile_name),
+            scope: Scope::Workspace,
+            provider_id: crate::domain::profile::ProviderId::new("opencode"),
+            skill_refs: vec![crate::domain::profile::SkillId::new("rust")],
+            mcp_refs: vec![],
+            instruction_refs: vec![],
+            prompt_overlay_path: None,
+            launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+        };
+
+        let plan = provider.build_launch_plan(&profile, None).unwrap();
+        assert_eq!(plan.profile_id.as_str(), "dev");
+        assert!(plan.patched_provider_config.is_some());
+
+        let config = plan.patched_provider_config.unwrap();
+        let permission = config.get("permission").unwrap();
+        let skill_perm = permission.get("skill").unwrap();
+        assert_eq!(skill_perm.get("rust").unwrap(), "allow");
+        assert_eq!(skill_perm.get("*").unwrap(), "deny");
+    }
+
+    #[test]
+    fn profile_runtime_errors_when_agent_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = OpenCodeProvider::new(dir.path().to_path_buf());
+
+        let profile = crate::domain::profile::Profile {
+            id: crate::domain::profile::ProfileId::new("nonexistent"),
+            scope: Scope::Workspace,
+            provider_id: crate::domain::profile::ProviderId::new("opencode"),
+            skill_refs: vec![],
+            mcp_refs: vec![],
+            instruction_refs: vec![],
+            prompt_overlay_path: None,
+            launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+        };
+
+        let result = provider.build_launch_plan(&profile, None);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("not found"));
     }
 }

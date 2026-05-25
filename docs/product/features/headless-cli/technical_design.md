@@ -129,11 +129,35 @@ No new traits are required. The CLI uses existing:
 
 ```
 src/cli/
-  mod.rs          # Re-export
-  entry.rs        # clap parser (extended with subcommands)
-  commands.rs     # Command implementations (sync, install, validate, pack)
-  output.rs       # Output formatting (--quiet, --verbose, --json)
+  mod.rs                # Re-export
+  entry.rs              # clap parser (extended with subcommands)
+  commands.rs           # Legacy command implementations (sync, install, validate, pack)
+  core_dispatcher.rs      # Phase 4 — CLI → CoreCommand translation + dispatch via AgkCore
+  presenter.rs          # Phase 4 — CoreEventSink with --quiet / --json support
 ```
+
+### `cli/core_dispatcher.rs`
+
+`to_core_command()` translates clap `Commands` enum into `app::command::CoreCommand` variants:
+
+| CLI Subcommand | CoreCommand Variant |
+|---------------|-------------------|
+| `profile start <name> --dry-run` | `StartProfile { id, scope, dry_run }` |
+| `profile create <name> --provider ...` | `CreateProfile { input }` |
+| `mcp add ...` | `RegisterMcp { input }` |
+| `sync --dry-run` | `SyncAssets { scope, dry_run }` |
+| `install <identity> --dry-run` | `InstallAsset { identity, ... }` |
+
+`dispatch(cli, workspace, core)` creates a `CliPresenter`, runs `core.execute()`, and maps `CoreOutcome` to process exit codes.
+
+### `cli/presenter.rs`
+
+`CliPresenter` implements `CoreEventSink` with three modes:
+- **Quiet** — swallows all events except errors (writes to stderr).
+- **Normal** — prints human-readable lines to stdout.
+- **JSON** — emits structured JSON objects per event (`event_to_json` helper maps `CoreEvent` → `serde_json::Value` without requiring `CoreEvent` to derive `Serialize`).
+
+The presenter buffers events when `--json` is used so the final output is a single JSON array.
 
 ## Testing Strategy
 

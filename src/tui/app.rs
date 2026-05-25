@@ -1,18 +1,8 @@
-use crate::domain::asset::{AssetKind, ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::app::tab_kind::TabKind;
+use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::config::{AssetKey, ConfigFile};
 use crate::domain::scope::Scope;
 use std::collections::{HashMap, HashSet};
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)]
-pub enum TabKind {
-    Asset,
-    Vault,
-    Provider,
-    Mcp,
-    Analytics,
-    Profile,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -72,9 +62,9 @@ pub struct AppState {
     pub prompt_buffer: String,
     pub configs: HashMap<Scope, ConfigFile>,
     pub tab_kinds: Vec<TabKind>,
-    pub vault_entries: Vec<VaultEntry>,
-    pub provider_entries: Vec<ProviderEntry>,
-    pub profile_entries: Vec<ProfileEntry>,
+    pub vault_entries: Vec<crate::app::snapshot::VaultEntry>,
+    pub provider_entries: Vec<crate::app::snapshot::ProviderEntry>,
+    pub profile_entries: Vec<crate::app::snapshot::ProfileEntry>,
     pub active_tasks: HashMap<usize, Progress>,
     pub latest_task_id: Option<usize>,
     pub pending_detach_vault: Option<String>,

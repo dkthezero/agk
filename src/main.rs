@@ -349,67 +349,72 @@ where
                 }
 
                 // Move freshly-created agent markdown into .agk/profiles if triggered by wizard
-                if command == "opencode" && args.iter().any(|a| a == "create") {
-                    let Some(name) = profile_name else {
-                        continue;
-                    };
-                    let agents_dir = current_dir.join(".opencode").join("agents");
-                    let target_dir: std::path::PathBuf =
-                        current_dir.join(".agk").join("profiles").join(&name);
+                // only when the interactive command succeeded.
+                if let Ok(s) = &status {
+                    if s.success() && command == "opencode" && args.iter().any(|a| a == "create") {
+                        let Some(name) = profile_name else {
+                            continue;
+                        };
+                        let agents_dir = current_dir.join(".opencode").join("agents");
+                        let target_dir: std::path::PathBuf =
+                            current_dir.join(".agk").join("profiles").join(&name);
 
-                    let mut moved = false;
-                    if let Ok(mut entries) = std::fs::read_dir(&agents_dir) {
-                        let now = std::time::SystemTime::now();
-                        let five_secs = std::time::Duration::from_secs(5);
-                        let mut newest: Option<(std::path::PathBuf, std::fs::Metadata)> = None;
+                        let mut moved = false;
+                        if let Ok(mut entries) = std::fs::read_dir(&agents_dir) {
+                            let now = std::time::SystemTime::now();
+                            let five_secs = std::time::Duration::from_secs(5);
+                            let mut newest: Option<(std::path::PathBuf, std::fs::Metadata)> = None;
 
-                        while let Some(Ok(entry)) = entries.next() {
-                            let path = entry.path();
-                            if let Some("md") = path.extension().and_then(|s| s.to_str()) {
-                                if let Ok(meta) = entry.metadata() {
-                                    if let Ok(modified) = meta.modified() {
-                                        if now.duration_since(modified).unwrap_or(five_secs)
-                                            <= five_secs
-                                        {
-                                            let newer = match &newest {
-                                                None => true,
-                                                Some((_, prev_meta)) => {
-                                                    match prev_meta.modified() {
-                                                        Ok(prev) => modified > prev,
-                                                        Err(_) => true,
+                            while let Some(Ok(entry)) = entries.next() {
+                                let path = entry.path();
+                                if let Some("md") = path.extension().and_then(|s| s.to_str()) {
+                                    if let Ok(meta) = entry.metadata() {
+                                        if let Ok(modified) = meta.modified() {
+                                            if now.duration_since(modified).unwrap_or(five_secs)
+                                                <= five_secs
+                                            {
+                                                let newer = match &newest {
+                                                    None => true,
+                                                    Some((_, prev_meta)) => {
+                                                        match prev_meta.modified() {
+                                                            Ok(prev) => modified > prev,
+                                                            Err(_) => true,
+                                                        }
                                                     }
+                                                };
+                                                if newer {
+                                                    newest = Some((path, meta));
                                                 }
-                                            };
-                                            if newer {
-                                                newest = Some((path, meta));
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        if let Some((agent_md, _)) = newest {
-                            if let Err(e) = std::fs::create_dir_all(&target_dir) {
-                                state.status_line = format!("Failed to create profile dir: {}", e);
-                            } else {
-                                let dest = target_dir.join("agent.md");
-                                if let Err(e) = std::fs::rename(&agent_md, &dest) {
-                                    state.status_line = format!("Failed to move agent file: {}", e);
-                                } else {
+                            if let Some((agent_md, _)) = newest {
+                                if let Err(e) = std::fs::create_dir_all(&target_dir) {
                                     state.status_line =
-                                        format!("Profile '{}' created successfully", name);
-                                    moved = true;
+                                        format!("Failed to create profile dir: {}", e);
+                                } else {
+                                    let dest = target_dir.join("agent.md");
+                                    if let Err(e) = std::fs::rename(&agent_md, &dest) {
+                                        state.status_line =
+                                            format!("Failed to move agent file: {}", e);
+                                    } else {
+                                        state.status_line =
+                                            format!("Profile '{}' created successfully", name);
+                                        moved = true;
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if !moved {
-                        state.status_line = format!(
-                            "Profile '{}' created, but no agent.md found in agents/",
-                            name
-                        );
+                        if !moved {
+                            state.status_line = format!(
+                                "Profile '{}' created, but no agent.md found in agents/",
+                                name
+                            );
+                        }
                     }
                 }
             }

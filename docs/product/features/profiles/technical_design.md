@@ -1,15 +1,61 @@
-# Profiles Feature – Technical Design
+## Profile Feature – Technical Design
 
 ## Architecture
 
 Profiles introduce three new pieces to the existing hexagonal architecture:
 
-1. **`Profile` domain model** — pure data, lives in `domain/config.rs`.
+1. **`Profile` domain model** — pure data, lives in `domain/profile.rs`.
 2. **`ProfileProvider` port trait** — provider-specific implementation for how to set up, launch, and tear down a profile session. Lives in `app/ports.rs`.
-3. **Extensible profile wizard** — a `Vec<WizardStep>` stack owned by the `ProfileProvider`. Each provider defines its own step sequence so the TUI stays generic.
-4. **`OpenCodeProfileProvider`** — concrete implementation in `infra/provider/opencode.rs` (extends existing `OpenCodeProvider`).
+3. **`ProfileRuntimePort`** — **new in Phase 5** — separates deterministic plan construction (`build_launch_plan`) from side-effectful execution (`run_plan`).  Implemented by provider adapters that support profile sessions (e.g. `OpenCodeProvider`).
+4. **Extensible profile wizard** — a `Vec<WizardStep>` stack owned by the `ProfileProvider`. Each provider defines its own step sequence so the TUI stays generic.
+5. **`OpenCodeProfileProvider`** — concrete implementation in `infra/provider/opencode.rs` (extends existing `OpenCodeProvider`).
 
 Everything else is TUI/CLI wiring using existing patterns.
+
+### Phase 5: Profile Runtime Port
+
+```rust
+/// Port for building and executing profile launch plans.
+pub trait ProfileRuntimePort: Send + Sync {
+    fn provider_id(&self) -> &str;
+
+    /// Build a deterministic launch plan without modifying filesystem state.
+    fn build_launch_plan(
+        &self,
+        profile: &Profile,
+        config: Option<&ConfigFile>,
+    ) -> Result<LaunchPlan>;
+
+    /// Execute a previously-built launch plan, returning a handle that
+    /// includes a cleanup closure for restoring provider state.
+    fn run_plan(&self,
+        plan: &LaunchPlan,
+    ) -> Result<ProfileSession>;
+}
+```
+
+#### `LaunchPlan` (app/event.rs)
+
+A concrete, serialisable plan for what a profile session will do:
+
+```rust
+pub struct LaunchPlan {
+    pub profile_id: ProfileId,
+    pub provider_id: ProviderId,
+    pub skills: Vec<SkillId>,
+    pub mcps: Vec<McpServerId>,
+    pub files_to_write: Vec<PathBuf>,
+    pub restore_required: bool,
+    // Provider-specific concrete plan details
+    pub agent_markdown_source: PathBuf,
+    pub patched_provider_config: Option<serde_json::Value>,
+    pub original_provider_config_bytes: Option<Vec<u8>>,
+}
+```
+
+- `build_launch_plan()` sets `agent_markdown_source`, `patched_provider_config`, `original_provider_config_bytes`.
+- `run_plan()` writes the session agent file, writes the patched config, spawns the process, and returns a `ProfileSession` with a cleanup closure that restores the original config bytes.
+- `--dry-run` flag returns `CoreOutcome::LaunchPlan(plan)` without calling `run_plan()`.
 
 ## Data Model
 
@@ -55,12 +101,14 @@ pub trait ProviderPort: Send + Sync {
 }
 ```
 
-### `ProviderPort` extension for wizard stepsnn`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
+### `ProviderPort` extension for wizard steps
+
+`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
 
 ```rust
 /// Steps that a provider wants the user to walk through when creating a profile.
-```
-
+/// Each step is a static description (what to show). Mutable UI state lives in
+/// `WizardState`, not in the step itself.
 ```
 
 ### `WizardStep` enum (TUI-generic)

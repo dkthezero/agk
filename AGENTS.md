@@ -39,6 +39,16 @@ TUI (tui/)  →  App (app/)  →  Domain (domain/)
 - `VaultPort` — vault source abstraction (id, list_packages, refresh)
 - `ProviderPort` — target AI platform installer (install, remove)
 - `ConfigStorePort` — scoped config persistence (Global vs Workspace)
+- `McpRegistryPort` — MCP server registration and lifecycle (register, enable, disable)
+- `VaultSearchPort` — remote vault search abstraction (search, vault_id)
+- `ProfileRuntimePort` — provider-specific profile session builder (build_launch_plan, run_plan)
+
+### Core Command / Event Contracts (app/command.rs, app/event.rs, app/outcome.rs)
+
+**CoreCommand** — what the user wants.  One enum consumed by `AgkCore::execute()`.
+**CoreEvent** — what happened.  Emitted via `CoreEventSink` so TUI and CLI observe the same facts.
+**CoreOutcome** — the return value from a use-case (Ok, LaunchPlan, ValidationReport, etc.).
+**UiIntent** — what the TUI intends to do next.  Produced by pure `reduce_key()` in `tui/reducer.rs`.
 
 ### Key Patterns
 
@@ -47,6 +57,9 @@ TUI (tui/)  →  App (app/)  →  Domain (domain/)
 - **Async I/O**: All network/git operations run on tokio tasks via `AppEvent` channel to keep TUI responsive. Never block the render loop.
 - **Bootstrap is the only DI point**: `app/bootstrap.rs` wires infra adapters. No infra imports outside this file and main.rs.
 - **ClawHub vault**: CLI-delegated — shells out to `clawhub` binary for search/install/inspect. Uses LocalVaultAdapter to scan its cache at `~/.config/agk/clawhub/`.
+- **Pure reducer pattern**: `tui/reducer.rs` contains the only key-event logic; it returns `Vec<UiIntent>` without side effects. `tui/command_mapper.rs` translates intents to `CoreCommand`s.
+- **Shared contracts**: Both TUI and CLI produce `CoreCommand`s and observe `CoreEvent`s through the same `AgkCore` façade. `tui/presenter.rs` bridges `CoreEventSink` → `AppEvent` channel.
+- **Profile runtime separation**: `ProfileRuntimePort::build_launch_plan()` produces a deterministic `LaunchPlan` (no side effects). `run_plan()` executes it and returns a `ProfileSession` with a cleanup closure.
 
 ### Vault Structure Convention
 
@@ -64,3 +77,66 @@ If adding a new feature area, create a new directory under `docs/product/feature
 ## Working with Worktrees
 
 Feature branches often use git worktrees at `.worktrees/<branch-name>/`. Code changes in a worktree are isolated from the main working directory — remember to `cd` into the worktree or use its path when building/testing.
+
+## Refactoring History
+
+### Completed Refactors (branch `feature/core-commands`)
+
+**Phase 0** (merged): Added dev-deps, moved `TabKind` from `tui/` → `app/`, extracted view models to `app/snapshot.rs`, created architecture enforcement tests.
+
+**Phase 1** (merged): Introduced `CoreCommand`, `CoreEvent`, `CoreOutcome`, `UiIntent`, and `AgkCore` façade. Domain `Profile` with typed IDs.
+
+**Phase 2** (merged): Pure `reduce_key()` in `tui/reducer.rs`, `TuiState`/`ListMode`/`WizardState` in `tui/app_state.rs`, `command_mapper.rs`. 12 reducer unit tests.
+
+**Phase 3** (merged): Use-case extraction — `attach_vault`, `deactivate_provider`, `register_mcp`, `search_remote_vault` with fake-port tests.
+
+**Phase 3.5** (merged): Wired `AgkCore` with real port injection (`ConfigStorePort`, `McpRegistryPort`, `VaultSearchPort`, `Registry`). Created `InfraMcpRegistryAdapter`, `ClawHubSearchAdapter`, `AppEventSink` presenter bridge.
+
+**Phase 4+4.5** (merged): `CliPresenter` with `--json`/`--quiet`, `cli/core_dispatcher.rs` routing commands through `AgkCore`, added `dry_run` to `ProfileCommands::Create`.
+
+**Phase 5** (merged): `ProfileRuntimePort` trait, real `LaunchPlan` with provider-specific fields, `start_profile` use-case resolves profile from `ConfigStorePort` and runtime port from registry.
+
+## TDD Templates
+
+When adding a new use-case in `app/usecases/<name>.rs`:
+
+```rust
+pub fn run(
+    // typed inputs
+    sink: &mut dyn CoreEventSink,
+) -> CoreResult {
+    // implementation
+    Ok(CoreOutcome::Ok)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::outcome::NullSink;
+
+    #[test]
+    fn use_case_happy_path() {
+        let mut sink = NullSink;
+        let result = run(/* inputs */);
+        assert!(result.is_ok());
+    }
+}
+```
+
+When adding a new port trait in `app/ports.rs`:
+
+```rust
+pub trait NewPort: Send + Sync {
+    fn port_id(&self) -> &str;
+    fn operation(&self, input: &Input) -> Result<Output>;
+}
+```
+
+When adding a new reducer intent in `tui/reducer.rs`:
+
+```rust
+fn derive_enter_intent(state: &TuiState) -> UiIntent {
+    // pattern match on state.list_mode / state.tab_index
+    // return UiIntent::Command(CoreCommand::...)
+}
+```

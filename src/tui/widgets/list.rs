@@ -1,4 +1,5 @@
-use crate::domain::asset::{AssetKind, ProfileEntry, ProviderEntry, ScannedPackage, VaultEntry};
+use crate::app::snapshot::{ProfileEntry, ProviderEntry, VaultEntry};
+use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::config::ConfigFile;
 use ratatui::{
     layout::Rect,

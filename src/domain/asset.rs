@@ -10,7 +10,7 @@ pub enum AssetKind {
 }
 
 /// Metadata from ClawHub for remote packages.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct RemoteMetadata {
     pub owner: String,
     pub summary: String,
@@ -18,7 +18,7 @@ pub struct RemoteMetadata {
     pub stars: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScannedPackage {
     pub identity: AssetIdentity,
     pub path: PathBuf,
@@ -38,49 +38,6 @@ pub struct ScannedPackage {
     pub include_evals: bool,
 }
 
-/// Display-only struct for the Vaults tab.
-#[derive(Debug, Clone)]
-pub struct VaultEntry {
-    pub id: String,
-    pub kind: String,
-    pub enabled: bool,
-    pub installed_skills: usize,
-    pub available_skills: usize,
-    pub installed_instructions: usize,
-    pub available_instructions: usize,
-    /// Source path or URL for this vault (PR #5)
-    pub source_path: String,
-}
-
-impl VaultEntry {
-    pub fn counts_label(&self) -> String {
-        format!(
-            "{}/{}s  {}/{}i",
-            self.installed_skills,
-            self.available_skills,
-            self.installed_instructions,
-            self.available_instructions,
-        )
-    }
-}
-
-/// Display-only struct for the Providers tab.
-#[derive(Debug, Clone)]
-pub struct ProviderEntry {
-    pub id: String,
-    pub name: String,
-    pub active: bool,
-}
-
-/// Display-only struct for the Profiles tab.
-#[derive(Debug, Clone)]
-pub struct ProfileEntry {
-    pub name: String,
-    pub provider_id: String,
-    pub skills: Vec<String>,
-    pub mcps: Vec<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,32 +51,6 @@ mod tests {
     #[test]
     fn asset_kind_eq() {
         assert_ne!(AssetKind::Skill, AssetKind::Instruction);
-    }
-
-    #[test]
-    fn vault_entry_display_counts() {
-        let entry = VaultEntry {
-            id: "community".to_string(),
-            kind: "github".to_string(),
-            enabled: true,
-            installed_skills: 30,
-            available_skills: 48,
-            installed_instructions: 8,
-            available_instructions: 12,
-            source_path: "https://github.com/org/community-agent-vault".to_string(),
-        };
-        assert_eq!(entry.id, "community");
-        assert_eq!(entry.counts_label(), "30/48s  8/12i");
-    }
-
-    #[test]
-    fn provider_entry_active_marker() {
-        let entry = ProviderEntry {
-            id: "claude-code".to_string(),
-            name: "Claude Code".to_string(),
-            active: true,
-        };
-        assert!(entry.active);
     }
 
     #[test]

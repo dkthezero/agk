@@ -1,4 +1,5 @@
 use crate::app::ports::WizardStep;
+use crate::app::tab_kind::TabKind;
 use crate::tui::app::{AppState, ListMode};
 use crate::tui::layout;
 use crate::tui::widgets::{detail, list, mcp, modal, status, tabs};
@@ -32,8 +33,6 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
     tabs::render(frame, layout.tabs, &state.tab_names, state.active_tab);
 
     // Content — dispatch by tab kind
-    use crate::tui::app::TabKind;
-
     let is_live = state.is_active_tab_live();
     let active_kind = state
         .tab_kinds
@@ -91,7 +90,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             let list_area = layout.list;
             let detail_area = layout.detail;
             // Build active provider list for checkbox rendering
-            let active_providers: Vec<crate::domain::asset::ProviderEntry> = state
+            let active_providers: Vec<crate::app::snapshot::ProviderEntry> = state
                 .provider_entries
                 .iter()
                 .filter(|p| p.active)
@@ -201,7 +200,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Enter local path or GitHub URL:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultBranch => {
@@ -210,7 +209,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Branch (default: main):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultPath => {
@@ -219,7 +218,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Subfolder (default: skills/):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::AttachVaultName => {
@@ -228,7 +227,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Vault name:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepName => {
@@ -237,7 +236,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Name:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepCommand => {
@@ -246,7 +245,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Command to run (e.g. npx, python):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepArgs => {
@@ -255,7 +254,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Arguments (space-separated, optional):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepTransport => {
@@ -264,7 +263,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Transport (stdio/sse), default stdio:",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::RegisterMcpStepDescription => {
@@ -273,7 +272,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Description (optional):",
                 &state.prompt_buffer,
-                state.prompt_buffer.len(),
+                state.prompt_buffer.chars().count(),
             );
         }
         ListMode::ProfileWizard => {

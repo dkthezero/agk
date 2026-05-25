@@ -112,6 +112,10 @@ pub enum ProfileCommands {
     Start {
         /// Profile name
         name: String,
+
+        /// Only show the launch plan without executing
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Create a new profile headlessly and generate the agent file
@@ -142,6 +146,10 @@ pub enum ProfileCommands {
         /// Scope for storing the profile config
         #[arg(short, long, value_enum, default_value = "workspace")]
         scope: ScopeArg,
+
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
