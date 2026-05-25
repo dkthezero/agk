@@ -349,11 +349,10 @@ where
                 }
 
                 // Move freshly-created agent markdown into .agk/profiles if triggered by wizard
-                if command == "opencode"
-                    && args.iter().any(|a| a == "create")
-                    && profile_name.is_some()
-                {
-                    let name = profile_name.unwrap();
+                if command == "opencode" && args.iter().any(|a| a == "create") {
+                    let Some(name) = profile_name else {
+                        continue;
+                    };
                     let agents_dir = current_dir.join(".opencode").join("agents");
                     let target_dir: std::path::PathBuf =
                         current_dir.join(".agk").join("profiles").join(&name);

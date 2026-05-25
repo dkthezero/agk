@@ -256,7 +256,7 @@ pub enum ScopeArg {
 }
 
 impl ScopeArg {
-    pub fn to_domain_scope(&self) -> crate::domain::scope::Scope {
+    pub fn into_domain_scope(self) -> crate::domain::scope::Scope {
         match self {
             ScopeArg::Global => crate::domain::scope::Scope::Global,
             ScopeArg::Workspace => crate::domain::scope::Scope::Workspace,

@@ -696,7 +696,8 @@ fn handle_profile_wizard_input(
                     ws.cursor_pos += 1;
                 } else {
                     // Insert at the char position (not byte) to handle multi-byte UTF-8 safely.
-                    let byte_idx = ws.prompt_buffer
+                    let byte_idx = ws
+                        .prompt_buffer
                         .char_indices()
                         .nth(ws.cursor_pos)
                         .map(|(i, _)| i)
@@ -709,7 +710,8 @@ fn handle_profile_wizard_input(
                 if ws.cursor_pos > 0 {
                     ws.cursor_pos -= 1;
                     // Remove the char at the current cursor position.
-                    let byte_idx = ws.prompt_buffer
+                    let byte_idx = ws
+                        .prompt_buffer
                         .char_indices()
                         .nth(ws.cursor_pos)
                         .map(|(i, _)| i)
@@ -1810,7 +1812,7 @@ pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
     }
 
     // If the first step is a Checklist we need to initialise checked vec.
-    if let Some(WizardStep::Checklist { options, .. }) = ws.steps.get(0) {
+    if let Some(WizardStep::Checklist { options, .. }) = ws.steps.first() {
         ws.checked = vec![false; options.len()];
     }
 

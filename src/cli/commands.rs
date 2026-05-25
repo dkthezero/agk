@@ -78,7 +78,7 @@ fn telemetry_to_csv(config: &crate::domain::telemetry::AnalyticsConfig) -> Strin
 
 fn resolve_scope(scope_arg: Option<ScopeArg>) -> Scope {
     scope_arg
-        .map(|s| s.to_domain_scope())
+        .map(|s| s.into_domain_scope())
         .unwrap_or(Scope::Workspace)
 }
 
@@ -200,7 +200,7 @@ pub fn cmd_sync(
             }
             match sync_single_asset(
                 scope,
-                &identity,
+                identity,
                 &AssetKind::Skill,
                 vault_id,
                 &registry,
@@ -222,7 +222,7 @@ pub fn cmd_sync(
             }
             match sync_single_asset(
                 scope,
-                &identity,
+                identity,
                 &AssetKind::Instruction,
                 vault_id,
                 &registry,
@@ -751,6 +751,7 @@ pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32>
 // Command: profile create
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_profile_create(
     name: &str,
     provider_id: &str,
@@ -843,7 +844,7 @@ pub fn run_profile_create(
                     let meta = e.metadata().ok()?;
                     if meta.is_file() {
                         let modified = meta.modified().ok()?;
-                        if latest.as_ref().map_or(true, |(_, t)| modified > *t) {
+                        if latest.as_ref().is_none_or(|(_, t)| modified > *t) {
                             latest = Some((e, modified));
                         }
                     }
@@ -1007,7 +1008,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
             } => {
                 let mode = OutputMode::from_cli(&cli);
                 let scope = resolve_scope(*scope);
-                let providers = crate::infra::mcp::build_mcp_providers(&workspace);
+                let providers = crate::infra::mcp::build_mcp_providers(workspace);
                 match crate::infra::mcp::enable(name, provider, scope, &providers) {
                     Ok(()) => {
                         println_if_not_quiet(
@@ -1029,7 +1030,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
             } => {
                 let mode = OutputMode::from_cli(&cli);
                 let scope = resolve_scope(*scope);
-                let providers = crate::infra::mcp::build_mcp_providers(&workspace);
+                let providers = crate::infra::mcp::build_mcp_providers(workspace);
                 match crate::infra::mcp::disable(name, provider, scope, &providers) {
                     Ok(()) => {
                         println_if_not_quiet(
@@ -1069,17 +1070,15 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                         })
                         .collect();
                     println!("{}", serde_json::to_string_pretty(&json)?);
+                } else if items.is_empty() {
+                    println_if_not_quiet(&mode, "No MCP servers registered.");
                 } else {
-                    if items.is_empty() {
-                        println_if_not_quiet(&mode, "No MCP servers registered.");
-                    } else {
-                        for s in items {
-                            let tested = if s.tested { "[✓]" } else { "[ ]" };
-                            println_if_not_quiet(
-                                &mode,
-                                &format!("{} {} ({:?})", tested, s.name, s.transport),
-                            );
-                        }
+                    for s in items {
+                        let tested = if s.tested { "[✓]" } else { "[ ]" };
+                        println_if_not_quiet(
+                            &mode,
+                            &format!("{} {} ({:?})", tested, s.name, s.transport),
+                        );
                     }
                 }
                 Ok(EXIT_SUCCESS)
@@ -1154,7 +1153,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                 };
 
                 if let Some(file_path) = output {
-                    std::fs::write(&file_path, &content)?;
+                    std::fs::write(file_path, &content)?;
                     println_if_not_quiet(&mode, &format!("Telemetry exported to {}", file_path));
                 } else {
                     println!("{}", content);
@@ -1180,7 +1179,7 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
                 mcps.as_slice(),
                 description.as_deref(),
                 description_file.as_deref(),
-                scope.to_domain_scope(),
+                scope.into_domain_scope(),
                 workspace,
             ),
         },
