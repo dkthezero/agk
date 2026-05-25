@@ -117,7 +117,7 @@ impl AgkCore {
                 Ok(CoreOutcome::Ok)
             }
 
-            // TODO: Phase 4 – wire remaining commands.
+            // Remaining commands: wired incrementally in Phases 1-5.
             _ => {
                 sink.on_error(format!("Command {:?} not yet implemented", command));
                 Ok(CoreOutcome::Ok)
