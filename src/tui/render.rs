@@ -1,4 +1,5 @@
 use crate::app::ports::WizardStep;
+use crate::app::tab_kind::TabKind;
 use crate::tui::app::{AppState, ListMode};
 use crate::tui::layout;
 use crate::tui::widgets::{detail, list, mcp, modal, status, tabs};
@@ -32,8 +33,6 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
     tabs::render(frame, layout.tabs, &state.tab_names, state.active_tab);
 
     // Content — dispatch by tab kind
-    use crate::tui::app::TabKind;
-
     let is_live = state.is_active_tab_live();
     let active_kind = state
         .tab_kinds
@@ -91,7 +90,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             let list_area = layout.list;
             let detail_area = layout.detail;
             // Build active provider list for checkbox rendering
-            let active_providers: Vec<crate::domain::asset::ProviderEntry> = state
+            let active_providers: Vec<crate::app::snapshot::ProviderEntry> = state
                 .provider_entries
                 .iter()
                 .filter(|p| p.active)

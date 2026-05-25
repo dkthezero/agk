@@ -1,4 +1,4 @@
-use crate::domain::asset::ProviderEntry;
+use crate::app::snapshot::ProviderEntry;
 use crate::domain::mcp::McpTransport;
 use crate::domain::scope::Scope;
 use ratatui::{

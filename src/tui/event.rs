@@ -209,7 +209,7 @@ pub fn handle(
             }
             KeyCode::Delete if state.list_mode == ListMode::Normal => {
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();
-                if active_kind == Some(crate::tui::app::TabKind::Profile) {
+                if active_kind == Some(crate::app::tab_kind::TabKind::Profile) {
                     handle_delete_profile(state, ctx)?;
                 }
             }
@@ -228,9 +228,9 @@ pub fn handle(
                 }
 
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();
-                if active_kind != Some(crate::tui::app::TabKind::Vault) {
+                if active_kind != Some(crate::app::tab_kind::TabKind::Vault) {
                     apply_search_char(state, *c);
-                    if active_kind == Some(crate::tui::app::TabKind::Asset)
+                    if active_kind == Some(crate::app::tab_kind::TabKind::Asset)
                         && is_clawhub_active(ctx)
                         && !state.search_query.is_empty()
                     {
@@ -985,7 +985,7 @@ fn handle_esc(state: &mut AppState) -> Result<ControlFlow> {
             state.esc_pressed_once = true;
             state.status_line = "Press ESC again to quit".to_string();
         }
-    } else if active_kind != Some(crate::tui::app::TabKind::Vault) {
+    } else if active_kind != Some(crate::app::tab_kind::TabKind::Vault) {
         apply_esc(state);
     }
     Ok(ControlFlow::Continue)
@@ -995,13 +995,13 @@ fn handle_backspace(state: &mut AppState) {
     let active_kind = state.tab_kinds.get(state.active_tab).copied();
     if state.is_attach_vault_mode() || state.is_register_mcp_mode() {
         state.prompt_buffer.pop();
-    } else if active_kind == Some(crate::tui::app::TabKind::Profile) {
+    } else if active_kind == Some(crate::app::tab_kind::TabKind::Profile) {
         // MacBook "Delete" key produces Backspace; treat it as profile deletion
         // on the Profile tab when in Normal mode.
         if matches!(state.list_mode, ListMode::Normal) {
             let _ = handle_delete_profile_no_ctx(state);
         }
-    } else if active_kind != Some(crate::tui::app::TabKind::Vault) {
+    } else if active_kind != Some(crate::app::tab_kind::TabKind::Vault) {
         state.search_query.pop();
         if state.search_query.is_empty() {
             state.list_mode = ListMode::Normal;
@@ -1017,10 +1017,10 @@ fn handle_backspace(state: &mut AppState) {
 fn handle_space(state: &mut AppState, ctx: &EventContext) -> Result<()> {
     let active_kind = state.tab_kinds.get(state.active_tab).cloned();
     match active_kind {
-        Some(crate::tui::app::TabKind::Provider) => handle_space_provider(state, ctx),
-        Some(crate::tui::app::TabKind::Vault) => handle_space_vault(state, ctx),
-        Some(crate::tui::app::TabKind::Mcp) => handle_space_mcp(state, ctx),
-        Some(crate::tui::app::TabKind::Asset) => {
+        Some(crate::app::tab_kind::TabKind::Provider) => handle_space_provider(state, ctx),
+        Some(crate::app::tab_kind::TabKind::Vault) => handle_space_vault(state, ctx),
+        Some(crate::app::tab_kind::TabKind::Mcp) => handle_space_mcp(state, ctx),
+        Some(crate::app::tab_kind::TabKind::Asset) => {
             if !state.active_scope_has_provider() {
                 let providers_idx = state
                     .tab_names
@@ -1544,8 +1544,8 @@ fn handle_enter(state: &mut AppState, ctx: &EventContext) -> Result<()> {
         .tab_kinds
         .get(state.active_tab)
         .cloned()
-        .unwrap_or(crate::tui::app::TabKind::Asset);
-    if active_kind != crate::tui::app::TabKind::Asset {
+        .unwrap_or(crate::app::tab_kind::TabKind::Asset);
+    if active_kind != crate::app::tab_kind::TabKind::Asset {
         state.status_line = "Update only applies to Skills/Instructions tabs".to_string();
     } else if !state.active_scope_has_provider() {
         let providers_idx = state
@@ -1904,9 +1904,9 @@ fn handle_open_location(
         .tab_kinds
         .get(state.active_tab)
         .copied()
-        .unwrap_or(crate::tui::app::TabKind::Asset);
+        .unwrap_or(crate::app::tab_kind::TabKind::Asset);
 
-    if active_kind != crate::tui::app::TabKind::Asset {
+    if active_kind != crate::app::tab_kind::TabKind::Asset {
         state.status_line = "Ctrl+O/T only works in Skills/Instructions tab".to_string();
         return Ok(());
     }
@@ -2191,7 +2191,7 @@ mod tests {
                 },
             ],
         );
-        state.tab_kinds = vec![crate::tui::app::TabKind::Asset];
+        state.tab_kinds = vec![crate::app::tab_kind::TabKind::Asset];
 
         let (tx, _) = tokio::sync::mpsc::unbounded_channel();
         let registry = Arc::new(crate::app::registry::Registry::new());
@@ -2298,14 +2298,14 @@ mod tests {
     fn toggle_provider_shows_confirm_popup_when_last_provider_has_assets() {
         let mut state = empty_state(5);
         state.tab_kinds = vec![
-            crate::tui::app::TabKind::Asset,    // Skills
-            crate::tui::app::TabKind::Mcp,      // MCP
-            crate::tui::app::TabKind::Asset,    // Instructions
-            crate::tui::app::TabKind::Provider, // Providers
-            crate::tui::app::TabKind::Vault,    // Vaults
+            crate::app::tab_kind::TabKind::Asset,    // Skills
+            crate::app::tab_kind::TabKind::Mcp,      // MCP
+            crate::app::tab_kind::TabKind::Asset,    // Instructions
+            crate::app::tab_kind::TabKind::Provider, // Providers
+            crate::app::tab_kind::TabKind::Vault,    // Vaults
         ];
         state.active_tab = 3; // Providers tab
-        state.provider_entries = vec![crate::domain::asset::ProviderEntry {
+        state.provider_entries = vec![crate::app::snapshot::ProviderEntry {
             id: "fake".to_string(),
             name: "Fake".to_string(),
             active: true,
@@ -2370,7 +2370,7 @@ mod tests {
             include_evals: false,
         };
         state.packages.insert(0, vec![pkg.clone()]);
-        state.tab_kinds = vec![crate::tui::app::TabKind::Asset];
+        state.tab_kinds = vec![crate::app::tab_kind::TabKind::Asset];
         state.active_tab = 0;
         state.selected_index = 0;
 
