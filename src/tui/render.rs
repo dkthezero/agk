@@ -1,3 +1,4 @@
+use crate::app::ports::WizardStep;
 use crate::tui::app::{AppState, ListMode};
 use crate::tui::layout;
 use crate::tui::widgets::{detail, list, mcp, modal, status, tabs};
@@ -134,6 +135,20 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
             | ListMode::ConfirmDeleteProfile
     ) {
         ""
+    } else if state.is_profile_wizard_mode() {
+        if let Some(ref ws) = state.wizard_state {
+            match ws.steps.get(ws.step_index) {
+                Some(crate::app::ports::WizardStep::Checklist { .. }) => {
+                    "[Space] Toggle  [Enter] Confirm  [Esc] Back"
+                }
+                Some(crate::app::ports::WizardStep::Review { .. }) => {
+                    "[Enter] Confirm Create  [Esc] Back"
+                }
+                _ => "[Enter] Confirm  [Esc] Cancel",
+            }
+        } else {
+            ""
+        }
     } else {
         match active_kind {
             TabKind::Asset => {
@@ -186,6 +201,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Enter local path or GitHub URL:",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::AttachVaultBranch => {
@@ -194,6 +210,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Branch (default: main):",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::AttachVaultPath => {
@@ -202,13 +219,26 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Attach Vault",
                 "Subfolder (default: skills/):",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::AttachVaultName => {
-            modal::render_input_modal(frame, "Attach Vault", "Vault name:", &state.prompt_buffer);
+            modal::render_input_modal(
+                frame,
+                "Attach Vault",
+                "Vault name:",
+                &state.prompt_buffer,
+                state.prompt_buffer.len(),
+            );
         }
         ListMode::RegisterMcpStepName => {
-            modal::render_input_modal(frame, "Register MCP Server", "Name:", &state.prompt_buffer);
+            modal::render_input_modal(
+                frame,
+                "Register MCP Server",
+                "Name:",
+                &state.prompt_buffer,
+                state.prompt_buffer.len(),
+            );
         }
         ListMode::RegisterMcpStepCommand => {
             modal::render_input_modal(
@@ -216,6 +246,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Command to run (e.g. npx, python):",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::RegisterMcpStepArgs => {
@@ -224,6 +255,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Arguments (space-separated, optional):",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::RegisterMcpStepTransport => {
@@ -232,6 +264,7 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Transport (stdio/sse), default stdio:",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
         ListMode::RegisterMcpStepDescription => {
@@ -240,15 +273,60 @@ pub fn draw(frame: &mut Frame, state: &AppState) {
                 "Register MCP Server",
                 "Description (optional):",
                 &state.prompt_buffer,
+                state.prompt_buffer.len(),
             );
         }
-        ListMode::ProfileWizardName => {
-            modal::render_input_modal(
-                frame,
-                "Add Profile",
-                "Profile name (e.g. opencode-dev):",
-                &state.prompt_buffer,
-            );
+        ListMode::ProfileWizard => {
+            if let Some(ref ws) = state.wizard_state {
+                let idx = ws.step_index;
+                if let Some(step) = ws.steps.get(idx) {
+                    match step {
+                        WizardStep::TextInput { title, placeholder } => {
+                            modal::render_input_modal(
+                                frame,
+                                title,
+                                placeholder,
+                                &ws.prompt_buffer,
+                                ws.cursor_pos,
+                            );
+                        }
+                        WizardStep::QuestionAnswer {
+                            question,
+                            placeholder,
+                        } => {
+                            modal::render_input_modal(
+                                frame,
+                                question,
+                                placeholder,
+                                &ws.prompt_buffer,
+                                ws.cursor_pos,
+                            );
+                        }
+                        WizardStep::Checklist { title, options } => {
+                            modal::render_checklist_modal(
+                                frame,
+                                title,
+                                options,
+                                &ws.checked,
+                                ws.selected,
+                            );
+                        }
+                        WizardStep::Review { title } => {
+                            let desc = ws.composed_description();
+                            modal::render_review_modal(
+                                frame,
+                                title,
+                                &ws.name,
+                                &desc,
+                                &ws.skills,
+                                &ws.mcps,
+                                "[Enter] Confirm Create  [Esc] Back",
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
         ListMode::ConfirmMcpTest => {
             let msg = format!(

@@ -12,15 +12,30 @@ The AGK TUI gains a new tab **Profiles** rendered at position `[5]` (between `[4
 
 - **Navigation:** `[5]` key switches to Profiles tab.
 - **List existing profiles:** Displays profiles stored in the active scope config (Workspace or Global).
-- **F2 — Add new profile:** Opens a multi-step modal:
-  1. **Profile name** — alphanumeric with hyphens (e.g. `opencode-dev`).
-  2. **Select agent CLI** — Choose from providers that implement `ProfileProvider`. Initially only OpenCode.
-  3. **Select skills** — Reusable checklist of available skills across all active vaults.
-  4. **Select MCPs** — Checklist of registered MCP servers.
-  5. **Run `opencode agent create`** — Invoke the OpenCode CLI to generate an agent markdown file. The generated file is moved into `.agk/profiles/<profile_name>/agent.md`.
-- **Delete profile:** `Delete` key on selected profile removes it from config and deletes its `.agk/profiles/` subdirectory.
+- **F2 — Add new profile:** Opens a provider-specific multi-step modal wizard.
 
-### CLI Launch
+#### Profile Creation Wizard (OpenCode Provider)
+
+The wizard is **owned by the provider** — each `ProfileProvider` implementation declares its own step sequence via a `Vec<WizardStep>` stack. This lets future providers (Gemini, Claude Code, etc.) define entirely different on-boarding flows.
+
+OpenCode provider steps (current default):
+
+1. **Profile name** — Enter a unique alphanumeric name with hyphens.
+2. **Tailor the agent** (Q&A loop) — Answer a short questionnaire so the final agent description matches the user's actual need. Each question is shown one at a time:
+   - *What is the primary task this agent should handle?*
+   - *What tone or style should the agent use?*
+   - *Are there any specific constraints or rules?*
+   Answers are accumulated and later joined into a single `--description` string passed to `opencode agent create`.
+3. **Select skills** — Scrollable checklist of all available skills across active vaults (`Space` toggles, `Enter` confirms).
+4. **Select MCP servers** — Scrollable checklist of registered MCP servers.
+5. **Review & confirm** — Read-only overview pane showing: profile name, generated description, selected skills count, selected MCPs count. `Enter` proceeds; `Esc` goes back to step 4.
+6. **Interactive agent creation** — AGK suspends its TUI, yields the terminal to `opencode agent create`, waits for the user to finish the interactive OpenCode wizard, then resumes AGK. The resulting agent markdown is moved to `.agk/profiles/<profile_name>/agent.md`.
+
+- **Delete profile:** `Delete` key on selected profile opens a confirmation modal, then removes it from config and deletes its `.agk/profiles/` subdirectory.
+
+### CLI Commands
+
+#### Launch a profile session
 
 ```
 agk p <profile_name>
@@ -41,6 +56,36 @@ agk p <profile_name>
 5. **Block until exit**.
 6. **Cleanup** — Remove session agent file, revert `opencode.json` changes, delete `opencode.json` if empty, prune `.opencode/` if empty.
 
+#### Create a profile headlessly
+
+```
+agk profile create <name> \
+  --provider opencode \
+  --skills skill1,skill2 \
+  --mcps mcp1,mcp2 \
+  --description "A Rust coding assistant" \
+  --scope workspace
+```
+
+**Args:**
+
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--provider` | `-p` | Provider ID (only `opencode` supported in v1) | `opencode` |
+| `--skills` | `-s` | Comma-separated list of skill names to bundle | (empty) |
+| `--mcps` | `-m` | Comma-separated list of MCP server names to enable | (empty) |
+| `--description` | `-d` | Raw description string passed to `opencode agent create` | (none) |
+| `--description-file` | | Path to a markdown file whose contents are used as description | (none) |
+| `--scope` | | `global` or `workspace` | `workspace` |
+
+**Flow:**
+
+1. Validate the provider is active and supports profiles.
+2. Ensure no duplicate profile name exists in the chosen scope.
+3. Write the new profile entry to `config.toml`.
+4. Run `opencode agent create --name <name> --description <desc>` headlessly.
+5. On success, copy the generated `.opencode/agents/<name>.md` → `.agk/profiles/<name>/agent.md`.
+
 ### Scope
 
 Profiles obey the existing scoped-config system:
@@ -59,10 +104,11 @@ Profiles obey the existing scoped-config system:
 7. If `.opencode/` has no remaining user files after cleanup, it may be removed.
 8. Concurrent sessions of the same profile shall be supported via unique session suffixes.
 9. If any step of session setup fails, the partial changes shall be rolled back before reporting the error.
+10. **Wizard extensibility:** The profile creation wizard shall be a stack of `WizardStep` values produced by the active `ProfileProvider`. New providers can inject their own steps (e.g. API-key prompts, model selection) without modifying `ListMode` or TUI dispatch code.
+11. **Q&A description:** The tailor step shall concatenate question+answer pairs into a single description string. This string is passed as `--description` to `opencode agent create` so the generated agent markdown reflects the user's intent.
 
 ## Out of Scope (Future)
 
-- Support for agent CLIs other than OpenCode (Gemini, Claude Code, etc.) — the `ProfileProvider` trait is designed to support this, but only OpenCode is implemented in v1.
 - Editing an existing profile after creation (users can delete and recreate).
 - Profile import/export.
 

@@ -244,6 +244,7 @@ mod tests {
             _pkg: &ScannedPackage,
             _scope: Scope,
             _config: Option<&crate::domain::config::ConfigFile>,
+            _include_evals: bool,
         ) -> Result<()> {
             Ok(())
         }
@@ -270,6 +271,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         }
     }
 

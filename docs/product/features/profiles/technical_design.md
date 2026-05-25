@@ -2,11 +2,12 @@
 
 ## Architecture
 
-Profiles introduce two new pieces to the existing hexagonal architecture:
+Profiles introduce three new pieces to the existing hexagonal architecture:
 
-1. **`Profile` domain model** — pure data, lives in `domain/profile.rs`.
+1. **`Profile` domain model** — pure data, lives in `domain/config.rs`.
 2. **`ProfileProvider` port trait** — provider-specific implementation for how to set up, launch, and tear down a profile session. Lives in `app/ports.rs`.
-3. **`OpenCodeProfileProvider`** — concrete implementation in `infra/provider/opencode.rs` (extends existing `OpenCodeProvider`).
+3. **Extensible profile wizard** — a `Vec<WizardStep>` stack owned by the `ProfileProvider`. Each provider defines its own step sequence so the TUI stays generic.
+4. **`OpenCodeProfileProvider`** — concrete implementation in `infra/provider/opencode.rs` (extends existing `OpenCodeProvider`).
 
 Everything else is TUI/CLI wiring using existing patterns.
 
@@ -35,33 +36,111 @@ pub profiles: Vec<Profile>,
 
 This serializes as `[[profiles]]` array-of-tables in TOML. The base agent markdown is located at a fixed path relative to the profile name (`.agk/profiles/<name>/agent.md`) so it is **not** stored in the config struct.
 
-## Port Trait: `ProfileProvider`
+## Port Extensions
+
+### `ProfileProvider` trait (session lifecycle)
+
+Already implemented in `app/ports.rs`:
 
 ```rust
-pub trait ProfileProvider: Send + Sync {
+pub trait ProviderPort: Send + Sync {
+    ...
     fn supports_profiles(&self) -> bool;
-
-    /// Prepare the workspace for a profile session.
-    /// Returns a `ProfileSession` handle that can be used for cleanup.
-    fn start_session(
+    fn start_profile_session(
         &self,
         profile: &Profile,
         session_key: &str,
         workspace_root: &Path,
     ) -> Result<ProfileSession>;
 }
+```
 
-pub struct ProfileSession {
-    pub process: std::process::Child,
-    pub cleanup: Box<dyn FnOnce() -> Result<()> + Send>,
+### `ProviderPort` extension for wizard stepsnn`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
+
+```rust
+/// Steps that a provider wants the user to walk through when creating a profile.
+```
+
+```
+
+### `WizardStep` enum (TUI-generic)
+
+```rust
+#[derive(Clone, Debug, PartialEq)]
+pub enum WizardStep {
+    TextInput {
+        title: String,
+        placeholder: String,
+    },
+    QuestionAnswer {
+        question: String,
+        placeholder: String,
+    },
+    Checklist {
+        title: String,
+        options: Vec<String>,
+    },
+    Review {
+        title: String,
+    },
+    Interactive {
+        title: String,
+        command: String,
+        args: Vec<String>,
+    },
 }
 ```
 
-**Why a trait?** Each agent CLI has different config files, directory layouts, and launch commands. OpenCode uses `.opencode/agents/` and `opencode.json`; Gemini CLI might use `.gemini/agents/` and `gemini.json`. The trait keeps provider-specific logic out of the app layer.
+The `WizardStep` values are **static descriptions** (what to show). Mutable state (cursor position, checked items, typed buffer) lives in `WizardState` inside `AppState`, indexed by `step_index`.
+
+### `WizardState` (AppState field)
+
+```rust
+pub struct WizardState {
+    pub steps: Vec<WizardStep>,
+    pub step_index: usize,
+    /// Shared accumulator across steps.
+    pub name: String,
+    pub description_parts: Vec<(String, String)>, // (question, answer)
+    pub skills: Vec<String>,
+    pub mcps: Vec<String>,
+    pub skill_options: Vec<String>,
+    pub mcp_options: Vec<String>,
+    /// UI state for the current step.
+    pub prompt_buffer: String,
+    checked: Vec<bool>,
+    selected: usize,
+}
+```
+
+### Description composition
+
+After the Q&A loop, the TUI joins every `(question, answer)` pair into a single string:
+
+```text
+Q: What is the primary task?
+A: Write Rust CLI tools.
+
+Q: What tone should it use?
+A: Concise, professional.
+```
+
+This exact string becomes `--description` for `opencode agent create`.
 
 ## OpenCode Provider Extension
 
-`OpenCodeProvider` already implements `ProviderPort` and `McpProvider`. We add `ProfileProvider`.
+`OpenCodeProvider` implements `ProviderPort`, `McpProvider`, and `ProfileWizard`.
+
+### Wizard steps returned by `OpenCodeProvider::wizard_steps()`
+
+1. `TextInput { title: "Profile name", placeholder: "my-agent", min_length: 1 }`
+2. `QuestionAnswer { question: "What is the primary task this agent should handle?", placeholder: "e.g. Write Rust CLI tools" }`
+3. `QuestionAnswer { question: "What tone or style should the agent use?", placeholder: "e.g. Concise, professional" }`
+4. `QuestionAnswer { question: "Are there any specific constraints or rules?", placeholder: "e.g. Always run cargo fmt" }`
+5. `Checklist { title: "Select Skills", options: ... }` — populated from active vault scan.
+6. `Checklist { title: "Select MCP Servers", options: ... }` — populated from `McpRegistry`.
+7. `Review { title: "Review & Confirm" }`
+8. `Interactive { title: "Create Agent", command: "opencode", args: vec!["agent","create",...] }`
 
 ### Session Setup
 
@@ -95,60 +174,92 @@ Spawn `opencode` in the workspace root (it auto-discovers the new primary agent)
 
 ### `TabKind` extension
 
+Already implemented:
+
 ```rust
 pub enum TabKind {
-    Asset,      // Skills / Instructions
+    Asset,
     Vault,
     Provider,
     Mcp,
     Analytics,
-    Profile,    // NEW
+    Profile,
 }
 ```
 
-### `AppState` extension
+### `ListMode` simplification
+
+**Old (hard-coded per step):**
 
 ```rust
-pub profile_entries: Vec<Profile>,
+ProfileWizardName,
+ProfileWizardDescription,
+ProfileWizardSelectSkills { ... },
+ProfileWizardSelectMcps { ... },
+ProfileWizardConfirmCreate,
 ```
 
-### `bootstrap.rs` extension
-
-Register a new `StubFeatureSet` for "profiles" → `TabKind::Profile`, inserted at data index 4 (rendered as `[5]`). This follows the exact pattern used for MCP, Providers, and Vaults.
+**New (single variant + stack):**
 
 ```rust
-registry.register_feature_set(Box::new(StubFeatureSet::new("profile", "Profiles", "")));
+ProfileWizard,
+```
+
+All sub-step behaviour is delegated to `state.wizard_state.step_index` and `state.wizard_state.steps[current]`.
+
+### `AppState` extension
+
+Replace the five old `pending_profile_*` fields with one `wizard_state: Option<WizardState>`.
+
+```rust
+pub wizard_state: Option<WizardState>,
 ```
 
 ### Render dispatch (`tui/render.rs`)
 
-Add `TabKind::Profile` arm:
-- Left list: profile names from `state.profile_entries`.
-- Right detail: profile details (provider, skills, MCPs).
-- Footer keybinds: `[↑/↓] Move  [F2] Add Profile  [Delete] Remove  [Esc]x2 Quit`
+When `list_mode == ListMode::ProfileWizard`:
 
-If `list_mode` is in profile creation substates, show the appropriate input modals.
+```rust
+if let Some(ref ws) = state.wizard_state {
+    let step = &ws.steps[ws.step_index];
+    match step {
+        WizardStep::TextInput { title, .. } => render_text_input_modal(...),
+        WizardStep::QuestionAnswer { question, .. } => render_text_input_modal(...),
+        WizardStep::Checklist { title, .. } => render_checklist_modal(...),
+        WizardStep::Review { .. } => render_review_modal(...),
+        _ => {}
+    }
+}
+```
 
 ### Event handling (`tui/event.rs`)
 
-Add `ListMode` variants for profile creation wizards:
+When `list_mode == ListMode::ProfileWizard`:
 
 ```rust
-ProfileWizardName,
-ProfileWizardSelectSkills,
-ProfileWizardSelectMcps,
-ProfileWizardConfirmCreate,
+if let Some(ref mut ws) = state.wizard_state {
+    match ws.steps[ws.step_index] {
+        WizardStep::TextInput { .. } | WizardStep::QuestionAnswer { .. } => {
+            handle_text_input(state, ctx, key_code)?
+        }
+        WizardStep::Checklist { .. } => handle_checklist(state, ctx, key_code)?,
+        WizardStep::Review { .. } => handle_review(state, ctx, key_code)?,
+        WizardStep::Interactive { .. } => handle_interactive(state, ctx, key_code)?,
+    }
+}
 ```
 
-Handle `F2` on Profile tab to start wizard. Handle `Delete` to show confirm-remove modal.
+`Esc` decrements `step_index` if > 0; if == 0, cancels wizard and clears `wizard_state`.
 
-**Skill/MCP selection UI:** Reuse existing list rendering but in modal form. Because AGK already has list + detail panes, the simplest modal is a full-screen overlay: a scrollable checklist with `[Space]` to toggle items and `[Enter]` to confirm.
+`Enter` either:
+- stores the typed buffer into the correct `WizardState` accumulator field, then increments `step_index`;
+- or, on the last step (Interactive), emits `AppEvent::RunInteractiveProcess`.
 
-### Profile creation wizard
+### Profile creation wizard flow
 
-Because `opencode agent create` is an interactive TUI command, we **cannot** embed it inside the AGK TUI directly (nested TUIs break terminal state). The wizard therefore works like this:
+Because `opencode agent create` is an interactive TUI command, we **cannot** embed it inside the AGK TUI directly (nested TUIs break terminal state). The last `WizardStep::Interactive` therefore works like this:
 
-1. AGK TUI quits to alternate screen.
+1. AGK TUI saves `wizard_state` data, then suspends its TUI (leave alternate screen).
 2. AGK runs `opencode agent create` as a child process, letting it take over the terminal.
 3. After `opencode` finishes, AGK TUI re-initializes (`enable_raw_mode`, `EnterAlternateScreen`).
 4. AGK locates the newly created `.opencode/agents/*.md` file, moves it to `.agk/profiles/<name>/agent.md`, and updates `config.toml`.
@@ -157,81 +268,63 @@ This is analogous to how `opencode agent create` is already used standalone.
 
 ## CLI Integration
 
-### `cli/entry.rs`
-
-Add subcommand:
-
-```rust
-/// Launch a profile session
-Profile {
-    #[command(subcommand)]
-    command: ProfileCommands,
-}
-```
+### Profile subcommand tree (clap)
 
 ```rust
 pub enum ProfileCommands {
-    /// Start a profile session
-    Start {
-        /// Profile name
+    Start { name: String },
+    Create {
         name: String,
+        provider: String,
+        skills: Vec<String>,
+        mcps: Vec<String>,
+        description: Option<String>,
+        description_file: Option<String>,
+        scope: ScopeArg,
     },
 }
 ```
 
-Add alias: `agk p <name>` → `agk profile start <name>` at the parser level (clap alias).
+### `profile start`
 
-### `cli/commands.rs`
+Already implemented. Loads profile, delegates session setup to `ProviderPort::start_profile_session`, blocks on child process, then runs cleanup.
 
-Add handler:
+### `profile create`
 
-```rust
-pub fn run_profile_start(name: &str, workspace: &Path) -> Result<i32> {
-    let (registry, _scan, store) = bootstrap::build(workspace)?;
-    let config = store.load(Scope::Workspace)?;
-    let profile = config.profiles.get(name)
-        .or_else(|| store.load(Scope::Global).ok()?.profiles.get(name))
-        .ok_or_else(|| anyhow!("Profile '{}' not found", name))?;
+Headless creation for providers that support it. OpenCode v1 flow:
 
-    let provider = registry.providers.iter()
-        .find(|p| p.id() == profile.provider_id)
-        .and_then(|p| p.as_profile_provider())
-        .ok_or_else(|| anyhow!("Provider '{}' does not support profiles", profile.provider_id))?;
+1. **Validate** — Provider must be registered and return `supports_profiles() == true`.
+2. **Check uniqueness** — `config.find_profile(name)` must be `None` in the target scope.
+3. **Write config** — Push a new `Profile` with provided `skills`, `mcps`, `provider_id` into `ConfigFile` and save.
+4. **Generate agent** — Spawn `opencode agent create --name <name> --description <desc> --mode primary` and wait for exit.
+5. **Relocate markdown** — Scan `.opencode/agents/` for the newest `.md` file (in case exact filename differs), copy it to `.agk/profiles/<name>/agent.md`.
+6. **Report** — Print the destination path on success; print a warning if the markdown file wasn't found.
 
-    let session_key = format!("{:06}", rand::random::<u32>() % 1_000_000);
-    let mut session = provider.start_session(profile, &session_key, workspace)?;
+**Error handling:**
+- Duplicate profile name → bail before any side effects.
+- Provider not active / no profile support → bail before config write.
+- `opencode agent create` exits non-zero → print stderr and return `EXIT_GENERAL_FAILURE`.
+- Generated markdown missing → warn but don't fail (profile config is already persisted).
 
-    let exit_status = session.process.wait()?;
+## Files to Modify
 
-    (session.cleanup)()?;
+### Core changes for this refactor
 
-    Ok(if exit_status.success() { 0 } else { 1 })
-}
-```
-
-## Files to Modify / Add
-
-### New files
-
-- `src/domain/profile.rs` — `Profile`, `ProfileConfig`, `ProfilesBucket`
-- `docs/product/features/profiles/prd.md` — this PRD
-- `docs/product/features/profiles/technical_design.md` — this document
-
-### Modified files
-
-- `src/domain/config.rs` — add `profiles` field to `ConfigFile`
-- `src/domain/mod.rs` — re-export `profile`
-- `src/app/ports.rs` — add `ProfileProvider` trait; add `as_profile_provider()` to `ProviderPort` or keep as separate trait
-- `src/app/registry.rs` — add `get_profile_provider()` helper
-- `src/app/bootstrap.rs` — register `StubFeatureSet` for profiles
-- `src/infra/provider/opencode.rs` — implement `ProfileProvider`
-- `src/infra/provider/mod.rs` — export profile provider helpers
-- `src/tui/app.rs` — add `TabKind::Profile`, `profile_entries`, `ProfileWizard*` list modes
-- `src/tui/render.rs` — render Profile tab and wizard modals
-- `src/tui/event.rs` — handle Profile tab keys and wizard input
-- `src/tui/widgets/mod.rs` — add profile list/detail widgets (or reuse existing list/detail)
-- `src/cli/entry.rs` — add `Profile` subcommand with `Start`
-- `src/cli/commands.rs` — add `run_profile_start`
+- `src/tui/app.rs`
+  - Replace `ListMode` hard-coded variants with `ProfileWizard`.
+  - Replace old `pending_profile_*` fields with `wizard_state: Option<WizardState>`.
+- `src/tui/event.rs`
+  - Replace `handle_profile_wizard_input` hard-coded match with `WizardState` dispatch.
+- `src/tui/render.rs`
+  - Replace profile wizard render branches with `WizardState` dispatch.
+- `src/app/ports.rs`
+  - Add `ProfileWizard` trait, `WizardStep` enum, `WizardState` struct.
+  - Add `as_profile_wizard()` to `ProviderPort`.
+- `src/infra/provider/opencode.rs`
+  - Implement `ProfileWizard` for `OpenCodeProvider`.
+  - Return the 8-step wizard sequence.
+- `docs/product/features/profiles/technical_design.md`
+  - This document.
 
 ## Testing Strategy
 
@@ -239,6 +332,7 @@ pub fn run_profile_start(name: &str, workspace: &Path) -> Result<i32> {
    - `Profile` serialization round-trip in `config.rs`.
    - `OpenCodeProfileProvider` computes correct `opencode.json` merge/diff.
    - Session cleanup restores original `opencode.json` state exactly.
+   - `WizardState` step navigation (next/back/cancel).
 
 2. **Integration tests:**
    - `agk p test-profile` with a fake `opencode` binary that exits immediately.
@@ -247,19 +341,12 @@ pub fn run_profile_start(name: &str, workspace: &Path) -> Result<i32> {
 
 3. **Manual tests:**
    - TUI `[5] Profiles` tab renders.
-   - F2 wizard prompts name, lists skills/MCPs, invokes `opencode agent create`.
+   - F2 wizard prompts name, Q&A, skills, MCPs, review, then invokes `opencode agent create`.
    - Launch and exit a real OpenCode session; verify cleanup.
-
-## Rollout Plan
-
-1. Merge domain + infra changes (OpenCode profile provider).
-2. Merge TUI tab rendering + event handling.
-3. Merge CLI `agk p` command.
-4. Add tests and docs.
-5. Final review and merge to master.
 
 ## Notes
 
+- `WizardStep` is `Clone + PartialEq` so `AppState` can stay `Clone` if needed. It intentionally carries no mutable UI state — that lives in `WizardState`.
 - The random 6-digit suffix is intentionally simple (not a UUID) because it only needs to be unique within the current workspace for a single session.
-- `opencode.json` is JSON, not JSONC, during profile manipulation; we use `serde_json` directly and preserve any existing JSONC comments via a round-trip parse → strip-comments → modify → write. The existing `strip_jsonc_comments` helper in `opencode.rs` can be extracted to a shared utility if needed.
+- `opencode.json` is JSON, not JSONC, during profile manipulation; we use `serde_json` directly and preserve any existing JSONC comments via a round-trip parse → strip-comments → modify → write.
 - MCP server definitions are read from `McpRegistry` (global), but their enabled state is written into the workspace `opencode.json` by the provider's `ProfileProvider` implementation.

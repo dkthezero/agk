@@ -59,6 +59,10 @@ pub enum Commands {
         /// Limit to a specific provider
         #[arg(short, long)]
         provider: Option<String>,
+
+        /// Include the `evals/` subfolder in the installation
+        #[arg(long)]
+        evals: bool,
     },
 
     /// Validate installed assets against source vaults
@@ -94,11 +98,50 @@ pub enum Commands {
         command: TelemetryCommands,
     },
 
-    /// Launch a profile session
+    /// Manage profiles
     #[command(visible_alias = "p")]
     Profile {
+        #[command(subcommand)]
+        command: ProfileCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProfileCommands {
+    /// Start (launch) a profile session
+    Start {
         /// Profile name
         name: String,
+    },
+
+    /// Create a new profile headlessly and generate the agent file
+    Create {
+        /// Profile name
+        name: String,
+
+        /// Provider to use (default: opencode)
+        #[arg(short, long, default_value = "opencode")]
+        provider: String,
+
+        /// Comma-separated list of skill names to include
+        #[arg(short, long, value_delimiter = ',')]
+        skills: Vec<String>,
+
+        /// Comma-separated list of MCP server names to enable
+        #[arg(short = 'm', long, value_delimiter = ',')]
+        mcps: Vec<String>,
+
+        /// Agent description (can be a path to a markdown file, or raw text)
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Read description from a markdown file
+        #[arg(long)]
+        description_file: Option<String>,
+
+        /// Scope for storing the profile config
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
     },
 }
 
@@ -213,7 +256,7 @@ pub enum ScopeArg {
 }
 
 impl ScopeArg {
-    pub fn to_domain_scope(&self) -> crate::domain::scope::Scope {
+    pub fn into_domain_scope(self) -> crate::domain::scope::Scope {
         match self {
             ScopeArg::Global => crate::domain::scope::Scope::Global,
             ScopeArg::Workspace => crate::domain::scope::Scope::Workspace,

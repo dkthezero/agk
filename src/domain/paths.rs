@@ -139,11 +139,13 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
 
 /// Escape a string for embedding inside a cmd.exe `"..."` block.
 /// Replaces each `"` with `\"`, then wraps in `"\"...\""` style.
+#[allow(dead_code)]
 fn escape_cmd_arg(s: &str) -> String {
     s.replace('"', "\"")
 }
 
 /// Minimal shell-escape for paths inside `sh -lc 'cd "..." && exec $SHELL'`.
+#[allow(dead_code)]
 fn shell_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
