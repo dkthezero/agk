@@ -10,7 +10,7 @@ pub enum AssetKind {
 }
 
 /// Metadata from ClawHub for remote packages.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct RemoteMetadata {
     pub owner: String,
     pub summary: String,
@@ -18,7 +18,7 @@ pub struct RemoteMetadata {
     pub stars: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScannedPackage {
     pub identity: AssetIdentity,
     pub path: PathBuf,

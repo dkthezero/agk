@@ -3,7 +3,7 @@
 /// data (counts, display strings) rather than pure domain identity.
 
 /// Display-only struct for the Vaults tab.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VaultEntry {
     pub id: String,
     pub kind: String,
@@ -29,7 +29,7 @@ impl VaultEntry {
 }
 
 /// Display-only struct for the Providers tab.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProviderEntry {
     pub id: String,
     pub name: String,
@@ -37,7 +37,7 @@ pub struct ProviderEntry {
 }
 
 /// Display-only struct for the Profiles tab.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProfileEntry {
     pub name: String,
     pub provider_id: String,

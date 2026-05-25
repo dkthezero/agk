@@ -4,6 +4,7 @@ pub(crate) mod hashing;
 pub(crate) mod identity;
 pub(crate) mod mcp;
 pub(crate) mod paths;
+pub(crate) mod profile;
 pub(crate) mod scope;
 pub(crate) mod telemetry;
 pub(crate) mod validation;
