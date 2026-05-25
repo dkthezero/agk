@@ -99,6 +99,7 @@ pub fn cli_search(query: &str) -> Result<Vec<ScannedPackage>> {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         });
     }
     Ok(packages)

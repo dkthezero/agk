@@ -14,6 +14,7 @@ use futures::StreamExt;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::collections::HashMap;
 use std::io;
+use std::io::Write;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -294,6 +295,124 @@ where
                         });
                     }
                 });
+            }
+            tui::event::AppEvent::RunInteractiveProcess {
+                command,
+                args,
+                current_dir,
+                profile_name,
+            } => {
+                // Pause TUI and run the command directly in the current terminal.
+                // This is synchronous in the event loop – no async races – so
+                // keystrokes are never dropped the way they are when spawning a
+                // background child with concurrent event processing.
+                let mut out = io::stdout();
+                let _ = crossterm::execute!(out, LeaveAlternateScreen);
+                let _ = out.flush();
+                let _ = terminal.show_cursor();
+                let _ = disable_raw_mode();
+
+                let status = std::process::Command::new(&command)
+                    .current_dir(&current_dir)
+                    .args(&args)
+                    .stdin(std::process::Stdio::inherit())
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status();
+
+                let _ = enable_raw_mode();
+
+                // Drain any crossterm events buffered while the child had stdin
+                while let Ok(tui::event::AppEvent::Input(_)) = rx.try_recv() {}
+
+                let _ = crossterm::execute!(out, EnterAlternateScreen);
+                let _ = out.flush();
+                let _ = terminal.hide_cursor();
+
+                // Force a full clear/redraw now that we're back in the alternate screen
+                let _ = terminal.clear();
+
+                match &status {
+                    Ok(s) if s.success() => {
+                        state.status_line = format!("Finished: {} {}", command, args.join(" "));
+                    }
+                    Ok(s) => {
+                        state.status_line = format!(
+                            "'{}' exited with status {}",
+                            command,
+                            s.code().unwrap_or(-1)
+                        );
+                    }
+                    Err(e) => {
+                        state.status_line = format!("Failed to run '{}': {}", command, e);
+                    }
+                }
+
+                // Move freshly-created agent markdown into .agk/profiles if triggered by wizard
+                if command == "opencode"
+                    && args.iter().any(|a| a == "create")
+                    && profile_name.is_some()
+                {
+                    let name = profile_name.unwrap();
+                    let agents_dir = current_dir.join("agents");
+                    let target_dir: std::path::PathBuf =
+                        current_dir.join(".agk").join("profiles").join(&name);
+
+                    let mut moved = false;
+                    if let Ok(mut entries) = std::fs::read_dir(&agents_dir) {
+                        let now = std::time::SystemTime::now();
+                        let five_secs = std::time::Duration::from_secs(5);
+                        let mut newest: Option<(std::path::PathBuf, std::fs::Metadata)> = None;
+
+                        while let Some(Ok(entry)) = entries.next() {
+                            let path = entry.path();
+                            if let Some("md") = path.extension().and_then(|s| s.to_str()) {
+                                if let Ok(meta) = entry.metadata() {
+                                    if let Ok(modified) = meta.modified() {
+                                        if now.duration_since(modified).unwrap_or(five_secs)
+                                            <= five_secs
+                                        {
+                                            let newer = match &newest {
+                                                None => true,
+                                                Some((_, prev_meta)) => {
+                                                    match prev_meta.modified() {
+                                                        Ok(prev) => modified > prev,
+                                                        Err(_) => true,
+                                                    }
+                                                }
+                                            };
+                                            if newer {
+                                                newest = Some((path, meta));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some((agent_md, _)) = newest {
+                            if let Err(e) = std::fs::create_dir_all(&target_dir) {
+                                state.status_line = format!("Failed to create profile dir: {}", e);
+                            } else {
+                                let dest = target_dir.join("agent.md");
+                                if let Err(e) = std::fs::rename(&agent_md, &dest) {
+                                    state.status_line = format!("Failed to move agent file: {}", e);
+                                } else {
+                                    state.status_line =
+                                        format!("Profile '{}' created successfully", name);
+                                    moved = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if !moved {
+                        state.status_line = format!(
+                            "Profile '{}' created, but no agent.md found in agents/",
+                            name
+                        );
+                    }
+                }
             }
         }
         terminal.draw(|frame| tui::render::draw(frame, state))?;

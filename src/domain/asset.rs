@@ -33,6 +33,9 @@ pub struct ScannedPackage {
     /// Parsed frontmatter metadata for display in detail panels
     pub author: Option<String>,
     pub description: Option<String>,
+    /// When `true`, the `evals` sub-folder is copied during install.
+    /// TUI keeps this `false`; headless CLI sets it via `--evals`.
+    pub include_evals: bool,
 }
 
 /// Display-only struct for the Vaults tab.
@@ -132,6 +135,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         assert_eq!(pkg.identity.name, "my-skill");
         assert_eq!(pkg.vault_id, "workspace");
@@ -150,6 +154,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         assert!(!pkg.is_remote);
     }
@@ -167,6 +172,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         assert!(pkg.is_remote);
     }

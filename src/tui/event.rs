@@ -1,3 +1,4 @@
+use crate::app::ports::WizardStep;
 use crate::tui::app::{AppState, ListMode};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
@@ -37,6 +38,14 @@ pub enum AppEvent {
         task_id: usize,
     },
     Tick,
+    /// Request the main loop to suspend TUI, run a child process inheriting stdio,
+    /// then resume TUI.  The child runs interactively (user can type/respond).
+    RunInteractiveProcess {
+        command: String,
+        args: Vec<String>,
+        current_dir: std::path::PathBuf,
+        profile_name: Option<String>,
+    },
 }
 
 pub struct EventContext {
@@ -145,8 +154,14 @@ pub fn handle(
                 let idx = (*c as usize) - ('1' as usize);
                 apply_tab_switch(state, idx, state.tab_names.len());
             }
+            KeyCode::Up | KeyCode::Down if state.is_profile_wizard_mode() => {
+                handle_profile_wizard_input(state, ctx, &key)?;
+            }
             KeyCode::Up | KeyCode::Down => {
                 handle_navigation(state, &key.code);
+            }
+            KeyCode::Char(' ') if state.is_profile_wizard_mode() => {
+                handle_profile_wizard_input(state, ctx, &key)?;
             }
             KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Enter
                 if state.is_attach_vault_mode()
@@ -158,7 +173,7 @@ pub fn handle(
                 } else if state.is_register_mcp_mode() {
                     handle_register_mcp_input(state, ctx, &key.code)?;
                 } else {
-                    handle_profile_wizard_input(state, ctx, &key.code)?;
+                    handle_profile_wizard_input(state, ctx, &key)?;
                 }
             }
             KeyCode::Esc => {
@@ -654,75 +669,217 @@ fn handle_register_mcp_input(
 fn handle_profile_wizard_input(
     state: &mut AppState,
     ctx: &EventContext,
-    code: &KeyCode,
+    key: &crossterm::event::KeyEvent,
 ) -> Result<()> {
-    match code {
-        KeyCode::Char(c) => {
-            state.prompt_buffer.push(*c);
-        }
-        KeyCode::Backspace => {
-            state.prompt_buffer.pop();
-        }
-        KeyCode::Enter => {
-            let name = std::mem::take(&mut state.prompt_buffer).trim().to_string();
-            if name.is_empty() {
-                state.list_mode = ListMode::Normal;
-                state.status_line = "Cancelled — name required".to_string();
-                return Ok(());
+    let code = &key.code;
+    let ws = match state.wizard_state.as_mut() {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+
+    // If the provider didn't provide steps or we've exhausted them, bail out.
+    if ws.step_index >= ws.steps.len() {
+        state.wizard_state = None;
+        state.list_mode = ListMode::Normal;
+        return Ok(());
+    }
+
+    let current_step = ws.steps[ws.step_index].clone();
+
+    match current_step {
+        WizardStep::TextInput { .. } | WizardStep::QuestionAnswer { .. } => match code {
+            KeyCode::Char(c) => {
+                // On some terminals Shift+Enter is reported as Shift+J (or Shift+j).
+                // Treat it as a newline so users can insert multi-line answers.
+                let is_shift_enter =
+                    matches!(c, 'J' | 'j') && key.modifiers.contains(KeyModifiers::SHIFT);
+                if is_shift_enter {
+                    ws.prompt_buffer.insert(ws.cursor_pos, '\n');
+                    ws.cursor_pos += 1;
+                } else {
+                    ws.prompt_buffer.insert(ws.cursor_pos, *c);
+                    ws.cursor_pos += 1;
+                }
             }
-
-            // Check if profile already exists
-            let config = state.active_config().clone();
-            if config.find_profile(&name).is_some() {
-                state.list_mode = ListMode::Normal;
-                state.status_line = format!("Profile '{}' already exists", name);
-                return Ok(());
+            KeyCode::Backspace => {
+                if ws.cursor_pos > 0 {
+                    ws.cursor_pos -= 1;
+                    ws.prompt_buffer.remove(ws.cursor_pos);
+                }
             }
-
-            // Create new profile with defaults (opencode provider)
-            let mut new_config = config.clone();
-            new_config.profiles.push(crate::domain::config::Profile {
-                name: name.clone(),
-                provider_id: "opencode".to_string(),
-                skills: vec![],
-                mcps: vec![],
-            });
-
-            let scope = state.active_scope;
-            let store = ctx.store.clone();
-            let tx = ctx.tx.clone();
-            let id =
-                crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-            tokio::task::spawn_blocking(move || {
-                let _ = tx.send(AppEvent::TaskStarted {
-                    id,
-                    name: format!("Creating profile '{}'", name),
-                });
-                match store.save(scope, &new_config) {
-                    Ok(()) => {
-                        let _ = tx.send(AppEvent::TriggerReload);
-                        let _ = tx.send(AppEvent::TaskCompleted {
-                            id,
-                            message: format!(
-                                "Profile '{}' created. Run `opencode agent create` to generate agent file.",
-                                name
-                            ),
-                        });
-                    }
-                    Err(e) => {
-                        let _ = tx.send(AppEvent::TaskFailed {
-                            id,
-                            error: format!("Failed to save profile: {}", e),
-                        });
+            KeyCode::Enter => {
+                let val = std::mem::take(&mut ws.prompt_buffer).trim().to_string();
+                if val.is_empty() {
+                    state.status_line = "Cancelled — input required".to_string();
+                    state.wizard_state = None;
+                    state.list_mode = ListMode::Normal;
+                    return Ok(());
+                }
+                // Check profile duplication before storing the name.
+                if let WizardStep::TextInput { .. } = current_step {
+                    let config = state.active_config().clone();
+                    if config.find_profile(&val).is_some() {
+                        state.status_line = format!("Profile '{}' already exists", val);
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        return Ok(());
                     }
                 }
-            });
+                // Re-borrow wizard state to save the collected value.
+                if let Some(ref mut ws) = state.wizard_state {
+                    match current_step {
+                        WizardStep::TextInput { .. } => {
+                            ws.name = val;
+                        }
+                        WizardStep::QuestionAnswer { question, .. } => {
+                            ws.description_parts.push((question, val));
+                        }
+                        _ => {}
+                    }
+                    ws.step_index += 1;
+                    ws.sync_checklist_state();
+                }
+            }
+            KeyCode::Left => {
+                if ws.cursor_pos > 0 {
+                    ws.cursor_pos -= 1;
+                }
+            }
+            KeyCode::Right => {
+                if ws.cursor_pos < ws.prompt_buffer.len() {
+                    ws.cursor_pos += 1;
+                }
+            }
+            KeyCode::Esc => {
+                if ws.step_index > 0 {
+                    ws.step_index -= 1;
+                } else {
+                    state.wizard_state = None;
+                    state.list_mode = ListMode::Normal;
+                    state.status_line = "Cancelled profile creation".to_string();
+                }
+            }
+            _ => {}
+        },
+        WizardStep::Checklist { ref options, .. } => match code {
+            KeyCode::Up => {
+                if ws.selected > 0 {
+                    ws.selected -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if ws.selected + 1 < ws.checked.len() {
+                    ws.selected += 1;
+                }
+            }
+            KeyCode::Char(' ') => {
+                if let Some(c) = ws.checked.get_mut(ws.selected) {
+                    *c = !*c;
+                }
+            }
+            KeyCode::Esc => {
+                if ws.step_index > 0 {
+                    ws.step_index -= 1;
+                    ws.sync_checklist_state();
+                } else {
+                    state.wizard_state = None;
+                    state.list_mode = ListMode::Normal;
+                    state.status_line = "Cancelled profile creation".to_string();
+                }
+            }
+            KeyCode::Enter => {
+                let selected_items: Vec<String> = options
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| ws.checked.get(*i) == Some(&true))
+                    .map(|(_, name)| name.clone())
+                    .collect();
 
-            state.list_mode = ListMode::Normal;
-            state.status_line.clear();
-        }
-        _ => {}
+                // Distinguish skills vs mcps by title prefix
+                if let WizardStep::Checklist { ref title, .. } = current_step {
+                    if title.to_lowercase().contains("skill") {
+                        ws.skills = selected_items;
+                    } else {
+                        ws.mcps = selected_items;
+                    }
+                }
+                ws.step_index += 1;
+                ws.sync_checklist_state();
+            }
+            _ => {}
+        },
+        WizardStep::Review { .. } => match code {
+            KeyCode::Enter => {
+                // Extract all wizard data and drop the borrow before touching state again.
+                let name = ws.name.clone();
+                let skills = ws.skills.clone();
+                let mcps = ws.mcps.clone();
+                let provider_id = ws.provider_id.clone();
+                let desc = ws.composed_description();
+                state.wizard_state = None;
+                state.list_mode = ListMode::Normal;
+                state.status_line.clear();
+
+                let mut new_config = state.active_config().clone();
+                new_config.profiles.push(crate::domain::config::Profile {
+                    name: name.clone(),
+                    provider_id,
+                    skills: skills.clone(),
+                    mcps: mcps.clone(),
+                });
+
+                let scope = state.active_scope;
+                let store = ctx.store.clone();
+                let tx = ctx.tx.clone();
+                let id =
+                    crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let workspace_root = ctx.workspace_root.clone();
+
+                tokio::task::spawn_blocking(move || {
+                    let _ = tx.send(AppEvent::TaskStarted {
+                        id,
+                        name: format!("Creating profile '{}'", name),
+                    });
+                    match store.save(scope, &new_config) {
+                        Ok(()) => {
+                            let _ = tx.send(AppEvent::TriggerReload);
+                            let _ = tx.send(AppEvent::RunInteractiveProcess {
+                                command: "opencode".into(),
+                                args: vec![
+                                    "agent".into(),
+                                    "create".into(),
+                                    "--path".into(),
+                                    workspace_root.display().to_string(),
+                                    "--mode".into(),
+                                    "primary".into(),
+                                    "--description".into(),
+                                    desc,
+                                ],
+                                current_dir: workspace_root,
+                                profile_name: Some(name),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = tx.send(AppEvent::TaskFailed {
+                                id,
+                                error: format!("Failed to save profile: {}", e),
+                            });
+                        }
+                    }
+                });
+            }
+            KeyCode::Esc => {
+                if ws.step_index > 0 {
+                    ws.step_index -= 1;
+                } else {
+                    state.wizard_state = None;
+                    state.list_mode = ListMode::Normal;
+                    state.status_line = "Cancelled profile creation".to_string();
+                }
+            }
+            _ => {}
+        },
+        WizardStep::Interactive { .. } => {}
     }
     Ok(())
 }
@@ -823,6 +980,12 @@ fn handle_backspace(state: &mut AppState) {
     let active_kind = state.tab_kinds.get(state.active_tab).copied();
     if state.is_attach_vault_mode() || state.is_register_mcp_mode() {
         state.prompt_buffer.pop();
+    } else if active_kind == Some(crate::tui::app::TabKind::Profile) {
+        // MacBook "Delete" key produces Backspace; treat it as profile deletion
+        // on the Profile tab when in Normal mode.
+        if matches!(state.list_mode, ListMode::Normal) {
+            let _ = handle_delete_profile_no_ctx(state);
+        }
     } else if active_kind != Some(crate::tui::app::TabKind::Vault) {
         state.search_query.pop();
         if state.search_query.is_empty() {
@@ -1455,7 +1618,7 @@ fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -> Re
             } else if state.active_tab == mcp_idx {
                 apply_enter_register_mcp(state);
             } else if state.active_tab == profile_idx {
-                apply_enter_add_profile(state);
+                apply_enter_add_profile(state, ctx);
             }
             Ok(())
         }
@@ -1579,13 +1742,73 @@ pub fn apply_enter_register_mcp(state: &mut AppState) {
     state.status_line.clear();
 }
 
-pub fn apply_enter_add_profile(state: &mut AppState) {
-    state.list_mode = ListMode::ProfileWizardName;
+pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
+    // Find first provider that supports profile wizards
+    let steps = if ctx.store.load(state.active_scope).is_ok() {
+        ctx.registry
+            .providers
+            .iter()
+            .find(|p| p.supports_profiles())
+            .map(|p| p.profile_wizard_steps())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    // Pre-populate skill options if there is a Checklist step for skills.
+    // This mirrors old behaviour: skills list built from active tab packages.
+    let mut ws = crate::app::ports::WizardState::new(steps, "opencode".to_string());
+
+    let skill_names: Vec<String> = state
+        .packages
+        .get(&state.active_tab)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|p| p.kind == crate::domain::asset::AssetKind::Skill)
+        .map(|p| p.identity.name)
+        .collect();
+    ws.skill_options = skill_names.clone();
+
+    let mcp_names: Vec<String> = state
+        .mcp_state
+        .servers_list()
+        .into_iter()
+        .map(|(id, _)| id.clone())
+        .collect();
+    ws.mcp_options = mcp_names.clone();
+
+    // Update any Checklist step so options match available data.
+    for step in &mut ws.steps {
+        if let WizardStep::Checklist {
+            title,
+            ref mut options,
+        } = step
+        {
+            if title.to_lowercase().contains("skill") && options.is_empty() {
+                *options = skill_names.clone();
+            } else if title.to_lowercase().contains("mcp") && options.is_empty() {
+                *options = mcp_names.clone();
+            }
+        }
+    }
+
+    // If the first step is a Checklist we need to initialise checked vec.
+    if let Some(WizardStep::Checklist { options, .. }) = ws.steps.get(0) {
+        ws.checked = vec![false; options.len()];
+    }
+
+    state.wizard_state = Some(ws);
+    state.list_mode = ListMode::ProfileWizard;
     state.prompt_buffer = String::new();
     state.status_line = "Profile name: ".to_string();
 }
 
 fn handle_delete_profile(state: &mut AppState, _ctx: &EventContext) -> Result<ControlFlow> {
+    handle_delete_profile_no_ctx(state)
+}
+
+fn handle_delete_profile_no_ctx(state: &mut AppState) -> Result<ControlFlow> {
     let filtered_len = state.profile_entries.len();
     if filtered_len == 0 || state.selected_index >= filtered_len {
         state.status_line = "No profile selected to delete".to_string();
@@ -1816,7 +2039,7 @@ fn execute_attach_vault(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::app::{AppState, ListMode};
+    use crate::domain::asset::AssetKind;
     use std::collections::HashMap;
 
     fn empty_state(tab_count: usize) -> AppState {
@@ -1933,6 +2156,7 @@ mod tests {
                     requires_optional: vec![],
                     author: None,
                     description: None,
+                    include_evals: false,
                 },
                 crate::domain::asset::ScannedPackage {
                     identity: crate::domain::identity::AssetIdentity::new("b", None, "hash"),
@@ -1945,6 +2169,7 @@ mod tests {
                     requires_optional: vec![],
                     author: None,
                     description: None,
+                    include_evals: false,
                 },
             ],
         );
@@ -1997,7 +2222,6 @@ mod tests {
     }
 
     use crate::app::ports::{ConfigStorePort, ProviderPort};
-    use crate::domain::asset::AssetKind;
     use crate::domain::config::ConfigFile;
     use crate::domain::identity::AssetIdentity;
     use crate::domain::scope::Scope;
@@ -2037,6 +2261,7 @@ mod tests {
             _pkg: &crate::domain::asset::ScannedPackage,
             _scope: Scope,
             _config: Option<&crate::domain::config::ConfigFile>,
+            _include_evals: bool,
         ) -> Result<()> {
             Ok(())
         }
@@ -2124,6 +2349,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         state.packages.insert(0, vec![pkg.clone()]);
         state.tab_kinds = vec![crate::tui::app::TabKind::Asset];

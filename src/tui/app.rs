@@ -4,6 +4,7 @@ use crate::domain::scope::Scope;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 pub enum TabKind {
     Asset,
     Vault,
@@ -14,6 +15,7 @@ pub enum TabKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum ListMode {
     Normal,
     Searching,
@@ -36,19 +38,8 @@ pub enum ListMode {
         options: Vec<(String, String)>,
         selected: usize,
     },
-    /// Profile wizard modal sub-steps
-    ProfileWizardName,
-    ProfileWizardSelectSkills {
-        options: Vec<String>,
-        checked: Vec<bool>,
-        selected: usize,
-    },
-    ProfileWizardSelectMcps {
-        options: Vec<String>,
-        checked: Vec<bool>,
-        selected: usize,
-    },
-    ProfileWizardConfirmCreate,
+    /// Profile creation wizard (provider-specific step stack)
+    ProfileWizard,
     ConfirmDeleteProfile,
 }
 
@@ -66,6 +57,7 @@ pub struct Progress {
 
 pub static NEXT_TASK_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
+#[allow(dead_code)]
 pub struct AppState {
     pub active_tab: usize,
     pub search_query: String,
@@ -107,13 +99,8 @@ pub struct AppState {
     pub pending_mcp_args: String,
     pub pending_mcp_transport: String,
     pub pending_mcp_description: String,
-    // Profile wizard pending fields (for modal)
-    pub pending_profile_name: String,
-    pub pending_profile_provider: String,
-    pub pending_profile_skills: Vec<String>,
-    pub pending_profile_mcps: Vec<String>,
-    pub pending_profile_skill_options: Vec<String>,
-    pub pending_profile_mcp_options: Vec<String>,
+    // Profile wizard state (replaces old pending_profile_* fields)
+    pub wizard_state: Option<crate::app::ports::WizardState>,
 }
 
 impl AppState {
@@ -162,13 +149,7 @@ impl AppState {
             pending_mcp_args: String::new(),
             pending_mcp_transport: String::new(),
             pending_mcp_description: String::new(),
-            // Profile wizard pending fields
-            pending_profile_name: String::new(),
-            pending_profile_provider: String::new(),
-            pending_profile_skills: Vec::new(),
-            pending_profile_mcps: Vec::new(),
-            pending_profile_skill_options: Vec::new(),
-            pending_profile_mcp_options: Vec::new(),
+            wizard_state: None,
         }
     }
 
@@ -295,13 +276,7 @@ impl AppState {
     }
 
     pub fn is_profile_wizard_mode(&self) -> bool {
-        matches!(
-            self.list_mode,
-            ListMode::ProfileWizardName
-                | ListMode::ProfileWizardSelectSkills { .. }
-                | ListMode::ProfileWizardSelectMcps { .. }
-                | ListMode::ProfileWizardConfirmCreate
-        )
+        matches!(self.list_mode, ListMode::ProfileWizard)
     }
 }
 
@@ -326,6 +301,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         }
     }
 
@@ -384,6 +360,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         state.remote_packages = vec![remote_pkg];
         let filtered = state.filtered_packages();
@@ -405,6 +382,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         state.remote_packages = vec![remote_pkg];
         let filtered = state.filtered_packages();

@@ -4,7 +4,7 @@ use crate::domain::identity::AssetIdentity;
 use crate::domain::mcp::{McpServer, McpTransport};
 use crate::domain::scope::Scope;
 use crate::infra::provider::common;
-use crate::infra::provider::common::copy_dir;
+use crate::infra::provider::common::{copy_dir, copy_dir_filtered};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
@@ -91,9 +91,18 @@ impl ProviderPort for OpenCodeProvider {
         pkg: &ScannedPackage,
         scope: Scope,
         config: Option<&crate::domain::config::ConfigFile>,
+        include_evals: bool,
     ) -> Result<()> {
         let dest = self.asset_dir(&scope, &pkg.kind, &pkg.identity.name, config);
-        copy_dir(&pkg.path, &dest)?;
+        if include_evals {
+            copy_dir(&pkg.path, &dest)?;
+        } else {
+            copy_dir_filtered(
+                &pkg.path,
+                &dest,
+                crate::infra::provider::common::is_not_evals,
+            )?;
+        }
 
         // OpenCode does NOT accept a "skills" key in opencode.json.
         // Skills are auto-discovered from the .opencode/skills directory.
@@ -144,8 +153,40 @@ impl ProviderPort for OpenCodeProvider {
         let session = self.start_opencode_session(profile, session_key)?;
         Ok(session)
     }
-}
 
+    fn profile_wizard_steps(&self) -> Vec<crate::app::ports::WizardStep> {
+        use crate::app::ports::WizardStep;
+        vec![
+            WizardStep::TextInput {
+                title: "Profile name".into(),
+                placeholder: "e.g. opencode-dev".into(),
+            },
+            WizardStep::QuestionAnswer {
+                question: "What is the primary task this agent should handle?".into(),
+                placeholder: "e.g. Write Rust CLI tools".into(),
+            },
+            WizardStep::QuestionAnswer {
+                question: "What tone or style should the agent use?".into(),
+                placeholder: "e.g. Concise, professional".into(),
+            },
+            WizardStep::QuestionAnswer {
+                question: "Are there any specific constraints or rules?".into(),
+                placeholder: "e.g. Always run cargo fmt".into(),
+            },
+            WizardStep::Checklist {
+                title: "Select Skills".into(),
+                options: vec![],
+            },
+            WizardStep::Checklist {
+                title: "Select MCP Servers".into(),
+                options: vec![],
+            },
+            WizardStep::Review {
+                title: "Review & Confirm".into(),
+            },
+        ]
+    }
+}
 impl McpProvider for OpenCodeProvider {
     fn provider_id(&self) -> &str {
         "opencode"
@@ -382,6 +423,8 @@ impl OpenCodeProvider {
 
         let process = match std::process::Command::new("opencode")
             .current_dir(&self.workspace_root)
+            .arg("--agent")
+            .arg(&agent_name)
             .spawn()
         {
             Ok(p) => p,
@@ -621,6 +664,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         }
     }
 
@@ -631,7 +675,9 @@ mod tests {
         std::fs::create_dir(&src_dir).unwrap();
         let pkg = make_pkg(&src_dir, "my-skill", AssetKind::Skill, "SKILL.md");
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
-        provider.install(&pkg, Scope::Workspace, None).unwrap();
+        provider
+            .install(&pkg, Scope::Workspace, None, false)
+            .unwrap();
         assert!(dir
             .path()
             .join(".opencode/skills/my-skill/SKILL.md")
@@ -645,7 +691,9 @@ mod tests {
         std::fs::create_dir(&src_dir).unwrap();
         let pkg = make_pkg(&src_dir, "my-inst", AssetKind::Instruction, "AGENTS.md");
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
-        provider.install(&pkg, Scope::Workspace, None).unwrap();
+        provider
+            .install(&pkg, Scope::Workspace, None, false)
+            .unwrap();
         assert!(dir
             .path()
             .join(".opencode/instructions/my-inst/AGENTS.md")
@@ -659,7 +707,9 @@ mod tests {
         std::fs::create_dir(&src_dir).unwrap();
         let pkg = make_pkg(&src_dir, "my-skill", AssetKind::Skill, "SKILL.md");
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
-        provider.install(&pkg, Scope::Workspace, None).unwrap();
+        provider
+            .install(&pkg, Scope::Workspace, None, false)
+            .unwrap();
 
         let config_path = dir.path().join("opencode.json");
         assert!(!config_path.exists());
@@ -750,7 +800,9 @@ mod tests {
         std::fs::create_dir(&src_dir).unwrap();
         let pkg = make_pkg(&src_dir, "my-skill", AssetKind::Skill, "SKILL.md");
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
-        provider.install(&pkg, Scope::Workspace, None).unwrap();
+        provider
+            .install(&pkg, Scope::Workspace, None, false)
+            .unwrap();
 
         let content = std::fs::read_to_string(config_path).unwrap();
         assert!(content.contains("customKey"));
@@ -771,7 +823,7 @@ mod tests {
         let pkg = make_pkg(&src_dir, "my-skill", AssetKind::Skill, "SKILL.md");
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
         provider
-            .install(&pkg, Scope::Workspace, Some(&config))
+            .install(&pkg, Scope::Workspace, Some(&config), false)
             .unwrap();
 
         // Should be in .agents, not .opencode

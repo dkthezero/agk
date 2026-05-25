@@ -5,3 +5,6 @@ docs/superpowers/
 .agk/
 opencode.json
 .idea/
+.agents/
+.opencode/
+agents/

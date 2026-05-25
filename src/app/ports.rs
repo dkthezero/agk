@@ -55,6 +55,7 @@ pub trait ProviderPort: Send + Sync {
         pkg: &ScannedPackage,
         scope: Scope,
         config: Option<&ConfigFile>,
+        include_evals: bool,
     ) -> Result<()>;
     fn remove(
         &self,
@@ -95,6 +96,107 @@ pub trait ProviderPort: Send + Sync {
         _workspace_root: &Path,
     ) -> Result<ProfileSession> {
         anyhow::bail!("Profile sessions not supported by this provider")
+    }
+
+    /// Return wizard steps if this provider supports profile creation.
+    fn profile_wizard_steps(&self) -> Vec<WizardStep> {
+        vec![]
+    }
+}
+
+/// A single static description of a wizard step.  Mutable UI state lives in
+/// `WizardState`, not here, so the step list can be cloned/replaced freely.
+#[derive(Clone, Debug, PartialEq)]
+pub enum WizardStep {
+    TextInput {
+        title: String,
+        placeholder: String,
+    },
+    QuestionAnswer {
+        question: String,
+        placeholder: String,
+    },
+    Checklist {
+        title: String,
+        options: Vec<String>,
+    },
+    Review {
+        title: String,
+    },
+    /// Reserved for future providers that want to embed an external interactive
+    /// command as a distinct wizard step.  Not currently used by OpenCode.
+    #[allow(dead_code)]
+    Interactive {
+        title: String,
+        command: String,
+        args: Vec<String>,
+    },
+}
+
+/// Accumulator + UI state for the active profile-creation wizard.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WizardState {
+    pub steps: Vec<WizardStep>,
+    pub step_index: usize,
+    /// Profile name collected in step 0.
+    pub name: String,
+    /// (question, answer) pairs from Q&A steps.
+    pub description_parts: Vec<(String, String)>,
+    pub skills: Vec<String>,
+    pub mcps: Vec<String>,
+    pub skill_options: Vec<String>,
+    pub mcp_options: Vec<String>,
+    /// Shared text buffer for TextInput / QuestionAnswer steps.
+    pub prompt_buffer: String,
+    /// Shared checklist state for Checklist steps.
+    pub checked: Vec<bool>,
+    pub selected: usize,
+    /// Cursor position within prompt_buffer (byte index).
+    pub cursor_pos: usize,
+    /// Provider id that produced this wizard.
+    pub provider_id: String,
+}
+
+impl WizardState {
+    pub fn new(steps: Vec<WizardStep>, provider_id: String) -> Self {
+        let mut ws = Self {
+            steps,
+            step_index: 0,
+            name: String::new(),
+            description_parts: Vec::new(),
+            skills: Vec::new(),
+            mcps: Vec::new(),
+            skill_options: Vec::new(),
+            mcp_options: Vec::new(),
+            prompt_buffer: String::new(),
+            checked: vec![],
+            selected: 0,
+            cursor_pos: 0,
+            provider_id,
+        };
+        ws.sync_checklist_state();
+        ws
+    }
+
+    /// Resize `checked` and reset `selected` when the current step is a Checklist.
+    pub fn sync_checklist_state(&mut self) {
+        if let Some(WizardStep::Checklist { options, .. }) = self.steps.get(self.step_index) {
+            if self.checked.len() != options.len() {
+                self.checked = vec![false; options.len()];
+                self.selected = self.selected.min(options.len().saturating_sub(1));
+            }
+        }
+    }
+
+    /// Compose the full description string from Q&A pairs.
+    pub fn composed_description(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for (q, a) in &self.description_parts {
+            lines.push(format!("Q: {}", q));
+            lines.push(format!("A: {}", a));
+            lines.push(String::new());
+        }
+        lines.join("\n")
     }
 }
 
@@ -160,7 +262,13 @@ mod tests {
         fn name(&self) -> &str {
             "Dummy"
         }
-        fn install(&self, _: &ScannedPackage, _: Scope, _: Option<&ConfigFile>) -> Result<()> {
+        fn install(
+            &self,
+            _: &ScannedPackage,
+            _: Scope,
+            _: Option<&ConfigFile>,
+            _: bool,
+        ) -> Result<()> {
             Ok(())
         }
         fn remove(

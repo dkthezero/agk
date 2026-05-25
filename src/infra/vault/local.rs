@@ -87,6 +87,7 @@ impl VaultPort for LocalVaultAdapter {
                 requires_optional,
                 author,
                 description,
+                include_evals: false,
             });
         }
 

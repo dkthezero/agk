@@ -17,7 +17,7 @@ pub fn install_asset(
     if config.providers.is_empty() {
         bail!("No provider configured for {:?} scope", scope);
     }
-    provider.install(pkg, scope, Some(&config))?;
+    provider.install(pkg, scope, Some(&config), pkg.include_evals)?;
     let section = config.vault_defs.entry(pkg.vault_id.clone()).or_default();
     let identity_str = pkg.identity.to_config_string();
     match pkg.kind {
@@ -243,6 +243,7 @@ mod tests {
             pkg: &ScannedPackage,
             _scope: Scope,
             _config: Option<&ConfigFile>,
+            _include_evals: bool,
         ) -> Result<()> {
             self.installed
                 .lock()
@@ -274,6 +275,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         }
     }
 
@@ -388,6 +390,7 @@ mod tests {
             requires_optional: vec![],
             author: None,
             description: None,
+            include_evals: false,
         };
         update_asset(Scope::Workspace, &pkg, &store, &provider).unwrap();
 

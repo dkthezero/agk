@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::domain::telemetry::AnalyticsConfig;
 use ratatui::{
     layout::Rect,

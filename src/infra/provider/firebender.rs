@@ -59,6 +59,7 @@ impl ProviderPort for FirebenderProvider {
         pkg: &ScannedPackage,
         scope: Scope,
         config: Option<&crate::domain::config::ConfigFile>,
+        _include_evals: bool,
     ) -> Result<()> {
         let dest = self.asset_dir(&scope, &pkg.kind, &pkg.identity.name, config);
         copy_dir(&pkg.path, &dest)
