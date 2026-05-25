@@ -96,36 +96,63 @@ pub fn render_input_modal(
     )]));
     lines.push(Line::from(""));
 
-    // Split the value into a line of spans so we can draw the cursor inside it.
-    let mut value_spans: Vec<Span> = Vec::new();
-    let chars: Vec<char> = value.chars().collect();
-    let mut byte_idx = 0;
+    // Split value by newlines so we can place the cursor on the correct line.
+    // `cursor_pos` is in **character indices**.
+    let value_text = value; // alias for clarity
+    let mut char_count = 0usize;
+    let mut cursor_line = 0usize;
+    let mut cursor_col = 0usize;
     let mut rendered_cursor = false;
-    for ch in &chars {
-        let ch_len = ch.len_utf8();
-        if !rendered_cursor && byte_idx >= cursor_pos {
-            // Render cursor as a block character.
-            value_spans.push(Span::styled(
+
+    for (line_no, line_text) in value_text.split('\n').enumerate() {
+        if !rendered_cursor {
+            let line_char_len = line_text.chars().count();
+            if char_count + line_char_len >= cursor_pos {
+                cursor_line = line_no;
+                cursor_col = cursor_pos.saturating_sub(char_count);
+                rendered_cursor = true;
+            }
+            char_count += line_char_len;
+            // Account for the newline character itself
+            if char_count == cursor_pos {
+                cursor_line = line_no + 1;
+                cursor_col = 0;
+                rendered_cursor = true;
+            }
+            char_count += 1; // the '\n' char
+        }
+
+        let mut spans: Vec<Span> = Vec::new();
+        let mut col_idx = 0usize;
+        for ch in line_text.chars() {
+            if line_no == cursor_line && col_idx == cursor_col {
+                spans.push(Span::styled(
+                    "█",
+                    Style::default().bg(Color::Cyan).fg(Color::Black),
+                ));
+            }
+            spans.push(Span::styled(
+                ch.to_string(),
+                Style::default().fg(Color::Cyan),
+            ));
+            col_idx += 1;
+        }
+        if line_no == cursor_line && col_idx == cursor_col {
+            spans.push(Span::styled(
                 "█",
                 Style::default().bg(Color::Cyan).fg(Color::Black),
             ));
-            rendered_cursor = true;
         }
-        value_spans.push(Span::styled(
-            ch.to_string(),
-            Style::default().fg(Color::Cyan),
-        ));
-        byte_idx += ch_len;
-    }
-    if !rendered_cursor {
-        // Cursor is at the end (or beyond the last char).
-        value_spans.push(Span::styled(
-            "█",
-            Style::default().bg(Color::Cyan).fg(Color::Black),
-        ));
+        lines.push(Line::from(spans));
     }
 
-    lines.push(Line::from(value_spans));
+    // If cursor is beyond all content (at the very end of the last line of the last char)
+    if !rendered_cursor {
+        lines.push(Line::from(vec![Span::styled(
+            "█",
+            Style::default().bg(Color::Cyan).fg(Color::Black),
+        )]));
+    }
 
     let paragraph = Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false });
     frame.render_widget(paragraph, inner);

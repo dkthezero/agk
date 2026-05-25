@@ -151,10 +151,15 @@ pub struct WizardState {
     /// Shared checklist state for Checklist steps.
     pub checked: Vec<bool>,
     pub selected: usize,
-    /// Cursor position within prompt_buffer (byte index).
+    /// Cursor position tracked in **character indices** (not bytes) so
+    /// multi-byte UTF-8 characters are handled correctly.
     pub cursor_pos: usize,
     /// Provider id that produced this wizard.
     pub provider_id: String,
+    /// Tracks which step_index `checked` was last initialized for, so
+    /// entering a different checklist step always resets state even if
+    /// option counts happen to match.
+    pub checked_step_index: Option<usize>,
 }
 
 impl WizardState {
@@ -173,17 +178,20 @@ impl WizardState {
             selected: 0,
             cursor_pos: 0,
             provider_id,
+            checked_step_index: None,
         };
         ws.sync_checklist_state();
         ws
     }
 
     /// Resize `checked` and reset `selected` when the current step is a Checklist.
+    /// Always resets when entering a new checklist step to prevent state leakage.
     pub fn sync_checklist_state(&mut self) {
         if let Some(WizardStep::Checklist { options, .. }) = self.steps.get(self.step_index) {
-            if self.checked.len() != options.len() {
+            if self.checked_step_index != Some(self.step_index) {
                 self.checked = vec![false; options.len()];
                 self.selected = self.selected.min(options.len().saturating_sub(1));
+                self.checked_step_index = Some(self.step_index);
             }
         }
     }

@@ -55,22 +55,12 @@ pub trait ProviderPort: Send + Sync {
 }
 ```
 
-### New: `ProfileWizard` trait (creation flow)
+### `ProviderPort` extension for wizard stepsnn`profile_wizard_steps()` is added directly to the `ProviderPort` trait (no separate `ProfileWizard` trait). Default returns empty vec.
 
 ```rust
 /// Steps that a provider wants the user to walk through when creating a profile.
-pub trait ProfileWizard: Send + Sync {
-    /// Return the ordered list of steps for this provider.
-    fn wizard_steps(&self) -> Vec<WizardStep>;
-}
 ```
 
-`ProviderPort` gains a new default method:
-
-```rust
-fn as_profile_wizard(&self) -> Option<&dyn ProfileWizard> {
-    None
-}
 ```
 
 ### `WizardStep` enum (TUI-generic)
@@ -81,7 +71,6 @@ pub enum WizardStep {
     TextInput {
         title: String,
         placeholder: String,
-        min_length: usize,
     },
     QuestionAnswer {
         question: String,

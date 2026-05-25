@@ -689,26 +689,38 @@ fn handle_profile_wizard_input(
     match current_step {
         WizardStep::TextInput { .. } | WizardStep::QuestionAnswer { .. } => match code {
             KeyCode::Char(c) => {
-                // On some terminals Shift+Enter is reported as Shift+J (or Shift+j).
-                // Treat it as a newline so users can insert multi-line answers.
                 let is_shift_enter =
                     matches!(c, 'J' | 'j') && key.modifiers.contains(KeyModifiers::SHIFT);
                 if is_shift_enter {
-                    ws.prompt_buffer.insert(ws.cursor_pos, '\n');
+                    ws.prompt_buffer.push('\n');
                     ws.cursor_pos += 1;
                 } else {
-                    ws.prompt_buffer.insert(ws.cursor_pos, *c);
+                    // Insert at the char position (not byte) to handle multi-byte UTF-8 safely.
+                    let byte_idx = ws.prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    ws.prompt_buffer.insert(byte_idx, *c);
                     ws.cursor_pos += 1;
                 }
             }
             KeyCode::Backspace => {
                 if ws.cursor_pos > 0 {
                     ws.cursor_pos -= 1;
-                    ws.prompt_buffer.remove(ws.cursor_pos);
+                    // Remove the char at the current cursor position.
+                    let byte_idx = ws.prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    let ch = ws.prompt_buffer[byte_idx..].chars().next().unwrap_or('\n');
+                    ws.prompt_buffer.drain(byte_idx..byte_idx + ch.len_utf8());
                 }
             }
             KeyCode::Enter => {
                 let val = std::mem::take(&mut ws.prompt_buffer).trim().to_string();
+                ws.cursor_pos = 0;
                 if val.is_empty() {
                     state.status_line = "Cancelled — input required".to_string();
                     state.wizard_state = None;
@@ -746,13 +758,14 @@ fn handle_profile_wizard_input(
                 }
             }
             KeyCode::Right => {
-                if ws.cursor_pos < ws.prompt_buffer.len() {
+                if ws.cursor_pos < ws.prompt_buffer.chars().count() {
                     ws.cursor_pos += 1;
                 }
             }
             KeyCode::Esc => {
                 if ws.step_index > 0 {
                     ws.step_index -= 1;
+                    ws.cursor_pos = 0;
                 } else {
                     state.wizard_state = None;
                     state.list_mode = ListMode::Normal;
@@ -1743,21 +1756,24 @@ pub fn apply_enter_register_mcp(state: &mut AppState) {
 }
 
 pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
-    // Find first provider that supports profile wizards
-    let steps = if ctx.store.load(state.active_scope).is_ok() {
+    // Find first provider that supports profile wizards; capture its id + steps.
+    let (provider_id, steps) = if ctx.store.load(state.active_scope).is_ok() {
         ctx.registry
             .providers
             .iter()
             .find(|p| p.supports_profiles())
-            .map(|p| p.profile_wizard_steps())
-            .unwrap_or_default()
+            .map(|p| {
+                let id = p.id().to_string();
+                let steps = p.profile_wizard_steps();
+                (id, steps)
+            })
+            .unwrap_or_else(|| ("opencode".to_string(), vec![]))
     } else {
-        Vec::new()
+        ("opencode".to_string(), vec![])
     };
 
     // Pre-populate skill options if there is a Checklist step for skills.
-    // This mirrors old behaviour: skills list built from active tab packages.
-    let mut ws = crate::app::ports::WizardState::new(steps, "opencode".to_string());
+    let mut ws = crate::app::ports::WizardState::new(steps, provider_id);
 
     let skill_names: Vec<String> = state
         .packages

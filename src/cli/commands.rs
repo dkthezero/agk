@@ -126,9 +126,14 @@ fn find_package_by_full_identity(
 }
 
 fn generate_profile_session_key() -> String {
-    static NEXT_SESSION_NONCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let nonce = NEXT_SESSION_NONCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    format!("{}", nonce)
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let pid = std::process::id();
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let nonce = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{}-{}-{}", timestamp, pid, nonce)
 }
 
 // ---------------------------------------------------------------------------

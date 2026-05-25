@@ -354,7 +354,7 @@ where
                     && profile_name.is_some()
                 {
                     let name = profile_name.unwrap();
-                    let agents_dir = current_dir.join("agents");
+                    let agents_dir = current_dir.join(".opencode").join("agents");
                     let target_dir: std::path::PathBuf =
                         current_dir.join(".agk").join("profiles").join(&name);
 
