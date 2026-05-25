@@ -695,7 +695,12 @@ impl OpenCodeProvider {
         let cleaned = strip_jsonc_comments(&content);
         let mut config: serde_json::Value = match serde_json::from_str(&cleaned) {
             Ok(v) => v,
-            Err(_) => return Ok(()),
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Failed to parse opencode.json after stripping comments: {}",
+                    e
+                ));
+            }
         };
 
         if let Some(obj) = config.as_object_mut() {

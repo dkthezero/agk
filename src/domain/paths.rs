@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 /// Resolve the global configuration root according to OS standards and user preference.
 /// - **macOS**: `~/.config/agk` (overriding default Library/Application Support)
 /// - **Linux**: `~/.config/agk` (standard XDG path via dirs_next)
@@ -137,11 +140,11 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Escape a string for embedding inside a cmd.exe `"..."` block.
-/// Replaces each `"` with `\"`, then wraps in `"\"...\""` style.
+/// Escape a string for embedding inside a cmd.exe double-quoted argument.
+/// Replaces each backslash with `\\`, then replaces each `"` with `\"`.
 #[allow(dead_code)]
 fn escape_cmd_arg(s: &str) -> String {
-    s.replace('"', "\"")
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Minimal shell-escape for paths inside `sh -lc 'cd "..." && exec $SHELL'`.

@@ -213,10 +213,16 @@ pub fn handle(
                     handle_delete_profile(state, ctx)?;
                 }
             }
-            KeyCode::Char('o') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('o')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && state.list_mode == ListMode::Normal =>
+            {
                 handle_open_location(state, ctx, false)?;
             }
-            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('t')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && state.list_mode == ListMode::Normal =>
+            {
                 handle_open_location(state, ctx, true)?;
             }
             KeyCode::Char(c) => {
