@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check & Test
+  fmt-lint-test:
+    name: Check, Format & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,5 +24,34 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --workspace --all-targets --all-features --verbose
+
+  architecture:
+    name: Architecture Boundary Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --test architecture -- --ignored
+
+  feature-matrix:
+    name: Feature Matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - "--no-default-features --features headless,toml"
+          - "--no-default-features --features headless,toml,yaml"
+          - "--no-default-features --features tui,toml"
+          - "--all-features"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check ${{ matrix.features }}

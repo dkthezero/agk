@@ -56,7 +56,7 @@ impl AgkCore {
             // Profile commands
             // ===============================================================
             CoreCommand::CreateProfile { input } => {
-                crate::app::usecases::create_profile::run(input, sink)
+                crate::app::usecases::create_profile::run(input, self.store.as_ref(), sink)
             }
             CoreCommand::StartProfile { id, scope, dry_run } => {
                 crate::app::usecases::start_profile::run(
@@ -178,15 +178,9 @@ impl AgkCore {
             // ===============================================================
             // MCP commands (wired)
             // ===============================================================
-            CoreCommand::RegisterMcp { input } => crate::app::usecases::register_mcp::run(
-                input.name.clone(),
-                input.command.clone(),
-                input.args.clone(),
-                format!("{:?}", input.transport),
-                input.description.clone(),
-                input.test_after,
-                sink,
-            ),
+            CoreCommand::RegisterMcp { input } => {
+                crate::app::usecases::register_mcp::run(input, self.mcp_registry.as_ref(), sink)
+            }
 
             // ===============================================================
             // Asset / search commands

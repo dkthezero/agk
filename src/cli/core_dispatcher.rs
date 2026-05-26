@@ -5,7 +5,6 @@ use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, ScopeArg, T
 use crate::cli::presenter::CliPresenter;
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
-use std::sync::Arc;
 
 /// Phase 4+4.5: routes all CLI commands through [`AgkCore`] instead of
 /// calling inline handlers directly.  This makes the CLI and TUI share the
@@ -111,7 +110,34 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                     test_after: !no_test,
                 },
             }),
-            _ => Err(anyhow::anyhow!("MCP command not yet wired to AgkCore")),
+            McpCommands::Enable {
+                name,
+                provider,
+                scope,
+            } => Ok(CoreCommand::EnableMcp {
+                name: name.clone(),
+                provider_id: provider.clone(),
+                scope: scope
+                    .map(|s| s.into_domain_scope())
+                    .unwrap_or(Scope::Workspace),
+            }),
+            McpCommands::Disable {
+                name,
+                provider,
+                scope,
+            } => Ok(CoreCommand::DisableMcp {
+                name: name.clone(),
+                provider_id: provider.clone(),
+                scope: scope
+                    .map(|s| s.into_domain_scope())
+                    .unwrap_or(Scope::Workspace),
+            }),
+            McpCommands::List { .. } => Err(anyhow::anyhow!(
+                "MCP list command not yet implemented in AgkCore"
+            )),
+            McpCommands::Test { .. } => Err(anyhow::anyhow!(
+                "MCP test command not yet implemented in AgkCore"
+            )),
         },
         Commands::Sync { global, dry_run } => Ok(CoreCommand::SyncAssets {
             scope: if *global {
@@ -174,7 +200,29 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 .map(crate::domain::context::ContextId::new),
             dry_run: *dry_run,
         }),
-        _ => Err(anyhow::anyhow!("Command not yet wired to AgkCore")),
+        Commands::Clean { .. } => Err(anyhow::anyhow!(
+            "Clean command not yet implemented in AgkCore"
+        )),
+        Commands::Validate { .. } => Err(anyhow::anyhow!(
+            "Validate command not yet implemented in AgkCore"
+        )),
+        Commands::Pack { .. } => Err(anyhow::anyhow!(
+            "Pack command not yet implemented in AgkCore"
+        )),
+        Commands::Telemetry { command } => match command {
+            TelemetryCommands::Enable => Err(anyhow::anyhow!(
+                "Telemetry enable not yet implemented in AgkCore"
+            )),
+            TelemetryCommands::Disable => Err(anyhow::anyhow!(
+                "Telemetry disable not yet implemented in AgkCore"
+            )),
+            TelemetryCommands::Status => Err(anyhow::anyhow!(
+                "Telemetry status not yet implemented in AgkCore"
+            )),
+            TelemetryCommands::Export { .. } => Err(anyhow::anyhow!(
+                "Telemetry export not yet implemented in AgkCore"
+            )),
+        },
     }
 }
 

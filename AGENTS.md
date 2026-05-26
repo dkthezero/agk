@@ -1,104 +1,177 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, GitHub Copilot, Gemini CLI, etc.) when working with code in this repository.
+This file is the **Agent Harness** for AGK. It defines how both human contributors and AI coding agents must work in this repository to preserve architectural integrity, product vision, and long-term maintainability.
 
-## Build & Development Commands
+**Core Rule:** Never add business logic in `cli/` or `tui/`. Adapters only translate intent and render results. All behavior lives in the Application Core (`app/`).
 
-```bash
-cargo build              # Build
-cargo run                # Run TUI
-cargo test               # Run all tests
+---
 
-cargo fmt --check        # Check formatting (CI enforced - MUST PASS)
-cargo fmt                # Auto-format
-cargo clippy -- -D warnings  # Lint (treat warnings as errors)
-```
+## Product Vision & Charter
 
-> **Formatting is enforced.** Run `cargo fmt` before every commit. CI will reject unformatted code.
+**AGK is the standard, lightweight way to define, share, and launch AI coding environments across solo, team, and enterprise contexts.**
 
-CI (.github/workflows/ci.yml) runs `cargo check`, `cargo fmt --check`, and `cargo test --verbose` on push to master and PRs.
+### Core Promises
+- **Portable intent**: Take a local or remote manifest and materialize a reproducible AI coding environment.
+- **Headless-first**: Every interactive flow must have a complete headless/CLI equivalent (or `--dry-run` contract).
+- **Lightweight**: Heavy subsystems (TUI, remote vaults, YAML, enterprise features) must be optional via Cargo features.
+- **Profiles as compositions**: Profiles reference (do not duplicate) skills, instructions, providers, vaults, and MCPs.
+- **Multi-provider**: Support Claude Code, OpenCode, Gemini, Copilot, and others without vendor lock-in.
 
-## Architecture
+**Primary users**: Solo engineers who want fast, repeatable setups.  
+**Secondary users**: Platform teams standardizing AI workflows across repositories and organizations.
 
-Hexagonal (Ports & Adapters) architecture with four layers:
+---
+
+## Architecture (Hexagonal / Ports & Adapters)
+
+We follow a **hybrid horizontal + feature-slice** structure. Preserve the existing top-level roots.
 
 ```
 TUI (tui/)  →  App (app/)  →  Domain (domain/)
                    ↓
               Infra (infra/)
+                  ↑
+            CLI (cli/)
 ```
 
-- **domain/**: Pure data models — no I/O. AssetIdentity, ConfigFile, Scope, ScannedPackage, hashing.
-- **app/**: Business logic orchestration. `ports.rs` defines the four core traits. `bootstrap.rs` is the composition root (only place infra is wired). `actions.rs` has reusable operations.
-- **infra/**: I/O adapters implementing port traits. Vault backends (local, github, clawhub), provider installers (Claude Code, Copilot, Gemini, etc.), TOML config store.
-- **tui/**: Ratatui-based UI. `app.rs` holds reactive AppState. `event.rs` maps keycodes to actions. Background tasks use `tokio::sync::mpsc::UnboundedSender<AppEvent>`.
+### Repository Layout (Target)
 
-### Core Port Traits (app/ports.rs)
+```
+src/
+├── main.rs                          # Pure composition root
+├── app/
+│   ├── bootstrap.rs                 # ONLY place where concrete infra is wired
+│   ├── command.rs                   # CoreCommand enum
+│   ├── event.rs                     # CoreEvent enum
+│   ├── outcome.rs                   # CoreOutcome enum
+│   ├── snapshot.rs                  # UI-oriented view models
+│   ├── ports/                       # All port traits
+│   ├── features/                    # Feature slices (apply/, profiles/, etc.)
+│   └── usecases/                    # Flat use-case files (migration path → features/)
+├── domain/                          # Pure models & invariants
+│   ├── asset/
+│   ├── profile/
+│   ├── vault/
+│   ├── mcp/
+│   ├── provider/
+│   ├── config/
+│   ├── bundle/
+│   └── ...
+├── infra/                           # Adapters (config codecs, providers, vaults, etc.)
+│   ├── config/
+│   ├── provider/
+│   ├── vault/
+│   ├── mcp/
+│   ├── process/
+│   └── ...
+├── cli/                             # Thin CLI adapter
+│   ├── core_dispatcher.rs           # Routes all CLI commands through AgkCore
+│   ├── commands/                    # Per-feature thin CLI modules
+│   └── ...
+└── tui/                             # Thin TUI adapter (Ratatui)
+    ├── reducer.rs                   # Pure key → UiIntent
+    ├── command_mapper.rs            # UiIntent → CoreCommand
+    ├── features/                    # Per-feature controllers
+    └── ...
+```
 
-- `FeatureSetPort` — defines how to scan a package type (skills vs instructions)
-- `VaultPort` — vault source abstraction (id, list_packages, refresh)
-- `ProviderPort` — target AI platform installer (install, remove)
-- `ConfigStorePort` — scoped config persistence (Global vs Workspace)
-- `McpRegistryPort` — MCP server registration and lifecycle (register, enable, disable)
-- `VaultSearchPort` — remote vault search abstraction (search, vault_id)
-- `ProfileRuntimePort` — provider-specific profile session builder (build_launch_plan, run_plan)
+### Dependency Rules (Enforced by `tests/architecture.rs`)
 
-### Core Command / Event Contracts (app/command.rs, app/event.rs, app/outcome.rs)
+| # | Rule | Enforcement |
+|---|------|-------------|
+| 1 | `domain/` depends on nothing outside `domain/` | Architecture test + code review |
+| 2 | `app/` depends only on `domain/` and its own ports/contracts | Architecture test |
+| 3 | `infra/` depends on `domain/` + `app::ports` only | Architecture test |
+| 4 | `cli/` and `tui/` depend on `app/` (commands, events, snapshots) + `domain/`. **Never** on `infra/` | Architecture test |
+| 5 | Only `main.rs` and `app/bootstrap.rs` may construct concrete adapters | Grep arch tests + review |
+| 6 | No `std::process::Command` outside `infra/process/` | New architecture test |
+| 7 | No file may own logic for more than one feature (split at ~300 LOC) | CI file-size lint + review |
 
-**CoreCommand** — what the user wants.  One enum consumed by `AgkCore::execute()`.
-**CoreEvent** — what happened.  Emitted via `CoreEventSink` so TUI and CLI observe the same facts.
-**CoreOutcome** — the return value from a use-case (Ok, LaunchPlan, ValidationReport, etc.).
-**UiIntent** — what the TUI intends to do next.  Produced by pure `reduce_key()` in `tui/reducer.rs`.
+---
 
-### Key Patterns
+## Development Workflow (Mandatory for Agents & Humans)
 
-- **SHA10 hashing** for asset change detection, not semantic versions. Version is display metadata; sha10 is the source of truth for freshness.
-- **Scoped config**: Global (`~/.config/agk/config.toml`) for vaults/providers, Workspace (`.agk/config.toml`) for installed assets.
-- **Async I/O**: All network/git operations run on tokio tasks via `AppEvent` channel to keep TUI responsive. Never block the render loop.
-- **Bootstrap is the only DI point**: `app/bootstrap.rs` wires infra adapters. No infra imports outside this file and main.rs.
-- **ClawHub vault**: CLI-delegated — shells out to `clawhub` binary for search/install/inspect. Uses LocalVaultAdapter to scan its cache at `~/.config/agk/clawhub/`.
-- **Pure reducer pattern**: `tui/reducer.rs` contains the only key-event logic; it returns `Vec<UiIntent>` without side effects. `tui/command_mapper.rs` translates intents to `CoreCommand`s.
-- **Shared contracts**: Both TUI and CLI produce `CoreCommand`s and observe `CoreEvent`s through the same `AgkCore` façade. `tui/presenter.rs` bridges `CoreEventSink` → `AppEvent` channel.
-- **Profile runtime separation**: `ProfileRuntimePort::build_launch_plan()` produces a deterministic `LaunchPlan` (no side effects). `run_plan()` executes it and returns a `ProfileSession` with a cleanup closure.
+**Always follow this order** — this is the most important section for keeping agents on rails.
 
-### Vault Structure Convention
+1. **Product Documentation First**
+   - Update or create `docs/product/features/<feature>/prd.md`
+   - Update or create `docs/product/features/<feature>/technical_design.md`
 
-Skills require `SKILL.md`, instructions require `AGENTS.md` as the marker file within their directory under `skills/` or `instructions/`.
+2. **Domain Layer**
+   - Add/update models and invariants in `domain/`
+   - Write domain unit tests
 
-## Documentation Requirements
+3. **Application Core**
+   - Implement or extend use cases in `app/features/<feature>/` or `app/usecases/`
+   - Add use-case tests using fake ports (`NullSink`, test doubles)
+   - Extend `CoreCommand`, `CoreEvent`, `CoreOutcome` as needed
 
-When implementing a new feature or modifying an existing one, always update the corresponding documentation under `docs/product/features/`. Each feature area must have both files:
+4. **Ports & Infra**
+   - Define/extend port traits in `app/ports.rs`
+   - Implement adapters in `infra/`
 
-- `prd.md` — Product requirements: what the feature does, user-facing behavior, functional requirements
-- `technical_design.md` — Technical design: trait contracts, data schemas, internal workflows, architecture rules
+5. **CLI Adapter**
+   - Add command parsing in `cli/commands/` or `cli/entry.rs`
+   - Route through `cli/core_dispatcher.rs` → `AgkCore`
+   - Never write business logic in CLI files
 
-If adding a new feature area, create a new directory under `docs/product/features/<feature-name>/` with both files.
+6. **TUI Adapter** (Last)
+   - Add `UiIntent` in `tui/reducer.rs`
+   - Map intent → `CoreCommand` in `tui/command_mapper.rs`
+   - Add feature controller in `tui/features/<feature>/` if needed
+   - Update rendering / widgets
+   - Never write business logic in TUI files
 
-## Working with Worktrees
+### Simulator-First Rule (for interactive flows)
 
-Feature branches often use git worktrees at `.worktrees/<branch-name>/`. Code changes in a worktree are isolated from the main working directory — remember to `cd` into the worktree or use its path when building/testing.
+- Design the flow in the HTML simulator first.
+- Export contract fixtures (`fixtures/contracts/`).
+- Use those fixtures to drive reducer + contract tests.
+- Keep `--dry-run --json` output compatible with the same scenario.
 
-## Refactoring History
+---
 
-### Completed Refactors (branch `feature/core-commands`)
+## Search Order for AI Agents
 
-**Phase 0** (merged): Added dev-deps, moved `TabKind` from `tui/` → `app/`, extracted view models to `app/snapshot.rs`, created architecture enforcement tests.
+When you need to understand or modify code, **search in this exact order**:
 
-**Phase 1** (merged): Introduced `CoreCommand`, `CoreEvent`, `CoreOutcome`, `UiIntent`, and `AgkCore` façade. Domain `Profile` with typed IDs.
+1. `docs/product/features/<feature>/` (PRD + technical design)
+2. `src/app/command.rs`, `src/app/event.rs`, `src/app/outcome.rs`
+3. `src/app/features/<feature>/` or `src/app/usecases/`
+4. `src/app/ports.rs`
+5. `src/infra/<area>/`
+6. `src/cli/commands/<feature>.rs`
+7. `src/tui/features/<feature>/`
 
-**Phase 2** (merged): Pure `reduce_key()` in `tui/reducer.rs`, `TuiState`/`ListMode`/`WizardState` in `tui/app_state.rs`, `command_mapper.rs`. 12 reducer unit tests.
+---
 
-**Phase 3** (merged): Use-case extraction — `attach_vault`, `deactivate_provider`, `register_mcp`, `search_remote_vault` with fake-port tests.
+## Key Patterns & Rules
 
-**Phase 3.5** (merged): Wired `AgkCore` with real port injection (`ConfigStorePort`, `McpRegistryPort`, `VaultSearchPort`, `Registry`). Created `InfraMcpRegistryAdapter`, `ClawHubSearchAdapter`, `AppEventSink` presenter bridge.
+- **Pure Reducer**: `tui/reducer.rs` must remain pure (no side effects). Return `Vec<UiIntent>`.
+- **Command/Event/Outcome**: All major flows go through `AgkCore::execute()`.
+- **No Business Logic in Adapters**: `cli/` and `tui/` may not mutate config directly, own workflows, or call infra directly.
+- **Manifest Codecs**: Support both TOML and YAML via `ManifestCodecPort`. Preserve original file extension on rewrite.
+- **Profile Start Flow**: Load → Resolve → Build `LaunchPlan` (dry-run) → Execute via `ProfileRuntimePort`.
+- **Feature Slicing**: Group new logic under `app/features/<feature>/` and `tui/features/<feature>/`.
+- **File Size Rule**: Split files before they exceed ~300 logical lines of business logic (enforced in CI).
+- **SHA10 Hashing**: Use SHA10 (SHA-256 truncated to 10 hex chars) for asset change detection. Version is display-only.
 
-**Phase 4+4.5** (merged): `CliPresenter` with `--json`/`--quiet`, `cli/core_dispatcher.rs` routing commands through `AgkCore`, added `dry_run` to `ProfileCommands::Create`.
+---
 
-**Phase 5** (merged): `ProfileRuntimePort` trait, real `LaunchPlan` with provider-specific fields, `start_profile` use-case resolves profile from `ConfigStorePort` and runtime port from registry.
+## CI & Quality Gates
 
-## TDD Templates
+- `cargo fmt --check` (enforced)
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- Architecture tests must pass (`cargo test --test architecture -- --ignored`)
+- Feature matrix builds (`--no-default-features` combinations)
+- Contract tests for key flows (especially profile start dry-run)
+- File-size lint (~300 LOC rule per non-test business-logic file)
 
-When adding a new use-case in `app/usecases/<name>.rs`:
+---
+
+## TDD / Implementation Templates
+
+### New Use Case
 
 ```rust
 pub fn run(
@@ -123,7 +196,7 @@ mod tests {
 }
 ```
 
-When adding a new port trait in `app/ports.rs`:
+### New Port Trait
 
 ```rust
 pub trait NewPort: Send + Sync {
@@ -132,7 +205,7 @@ pub trait NewPort: Send + Sync {
 }
 ```
 
-When adding a new reducer intent in `tui/reducer.rs`:
+### New Reducer Intent
 
 ```rust
 fn derive_enter_intent(state: &TuiState) -> UiIntent {
@@ -141,9 +214,111 @@ fn derive_enter_intent(state: &TuiState) -> UiIntent {
 }
 ```
 
+### New Feature Slice (`app/features/<feature>/`)
+
+```
+app/features/<feature>/
+├── mod.rs          # Re-export public API
+├── command.rs      # Input structs, CoreCommand constructors for this feature
+├── usecase.rs      # Main use-case file (or split into multiple)
+└── planner.rs      # Optional: deterministic planning logic (e.g. LaunchPlan)
+```
+
+### New TUI Feature Controller (`tui/features/<feature>/`)
+
+```
+tui/features/<feature>/
+├── mod.rs          # Re-export
+├── controller.rs   # Handles async side effects for this feature tab
+└── widget.rs       # Rendering / layout helpers for this feature tab
+```
+
+---
+
+## Testing Strategy
+
+### Layer 1: Domain Tests
+- Protect invariants in `domain/`.
+- Pure functions, no I/O mocks needed.
+
+### Layer 2: Use-Case Tests
+- Protect behavior in `app/usecases/` / `app/features/`.
+- Use fake port implementations (`NullSink`, in-memory stores).
+
+### Layer 3: Contract Tests
+- Protect CLI/TUI equivalence.
+- Use `--dry-run --json` golden fixtures.
+- Example: `profile_start_dry_run_matches_contract_fixture`.
+
+### Layer 4: Snapshot Tests
+- Protect TUI rendering shapes using `ratatui::TestBackend` + `insta`.
+
+### Layer 5: Binary Integration Tests
+- Small number of real-workspace flows using `assert_cmd`.
+
+---
+
+## Refactoring Strategy
+
+We are in a **tightening phase**, not a rewrite. Follow the phased plan in `docs/proposals/architectural-convergence-plan.md`.
+
+### Priority Order
+
+| Phase | Goal | Duration | Risk |
+|-------|------|----------|------|
+| **Phase A** | Enforce architecture tests + CI gates | 1–2 days | Existing violations may block CI |
+| **Phase B** | CLI convergence through `core_dispatcher.rs` | 3–5 days | Some commands rely on legacy helpers |
+| **Phase C** | Decompose `tui/event.rs` into runtime loop + feature controllers | 5–7 days | Transient UI regressions |
+| **Phase D** | Complete stubbed use cases + finish feature slices | 4–6 days | Config persistence shape changes |
+| **Phase E** | Add YAML/TOML codecs + Cargo feature slimming | 3–5 days | Feature interaction bugs |
+| **Phase F** | Simulator contracts + golden fixture tests | 2–4 days | Fixture drift |
+| **Phase G** | Docs + agent harness finalization | 1 day | — |
+
+**Total effort**: ~20–30 engineering days, deliverable in small, revertible PRs.
+
+---
+
+## Build & Development Commands
+
+```bash
+cargo build              # Build
+cargo run                # Run TUI
+cargo test               # Run all tests (except ignored arch tests)
+
+cargo fmt --check        # Check formatting (CI enforced — MUST PASS)
+cargo fmt                # Auto-format
+cargo clippy -- -D warnings  # Lint (treat warnings as errors)
+```
+
+> **Formatting is enforced.** Run `cargo fmt` before every commit. CI will reject unformatted code.
+
+**Run architecture tests explicitly**:
+```bash
+cargo test --test architecture -- --ignored
+```
+
+**Run specific contract test**:
+```bash
+cargo test profile_start_dry_run_matches_contract_fixture -- --nocapture
+```
+
+---
+
+## Vault Structure Convention
+
+Skills require `SKILL.md`, instructions require `AGENTS.md` as the marker file within their directory under `skills/` or `instructions/`.
+
+---
+
+## Working with Worktrees
+
+Feature branches often use git worktrees at `.worktrees/<branch-name>/`. Code changes in a worktree are isolated from the main working directory — remember to `cd` into the worktree or use its path when building/testing.
+
+---
+
 ## File Size & Splitting Guidelines
 
-**Rule of Thumb**: No file should exceed ~250-300 lines (excluding tests and imports).
+**Rule of Thumb**: No file should exceed ~250–300 lines (excluding tests and imports).
 
 ### When to Split a File / Function
 
@@ -154,11 +329,6 @@ fn derive_enter_intent(state: &TuiState) -> UiIntent {
   - The file contains both UI logic and business logic.
   - The file directly calls `infra/` from `tui/` or `cli/`.
 
-- **Examples**:
-  - `tui/event.rs` → Split into `reducer.rs` + `intent.rs` + `command_mapper.rs` + `presenter.rs`.
-  - A use-case doing > 3 things → Split into smaller use-cases or private functions.
-  - Provider installer with install + config + wizard → Split into `install.rs`, `config.rs`, `wizard.rs` inside `infra/provider/opencode/`.
-
 ### Preferred Patterns
 
 1. **TUI Pattern** (Elm-inspired):
@@ -167,9 +337,39 @@ fn derive_enter_intent(state: &TuiState) -> UiIntent {
    - Presenter: CoreEvent → UI State
 
 2. **Use Case Pattern**:
-   - One file per use case (`app/usecases/attach_vault.rs`)
+   - One file per use case (`app/usecases/<name>.rs`)
    - Small, testable, focused on one business action.
+   - Migrate to `app/features/<feature>/usecase.rs` as slices mature.
 
 3. **Naming Convention**:
    - `handle_xxx` → Only allowed in reducer or very thin presenter glue.
-   - Business logic → Must go to `app/usecases/`
+   - Business logic → Must go to `app/usecases/` or `app/features/<feature>/`.
+
+---
+
+## Completed Refactor History
+
+### Phase 0 (merged)
+Added dev-deps, moved `TabKind` from `tui/` → `app/`, extracted view models to `app/snapshot.rs`, created architecture enforcement tests.
+
+### Phase 1 (merged)
+Introduced `CoreCommand`, `CoreEvent`, `CoreOutcome`, `UiIntent`, and `AgkCore` façade. Domain `Profile` with typed IDs.
+
+### Phase 2 (merged)
+Pure `reduce_key()` in `tui/reducer.rs`, `TuiState`/`ListMode`/`WizardState` in `tui/app_state.rs`, `command_mapper.rs`. 12 reducer unit tests.
+
+### Phase 3 (merged)
+Use-case extraction — `attach_vault`, `deactivate_provider`, `register_mcp`, `search_remote_vault` with fake-port tests.
+
+### Phase 3.5 (merged)
+Wired `AgkCore` with real port injection (`ConfigStorePort`, `McpRegistryPort`, `VaultSearchPort`, `Registry`). Created `InfraMcpRegistryAdapter`, `ClawHubSearchAdapter`, `AppEventSink` presenter bridge.
+
+### Phase 4 + 4.5 (merged)
+`CliPresenter` with `--json`/`--quiet`, `cli/core_dispatcher.rs` routing commands through `AgkCore`, added `dry_run` to `ProfileCommands::Create`.
+
+### Phase 5 (merged)
+`ProfileRuntimePort` trait, real `LaunchPlan` with provider-specific fields, `start_profile` use-case resolves profile from `ConfigStorePort` and runtime port from registry.
+
+---
+
+*Last updated: 2026-05-26 — Phases A-F completed; Phase G in progress.*
