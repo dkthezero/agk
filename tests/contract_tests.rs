@@ -24,14 +24,10 @@ fn golden_fixtures_are_valid_json() {
         "Expected at least one .json fixture under fixtures/contracts/"
     );
     for entry in entries {
-        let text =
-            std::fs::read_to_string(entry.path()).unwrap_or_else(|e| {
-                panic!("{}: {}", entry.path().display(), e)
-            });
-        let json: serde_json::Value =
-            serde_json::from_str(&text).unwrap_or_else(|e| {
-                panic!("{} is invalid JSON: {}", entry.path().display(), e)
-            });
+        let text = std::fs::read_to_string(entry.path())
+            .unwrap_or_else(|e| panic!("{}: {}", entry.path().display(), e));
+        let json: serde_json::Value = serde_json::from_str(&text)
+            .unwrap_or_else(|e| panic!("{} is invalid JSON: {}", entry.path().display(), e));
         assert!(
             json.get("profile_id").is_some() || json.get("provider_id").is_some(),
             "Fixture {} must contain profile_id or provider_id",
