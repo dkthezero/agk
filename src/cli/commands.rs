@@ -1186,9 +1186,46 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
             ),
         },
 
+        Some(Commands::Apply {
+            source: _,
+            scope: _,
+            context: _,
+            environment: _,
+            dry_run: _,
+        }) => {
+            println!("Apply command is wired to AgkCore; run via `cli::core_dispatcher` instead.");
+            Ok(EXIT_SUCCESS)
+        }
+
+        Some(Commands::Context { command: _ }) => {
+            println!("Context commands are wired to AgkCore; run via `cli::core_dispatcher`.");
+            Ok(EXIT_SUCCESS)
+        }
+
         None => {
             // No subcommand — fall through to TUI in main.rs
             Ok(EXIT_SUCCESS)
         }
     }
+}
+
+// Stub for Apply and Context commands — full wiring lives in core_dispatcher
+fn dispatch_core_command(cli: &Cli, workspace: &std::path::Path) -> Result<i32> {
+    use crate::app::core::AgkCore;
+    use crate::app::ports::ConfigStorePort;
+    use std::sync::Arc;
+
+    let (registry, _scan, store) = bootstrap::build(workspace.to_path_buf())?;
+    let context_store = crate::infra::context::TomlContextStore::standard();
+    let core = AgkCore::new(
+        Arc::new(store),
+        Arc::new(context_store),
+        Arc::new(crate::infra::mcp::adapter::InfraMcpRegistryAdapter::new(
+            workspace.to_path_buf(),
+        )),
+        Arc::new(crate::infra::vault::search_adapters::ClawHubSearchAdapter::new("clawhub")),
+        Arc::new(registry),
+        std::collections::HashMap::new(),
+    );
+    crate::cli::core_dispatcher::dispatch(cli, workspace, &core)
 }

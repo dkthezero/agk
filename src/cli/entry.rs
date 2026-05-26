@@ -32,6 +32,30 @@ pub enum Commands {
         global: bool,
     },
 
+    /// Apply a declarative team configuration from a URL or local path
+    Apply {
+        /// Source URL or file path to the configuration
+        source: String,
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+        /// Target context (if omitted, applies to current context)
+        #[arg(short, long)]
+        context: Option<String>,
+        /// Target environment (local, dev, staging, prod)
+        #[arg(short, long, value_enum)]
+        environment: Option<EnvironmentArg>,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Manage contexts (company / team separation)
+    Context {
+        #[command(subcommand)]
+        command: ContextCommands,
+    },
+
     /// Synchronize installed assets with config (install missing, update outdated)
     Sync {
         /// Force global scope
@@ -251,6 +275,30 @@ pub enum TelemetryCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum ContextCommands {
+    /// Switch to a context and apply its defaults
+    Switch {
+        /// Context name
+        name: String,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// List all configured contexts
+    List,
+
+    /// Create a new context
+    Create {
+        /// Context name
+        name: String,
+        /// Display name
+        #[arg(short, long)]
+        display_name: Option<String>,
+    },
+}
+
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum ExportFormat {
     Json,
@@ -268,6 +316,25 @@ impl ScopeArg {
         match self {
             ScopeArg::Global => crate::domain::scope::Scope::Global,
             ScopeArg::Workspace => crate::domain::scope::Scope::Workspace,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum EnvironmentArg {
+    Local,
+    Dev,
+    Staging,
+    Prod,
+}
+
+impl From<EnvironmentArg> for crate::domain::context::Environment {
+    fn from(arg: EnvironmentArg) -> Self {
+        match arg {
+            EnvironmentArg::Local => crate::domain::context::Environment::Local,
+            EnvironmentArg::Dev => crate::domain::context::Environment::Dev,
+            EnvironmentArg::Staging => crate::domain::context::Environment::Staging,
+            EnvironmentArg::Prod => crate::domain::context::Environment::Prod,
         }
     }
 }

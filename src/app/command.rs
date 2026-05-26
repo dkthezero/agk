@@ -122,6 +122,26 @@ pub enum CoreCommand {
     },
 
     // -----------------------------------------------------------------------
+    // Context commands
+    // -----------------------------------------------------------------------
+    SwitchContext {
+        id: crate::domain::context::ContextId,
+        dry_run: bool,
+    },
+    ListContexts,
+
+    // -----------------------------------------------------------------------
+    // Apply commands
+    // -----------------------------------------------------------------------
+    ApplyConfig {
+        input: ApplyConfigInput,
+        scope: crate::domain::scope::Scope,
+        environment: Option<crate::domain::context::Environment>,
+        context: Option<crate::domain::context::ContextId>,
+        dry_run: bool,
+    },
+
+    // -----------------------------------------------------------------------
     // Workspace commands
     // -----------------------------------------------------------------------
     LoadWorkspaceSnapshot {
@@ -132,6 +152,48 @@ pub enum CoreCommand {
 // ---------------------------------------------------------------------------
 // Input structs
 // ---------------------------------------------------------------------------
+
+/// Payload for [`CoreCommand::ApplyConfig`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApplyConfigInput {
+    pub source_url: String,
+    pub vaults: Vec<crate::domain::apply::ApplyVault>,
+    pub providers: Vec<String>,
+    pub profiles: Vec<crate::domain::config::Profile>,
+}
+
+impl ApplyConfigInput {
+    pub fn from_url(url: impl Into<String>) -> Self {
+        Self {
+            source_url: url.into(),
+            vaults: Vec::new(),
+            providers: Vec::new(),
+            profiles: Vec::new(),
+        }
+    }
+
+    pub fn with_vault(
+        mut self,
+        id: impl Into<String>,
+        config: crate::domain::config::VaultConfig,
+    ) -> Self {
+        self.vaults.push(crate::domain::apply::ApplyVault {
+            id: id.into(),
+            config,
+        });
+        self
+    }
+
+    pub fn with_provider(mut self, id: impl Into<String>) -> Self {
+        self.providers.push(id.into());
+        self
+    }
+
+    pub fn with_profile(mut self, profile: crate::domain::config::Profile) -> Self {
+        self.profiles.push(profile);
+        self
+    }
+}
 
 /// Payload for [`CoreCommand::CreateProfile`].
 #[derive(Debug, Clone, PartialEq)]

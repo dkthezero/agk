@@ -140,3 +140,36 @@ fn derive_enter_intent(state: &TuiState) -> UiIntent {
     // return UiIntent::Command(CoreCommand::...)
 }
 ```
+
+## File Size & Splitting Guidelines
+
+**Rule of Thumb**: No file should exceed ~250-300 lines (excluding tests and imports).
+
+### When to Split a File / Function
+
+- **Split if**:
+  - The file has more than one major responsibility.
+  - A function has > 50 lines or > 3 levels of nesting.
+  - A `match` statement has > 8 arms.
+  - The file contains both UI logic and business logic.
+  - The file directly calls `infra/` from `tui/` or `cli/`.
+
+- **Examples**:
+  - `tui/event.rs` → Split into `reducer.rs` + `intent.rs` + `command_mapper.rs` + `presenter.rs`.
+  - A use-case doing > 3 things → Split into smaller use-cases or private functions.
+  - Provider installer with install + config + wizard → Split into `install.rs`, `config.rs`, `wizard.rs` inside `infra/provider/opencode/`.
+
+### Preferred Patterns
+
+1. **TUI Pattern** (Elm-inspired):
+   - Reducer: Pure key → intents
+   - Mapper: Intent → CoreCommand
+   - Presenter: CoreEvent → UI State
+
+2. **Use Case Pattern**:
+   - One file per use case (`app/usecases/attach_vault.rs`)
+   - Small, testable, focused on one business action.
+
+3. **Naming Convention**:
+   - `handle_xxx` → Only allowed in reducer or very thin presenter glue.
+   - Business logic → Must go to `app/usecases/`

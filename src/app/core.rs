@@ -1,6 +1,8 @@
 use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
-use crate::app::ports::{ConfigStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort};
+use crate::app::ports::{
+    ConfigStorePort, ContextStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort,
+};
 use crate::app::registry::Registry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,6 +18,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AgkCore {
     store: Arc<dyn ConfigStorePort>,
+    context_store: Arc<dyn ContextStorePort>,
     mcp_registry: Arc<dyn McpRegistryPort>,
     vault_search: Arc<dyn VaultSearchPort>,
     registry: Arc<Registry>,
@@ -26,6 +29,7 @@ pub struct AgkCore {
 impl AgkCore {
     pub fn new(
         store: Arc<dyn ConfigStorePort>,
+        context_store: Arc<dyn ContextStorePort>,
         mcp_registry: Arc<dyn McpRegistryPort>,
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
@@ -33,6 +37,7 @@ impl AgkCore {
     ) -> Self {
         Self {
             store,
+            context_store,
             mcp_registry,
             vault_search,
             registry,
@@ -77,8 +82,60 @@ impl AgkCore {
             .map_err(Into::into),
 
             // ===============================================================
-            // Provider commands (stubbed — requires ProviderPort lookup)
+            // Context commands
             // ===============================================================
+            CoreCommand::SwitchContext { id, dry_run } => {
+                crate::app::usecases::switch_context::run(
+                    id,
+                    *dry_run,
+                    self.context_store.as_ref(),
+                    sink,
+                    self.store.as_ref(),
+                )
+            }
+            CoreCommand::ListContexts => {
+                let file = self.context_store.load_contexts()?;
+                for (name, ctx) in &file.contexts {
+                    let marker = if name == &file.current_context {
+                        "* "
+                    } else {
+                        "  "
+                    };
+                    let display = ctx.display_name.as_ref().unwrap_or(name);
+                    let env = ctx
+                        .environment
+                        .map(|e| e.as_str().to_string())
+                        .unwrap_or_default();
+                    sink.on_event(crate::app::event::CoreEvent::TaskCompleted {
+                        id: 0,
+                        message: format!(
+                            "{}{} [{}] (vaults: {}, profiles: {})",
+                            marker,
+                            display,
+                            env,
+                            ctx.vaults.len(),
+                            ctx.profiles.len()
+                        ),
+                    });
+                }
+                Ok(CoreOutcome::Ok)
+            }
+
+            // ===============================================================
+            // Provider commands
+            // ===============================================================
+            CoreCommand::ActivateProvider { id, scope } => match self.registry.get_provider(id) {
+                Ok(_provider) => crate::app::usecases::activate_provider::run(
+                    id.clone(),
+                    *scope,
+                    self.store.as_ref(),
+                    sink,
+                ),
+                Err(e) => {
+                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
+                    Ok(CoreOutcome::Ok)
+                }
+            },
             CoreCommand::DeactivateProvider { id, scope } => match self.registry.get_provider(id) {
                 Ok(provider) => crate::app::usecases::deactivate_provider::run(
                     id.clone(),
@@ -92,6 +149,31 @@ impl AgkCore {
                     Ok(CoreOutcome::Ok)
                 }
             },
+
+            // ===============================================================
+            // Apply commands
+            // ===============================================================
+            CoreCommand::ApplyConfig {
+                input,
+                scope,
+                environment,
+                context,
+                dry_run,
+            } => crate::app::usecases::apply_config::run(
+                input.clone(),
+                *scope,
+                *environment,
+                context.clone(),
+                *dry_run,
+                self.store.as_ref(),
+                self.context_store.as_ref(),
+                self.registry
+                    .providers
+                    .iter()
+                    .map(|p| p.id().to_string())
+                    .collect(),
+                sink,
+            ),
 
             // ===============================================================
             // MCP commands (wired)
@@ -209,6 +291,30 @@ mod tests {
         }
     }
 
+    struct FakeCtxStore;
+    impl FakeCtxStore {
+        fn new() -> Self {
+            FakeCtxStore
+        }
+    }
+    impl crate::app::ports::ContextStorePort for FakeCtxStore {
+        fn load_contexts(&self) -> anyhow::Result<crate::domain::context::ContextFile> {
+            Ok(Default::default())
+        }
+        fn save_contexts(
+            &self,
+            _contexts: &crate::domain::context::ContextFile,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn current_context(&self) -> anyhow::Result<crate::domain::context::ContextId> {
+            Ok(crate::domain::context::ContextId::default())
+        }
+        fn switch_context(&self, _id: &crate::domain::context::ContextId) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
     struct StubSink;
     impl CoreEventSink for StubSink {
         fn on_event(&mut self, _event: crate::app::event::CoreEvent) {}
@@ -218,6 +324,7 @@ mod tests {
     fn test_core() -> AgkCore {
         AgkCore::new(
             Arc::new(FakeStore::new()),
+            Arc::new(FakeCtxStore::new()),
             Arc::new(FakeMcp),
             Arc::new(FakeVaultSearch),
             Arc::new(crate::app::registry::Registry::new()),

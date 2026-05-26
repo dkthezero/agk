@@ -35,6 +35,21 @@ pub fn clawhub_cache_dir() -> PathBuf {
     global_config_root().join("clawhub")
 }
 
+/// Resolve the contexts directory: `<config_root>/contexts`.
+pub fn contexts_dir() -> PathBuf {
+    global_config_root().join("contexts")
+}
+
+/// Resolve the contexts file path: `<config_root>/contexts.toml`.
+pub fn contexts_file_path() -> PathBuf {
+    global_config_root().join("contexts.toml")
+}
+
+/// Resolve the current-context file path: `<config_root>/current-context`.
+pub fn current_context_path() -> PathBuf {
+    global_config_root().join("current-context")
+}
+
 /// Resolve the analytics file path: `<config_root>/analytics.toml`.
 pub fn analytics_path() -> PathBuf {
     global_config_root().join("analytics.toml")

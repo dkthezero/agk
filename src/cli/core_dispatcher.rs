@@ -136,6 +136,44 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             include_evals: *evals,
             dry_run: *dry_run,
         }),
+        Commands::Context { command } => match command {
+            crate::cli::entry::ContextCommands::Switch { name, dry_run } => {
+                Ok(CoreCommand::SwitchContext {
+                    id: crate::domain::context::ContextId::new(name.clone()),
+                    dry_run: *dry_run,
+                })
+            }
+            crate::cli::entry::ContextCommands::List => Ok(CoreCommand::ListContexts),
+            crate::cli::entry::ContextCommands::Create { name, display_name } => {
+                Ok(CoreCommand::ApplyConfig {
+                    input: crate::app::command::ApplyConfigInput::from_url(format!(
+                        "context://{}",
+                        name
+                    )),
+                    scope: crate::domain::scope::Scope::Global,
+                    environment: None,
+                    context: Some(crate::domain::context::ContextId::new(name.clone())),
+                    dry_run: false,
+                })
+            }
+        },
+        Commands::Apply {
+            source,
+            scope,
+            context,
+            environment,
+            dry_run,
+        } => Ok(CoreCommand::ApplyConfig {
+            input: crate::app::command::ApplyConfigInput::from_url(source.clone()),
+            scope: scope.into_domain_scope(),
+            environment: environment
+                .as_ref()
+                .map(|e| crate::domain::context::Environment::from(*e)),
+            context: context
+                .as_deref()
+                .map(crate::domain::context::ContextId::new),
+            dry_run: *dry_run,
+        }),
         _ => Err(anyhow::anyhow!("Command not yet wired to AgkCore")),
     }
 }

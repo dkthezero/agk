@@ -16,6 +16,14 @@ pub fn map_intents(intents: Vec<UiIntent>) -> Vec<CoreCommand> {
 
 fn map_single_intent(intent: UiIntent) -> Option<CoreCommand> {
     match intent {
+        UiIntent::ActivateProvider(id) => Some(CoreCommand::ActivateProvider {
+            id,
+            scope: crate::domain::scope::Scope::Workspace,
+        }),
+        UiIntent::DeactivateProvider(id) => Some(CoreCommand::DeactivateProvider {
+            id,
+            scope: crate::domain::scope::Scope::Workspace,
+        }),
         UiIntent::StartProfile(id) => Some(CoreCommand::StartProfile {
             id,
             scope: crate::domain::scope::Scope::Workspace,
@@ -27,6 +35,13 @@ fn map_single_intent(intent: UiIntent) -> Option<CoreCommand> {
         }),
         UiIntent::RequestReload => Some(CoreCommand::LoadWorkspaceSnapshot {
             scope: crate::domain::scope::Scope::Workspace,
+        }),
+        UiIntent::ApplyConfig(source) => Some(CoreCommand::ApplyConfig {
+            input: crate::app::command::ApplyConfigInput::from_url(source),
+            scope: crate::domain::scope::Scope::Workspace,
+            environment: None,
+            context: None,
+            dry_run: false,
         }),
         // TODO: Phase 3 – map remaining intents as use-cases are implemented.
         _ => None,
