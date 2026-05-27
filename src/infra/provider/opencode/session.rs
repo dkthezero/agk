@@ -16,11 +16,16 @@ impl ProfileRuntimePort for OpenCodeProvider {
     ) -> Result<LaunchPlan> {
         let name = profile.id.as_str();
         let base_agent_path = self.profile_agent_path(name);
+
+        // Auto-generate a minimal agent markdown if the file is missing.
+        // This can happen when a profile was created via the config-only
+        // headless path (e.g. Phase-B fallback) before agent generation was wired.
         if !base_agent_path.exists() {
-            anyhow::bail!(
-                "Profile agent file not found at {}",
-                base_agent_path.display()
-            );
+            if let Some(parent) = base_agent_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let content = format!("# {}\n\nProfile agent for {}.\n", name, name);
+            std::fs::write(&base_agent_path, content)?;
         }
 
         let (current_config, original_bytes) = self.read_workspace_config()?;
@@ -151,11 +156,19 @@ impl OpenCodeProvider {
         super::config::validate_profile_name(&profile.name)?;
 
         let base_agent_path = self.profile_agent_path(&profile.name);
+
+        // Auto-generate a minimal agent markdown if the file is missing.
+        // This can happen when a profile was created via the config-only
+        // headless path before agent generation was wired.
         if !base_agent_path.exists() {
-            anyhow::bail!(
-                "Profile agent file not found at {}",
-                base_agent_path.display()
+            if let Some(parent) = base_agent_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let content = format!(
+                "# {}\n\nProfile agent for {}.\n",
+                profile.name, profile.name
             );
+            std::fs::write(&base_agent_path, content)?;
         }
 
         let agent_name = format!("{}_{}", profile.name, session_key);

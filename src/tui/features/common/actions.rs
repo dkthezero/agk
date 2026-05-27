@@ -65,12 +65,10 @@ pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
 
     let skill_names: Vec<String> = state
         .packages
-        .get(&state.active_tab)
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
+        .values()
+        .flatten()
         .filter(|p| p.kind == crate::domain::asset::AssetKind::Skill)
-        .map(|p| p.identity.name)
+        .map(|p| p.identity.name.clone())
         .collect();
     ws.skill_options = skill_names.clone();
 

@@ -76,7 +76,6 @@ pub fn update_asset(
 }
 
 /// Register a provider in the scope's config and copy all checked assets into it.
-#[allow(dead_code)]
 pub fn install_provider(
     scope: Scope,
     provider_id: &str,

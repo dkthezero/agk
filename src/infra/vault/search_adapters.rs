@@ -4,7 +4,6 @@ use anyhow::Result;
 
 /// Concrete [`VaultSearchPort`] adapter for ClawHub.
 pub struct ClawHubSearchAdapter {
-    #[allow(dead_code)] // VaultSearchPort contract — id used in search results & logging
     vault_id: String,
 }
 

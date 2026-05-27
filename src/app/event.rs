@@ -4,7 +4,6 @@
 /// Both TUI and CLI observe the same events, but render them differently (UI state
 /// updates vs stdout/JSON).
 /// NOTE: Events are emitted incrementally as use-cases are wired into core.rs.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreEvent {
     // -----------------------------------------------------------------------
@@ -171,7 +170,6 @@ pub struct TaskView {
     pub status: TaskStatus,
 }
 
-#[allow(dead_code)] // TaskStatus variants wired incrementally for progress tracking
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskStatus {
     Running,

@@ -5,7 +5,6 @@
 /// over time (e.g. sync, refresh) emit [`crate::app::event::CoreEvent`]s via
 /// the event sink instead.
 /// NOTE: Outcomes are returned incrementally as use-cases are wired into core.rs.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreOutcome {
     /// Command succeeded with no additional payload.
@@ -42,7 +41,6 @@ pub trait CoreEventSink: Send {
 }
 
 /// A no-op sink useful for headless fire-and-forget commands.
-#[allow(dead_code)] // test-only no-op sink, used by app/usecases/ tests
 pub struct NullSink;
 
 impl CoreEventSink for NullSink {
@@ -54,7 +52,6 @@ impl CoreEventSink for NullSink {
 mod tests {
     use super::*;
 
-    #[allow(dead_code)] // test helper pattern — used by downstream use-case tests
     struct StubSink {
         events: Vec<crate::app::event::CoreEvent>,
     }

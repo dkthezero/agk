@@ -36,7 +36,6 @@ pub fn remove_asset(
 }
 
 /// Remove a provider from the scope's config.
-#[allow(dead_code)]
 pub fn remove_provider(scope: Scope, provider_id: &str, store: &dyn ConfigStorePort) -> Result<()> {
     let mut config = store.load(scope)?;
     config.providers.retain(|p| p != provider_id);

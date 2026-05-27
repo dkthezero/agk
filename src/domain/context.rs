@@ -105,7 +105,6 @@ fn default_context() -> String {
 }
 
 impl ContextFile {
-    #[allow(dead_code)] // used in tests, context switching not yet wired in core.rs
     pub fn current_id(&self) -> ContextId {
         ContextId::new(&self.current_context)
     }

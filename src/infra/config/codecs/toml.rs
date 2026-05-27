@@ -1,7 +1,6 @@
 use crate::app::ports::ManifestCodecPort;
 use crate::domain::config::ConfigFile;
 
-#[allow(dead_code)] // Phase E codec stub — no caller selects codec yet
 #[derive(Debug)]
 pub struct TomlCodec;
 

@@ -6,7 +6,6 @@
 /// interactive behaviour can never diverge.
 /// NOTE: Variants are wired incrementally as use-cases migrate into `core.rs`.
 /// Dead-code warnings are suppressed because every variant has a planned home.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreCommand {
     // -----------------------------------------------------------------------
@@ -182,7 +181,6 @@ impl ApplyConfigInput {
         }
     }
 
-    #[allow(dead_code)] // builder methods used in tests / apply_config use-case
     pub fn with_vault(
         mut self,
         id: impl Into<String>,
@@ -195,13 +193,11 @@ impl ApplyConfigInput {
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_provider(mut self, id: impl Into<String>) -> Self {
         self.providers.push(id.into());
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_profile(mut self, profile: crate::domain::config::Profile) -> Self {
         self.profiles.push(profile);
         self

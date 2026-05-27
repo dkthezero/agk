@@ -1,3 +1,6 @@
+// During architectural convergence dead-code placeholders are expected.
+#![allow(dead_code)]
+
 mod app;
 mod cli;
 mod domain;
@@ -7,6 +10,7 @@ mod tui;
 use anyhow::Result;
 use app::core::AgkCore;
 use app::ports::ConfigStorePort;
+use futures::StreamExt;
 use std::sync::Arc;
 
 pub const EXIT_SUCCESS: i32 = 0;
@@ -84,6 +88,18 @@ async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
         tx: tx.clone(),
         workspace_root: workspace.clone(),
     };
+
+    // Spawn a keyboard input reader that forwards crossterm events into the
+    // same async channel consumed by `runtime_loop::run_loop`.
+    let tx_input = tx.clone();
+    tokio::spawn(async move {
+        let mut reader = crossterm::event::EventStream::new();
+        while let Some(Ok(evt)) = reader.next().await {
+            if tx_input.send(tui::event::AppEvent::Input(evt)).is_err() {
+                break;
+            }
+        }
+    });
 
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();

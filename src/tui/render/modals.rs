@@ -144,7 +144,8 @@ pub fn draw_modals(frame: &mut Frame, state: &AppState) {
                                 &desc,
                                 &ws.skills,
                                 &ws.mcps,
-                                "[Enter] Confirm Create  [Esc] Back",
+                                "[Enter] Confirm Create  [Esc] Back  [↑/↓] Scroll",
+                                ws.scroll_offset,
                             );
                         }
                         _ => {}

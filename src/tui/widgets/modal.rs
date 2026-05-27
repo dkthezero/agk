@@ -2,7 +2,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{
+        Block, Borders, Clear, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Wrap,
+    },
     Frame,
 };
 
@@ -260,11 +263,12 @@ pub fn render_confirm_modal(frame: &mut Frame, title: &str, message: &str, actio
     }
 }
 
-/// Render a review modal with structured sections that are guaranteed to show.
+/// Render a scrollable review modal with structured sections.
 ///
-/// Sections are shown as labeled blocks with their content underneath.  Empty
-/// sections display “(none)” so the user always sees the full profile summary.
-/// The modal is tall and wide enough to accommodate multi-line descriptions.
+/// The modal always auto-adjusts its outer height to the content but is
+/// capped at 90% of the terminal.  When content exceeds modal height, a
+/// scrollbar appears and `scroll_offset` controls the vertical position.
+#[allow(clippy::too_many_arguments)]
 pub fn render_review_modal(
     frame: &mut Frame,
     title: &str,
@@ -273,6 +277,7 @@ pub fn render_review_modal(
     skills: &[String],
     mcps: &[String],
     actions: &str,
+    scroll_offset: usize,
 ) {
     let area = frame.area();
     let width = (area.width as f32 * 0.8).clamp(40.0, 100.0) as u16;
@@ -290,16 +295,19 @@ pub fn render_review_modal(
         estimate_wrapped_lines(&mcps.join(", "), inner_width)
     };
 
-    // height: title line (1) + blank (1) + sections (each: label 1 + content N + blank 1)
-    let content_height = 1                // Profile: name
-        + 2                             // blank + Description label
+    // Content height: label + content + spacing for each section
+    let content_height = 1 // Profile: name
+        + 2                 // blank + Description label
         + desc_lines
-        + 2                             // blank + Skills label
+        + 2                 // blank + Skills label
         + skills_lines
-        + 2                             // blank + MCPs label
+        + 2                 // blank + MCPs label
         + mcps_lines
         + 2; // blank + actions padding
-    let height = content_height.min(area.height.saturating_sub(4)).max(12);
+
+    // Cap outer height at 90% of terminal (leave 5% margin top+bottom)
+    let max_height = (area.height * 90) / 100;
+    let height = content_height.max(12).min(max_height);
     let popup = centered_rect(width, height, area);
 
     frame.render_widget(Clear, popup);
@@ -375,8 +383,30 @@ pub fn render_review_modal(
     let action_spans = color_keys(actions);
     lines.push(Line::from(action_spans));
 
-    let paragraph = Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false });
+    // Clamp scroll offset so we don't scroll past the end
+    let total_lines = lines.len() as u16;
+    let visible_lines = inner.height;
+    let max_scroll = total_lines.saturating_sub(visible_lines) as usize;
+    let scroll_offset = scroll_offset.min(max_scroll);
+
+    let paragraph = Paragraph::new(Text::from(lines))
+        .wrap(Wrap { trim: false })
+        .scroll((scroll_offset as u16, 0));
+
     frame.render_widget(paragraph, inner);
+
+    // Render scrollbar only when content overflows
+    if total_lines > visible_lines {
+        let mut scrollbar_state = ScrollbarState::new(total_lines as usize).position(scroll_offset);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .thumb_symbol("█")
+            .track_symbol(Some("│"));
+        frame.render_stateful_widget(
+            scrollbar,
+            popup.inner(Margin::new(0, 1)),
+            &mut scrollbar_state,
+        );
+    }
 }
 
 fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {

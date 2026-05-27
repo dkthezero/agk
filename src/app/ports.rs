@@ -27,7 +27,6 @@ pub trait FeatureSetPort: Send + Sync {
 #[async_trait::async_trait]
 pub trait VaultPort: Send + Sync {
     fn id(&self) -> &str;
-    #[allow(dead_code)]
     fn kind_name(&self) -> &str;
 
     async fn refresh(&self) -> Result<()> {
@@ -38,7 +37,6 @@ pub trait VaultPort: Send + Sync {
 }
 
 /// Port for searching remote vaults (e.g. ClawHub).
-#[allow(dead_code)] // wired in core.rs but no actual search implementation yet
 #[async_trait::async_trait]
 pub trait VaultSearchPort: Send + Sync {
     fn vault_id(&self) -> &str;
@@ -64,7 +62,6 @@ pub trait McpRegistryPort: Send + Sync {
 }
 
 /// Port for running external processes.
-#[allow(dead_code)] // Phase E process runner port — not yet wired
 pub trait ProcessRunnerPort: Send + Sync {
     fn run(
         &self,
@@ -75,7 +72,6 @@ pub trait ProcessRunnerPort: Send + Sync {
 }
 
 /// Port for configuration format codecs (TOML, YAML, JSON, etc.)
-#[allow(dead_code)] // Phase E config codec port — TomlCodec only impl so far
 pub trait ManifestCodecPort: std::fmt::Debug {
     /// Codec identifier e.g. "toml", "yaml"
     fn id(&self) -> &'static str;
@@ -101,7 +97,6 @@ pub trait ConfigStorePort: Send + Sync {
 pub trait ContextStorePort: Send + Sync {
     fn load_contexts(&self) -> Result<crate::domain::context::ContextFile>;
     fn save_contexts(&self, contexts: &crate::domain::context::ContextFile) -> Result<()>;
-    #[allow(dead_code)] // used by tests and list_contexts view; production callers inline load_contexts().current_context
     fn current_context(&self) -> Result<crate::domain::context::ContextId>;
     fn switch_context(&self, id: &crate::domain::context::ContextId) -> Result<()>;
 }
@@ -184,7 +179,6 @@ pub enum WizardStep {
     },
     /// Reserved for future providers that want to embed an external interactive
     /// command as a distinct wizard step.  Not currently used by OpenCode.
-    #[allow(dead_code)]
     Interactive {
         title: String,
         command: String,
@@ -219,6 +213,8 @@ pub struct WizardState {
     /// entering a different checklist step always resets state even if
     /// option counts happen to match.
     pub checked_step_index: Option<usize>,
+    /// Vertical scroll offset for the Review step (wrapped lines).
+    pub scroll_offset: usize,
 }
 
 impl WizardState {
@@ -238,6 +234,7 @@ impl WizardState {
             cursor_pos: 0,
             provider_id,
             checked_step_index: None,
+            scroll_offset: 0,
         };
         ws.sync_checklist_state();
         ws
@@ -270,7 +267,6 @@ impl WizardState {
 /// Port for building and executing profile launch plans.
 /// Implemented by provider adapters that support profile sessions.
 pub trait ProfileRuntimePort: Send + Sync {
-    #[allow(dead_code)] // provider runtime port contract
     fn provider_id(&self) -> &str;
 
     /// Build a deterministic launch plan without modifying filesystem state.
@@ -316,7 +312,6 @@ impl ProfileSession {
 pub trait McpProvider: Send + Sync {
     fn provider_id(&self) -> &str;
     fn supports_mcp(&self) -> bool;
-    #[allow(dead_code)]
     fn mcp_config_path(&self, scope: Scope) -> Option<PathBuf>;
     fn write_mcp_server(&self, server: &McpServer, scope: Scope) -> Result<()>;
     fn remove_mcp_server(&self, name: &str, scope: Scope) -> Result<()>;

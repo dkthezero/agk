@@ -60,7 +60,6 @@ impl McpServerId {
 pub struct InstructionId(pub String);
 
 impl InstructionId {
-    #[allow(dead_code)]
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }

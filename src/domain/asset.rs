@@ -5,7 +5,6 @@ use std::path::PathBuf;
 pub enum AssetKind {
     Skill,
     Instruction,
-    #[allow(dead_code)]
     McpServer,
 }
 

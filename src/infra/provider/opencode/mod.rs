@@ -450,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn profile_runtime_errors_when_agent_missing() {
+    fn profile_runtime_auto_generates_agent_when_missing() {
         let dir = tempfile::tempdir().unwrap();
         let provider = OpenCodeProvider::new(dir.path().to_path_buf());
 
@@ -466,8 +466,9 @@ mod tests {
         };
 
         let result = provider.build_launch_plan(&profile, None);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("not found"));
+        assert!(result.is_ok(), "Should auto-generate agent.md when missing");
+        let plan = result.unwrap();
+        assert_eq!(plan.profile_id.as_str(), "nonexistent");
+        assert!(plan.agent_markdown_source.exists());
     }
 }

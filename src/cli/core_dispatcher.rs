@@ -1,4 +1,4 @@
-use crate::app::command::{CoreCommand, CreateProfileInput};
+use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
 use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TelemetryCommands};
@@ -37,38 +37,9 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 scope: Scope::Workspace,
                 dry_run: *dry_run,
             }),
-            ProfileCommands::Create {
-                name,
-                provider,
-                skills,
-                mcps,
-                description,
-                description_file,
-                scope,
-                dry_run: _,
-            } => {
-                let desc = if let Some(path) = description_file {
-                    std::fs::read_to_string(path)
-                        .map_err(|e| anyhow::anyhow!("Failed to read description file: {}", e))?
-                } else {
-                    description.clone().unwrap_or_default()
-                };
-                let mut input = CreateProfileInput::new(
-                    ProfileId::new(name.clone()),
-                    crate::domain::profile::ProviderId::new(provider.clone()),
-                    scope.into_domain_scope(),
-                );
-                input.description = desc;
-                input.skill_refs = skills
-                    .iter()
-                    .map(crate::domain::profile::SkillId::new)
-                    .collect();
-                input.mcp_refs = mcps
-                    .iter()
-                    .map(crate::domain::profile::McpServerId::new)
-                    .collect();
-                Ok(CoreCommand::CreateProfile { input })
-            }
+            ProfileCommands::Create { dry_run: _, .. } => Err(anyhow::anyhow!(
+                "Profile create command not yet wired through AgkCore"
+            )),
         },
         Commands::Mcp { command } => match command {
             McpCommands::Add {
@@ -249,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn to_core_command_profile_create() {
+    fn to_core_command_profile_create_fallbacks_to_legacy() {
         let cmd = Commands::Profile {
             command: ProfileCommands::Create {
                 name: "test".into(),
@@ -262,11 +233,8 @@ mod tests {
                 dry_run: false,
             },
         };
-        let core = to_core_command(&cmd, std::path::Path::new(".")).unwrap();
-        assert!(matches!(
-            core,
-            CoreCommand::CreateProfile { ref input }
-            if input.id.as_str() == "test" && input.provider_id.as_str() == "opencode"
-        ));
+        let result = to_core_command(&cmd, std::path::Path::new("."));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not yet wired"));
     }
 }

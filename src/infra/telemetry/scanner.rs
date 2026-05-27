@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::domain::telemetry::AnalyticsConfig;
 use std::path::PathBuf;
 use std::time::Duration;

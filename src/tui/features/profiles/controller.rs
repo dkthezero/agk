@@ -216,6 +216,14 @@ pub fn handle_profile_wizard_input(
                     state.status_line = "Cancelled profile creation".to_string();
                 }
             }
+            KeyCode::Up => {
+                if ws.scroll_offset > 0 {
+                    ws.scroll_offset -= 1;
+                }
+            }
+            KeyCode::Down => {
+                ws.scroll_offset = ws.scroll_offset.saturating_add(1);
+            }
             _ => {}
         },
         WizardStep::Interactive { .. } => {}

@@ -147,13 +147,11 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
 
 /// Escape a string for embedding inside a cmd.exe double-quoted argument.
 /// Replaces each backslash with `\\`, then replaces each `"` with `\"`.
-#[allow(dead_code)]
 fn escape_cmd_arg(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Minimal shell-escape for paths inside `sh -lc 'cd "..." && exec $SHELL'`.
-#[allow(dead_code)]
 fn shell_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
