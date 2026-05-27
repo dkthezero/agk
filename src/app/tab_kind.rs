@@ -8,7 +8,6 @@ use crate::domain::asset::AssetKind;
 /// root (`app/bootstrap.rs`) can build tab metadata without violating the
 /// hexagonal boundary rule that `app/` must not depend on `tui/`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[allow(dead_code)]
 pub enum TabKind {
     /// Skill- or instruction-like package assets.
     Asset,
@@ -25,14 +24,10 @@ pub enum TabKind {
 }
 
 impl TabKind {
-    /// Returns `true` if this tab displays packages that are installed on a per-
-    /// asset basis (Skills / Instructions).
     pub fn is_asset_like(self) -> bool {
         matches!(self, TabKind::Asset)
     }
 
-    /// The tab label that should be shown on the status line when a user tries
-    /// to perform an action that is only valid for asset tabs.
     pub fn asset_label(self) -> Option<&'static str> {
         match self {
             TabKind::Asset => Some("Skills/Instructions"),

@@ -5,7 +5,6 @@ use crate::domain::scope::Scope;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
 pub enum ListMode {
     Normal,
     Searching,
@@ -47,7 +46,6 @@ pub struct Progress {
 
 pub static NEXT_TASK_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
-#[allow(dead_code)]
 pub struct AppState {
     pub active_tab: usize,
     pub search_query: String,

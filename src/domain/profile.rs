@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Unique identifier for a profile (display name acts as the key).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct ProfileId(pub String);
 
 impl ProfileId {
@@ -27,26 +27,6 @@ impl From<String> for ProfileId {
     }
 }
 
-impl Default for ProfileId {
-    fn default() -> Self {
-        Self(String::new())
-    }
-}
-
-/// Typed wrapper for vault identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct VaultId(pub String);
-
-impl VaultId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
 /// Typed wrapper for skill identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SkillId(pub String);
@@ -54,6 +34,10 @@ pub struct SkillId(pub String);
 impl SkillId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -64,6 +48,10 @@ pub struct McpServerId(pub String);
 impl McpServerId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -78,7 +66,7 @@ impl InstructionId {
 }
 
 /// Typed wrapper for provider identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct ProviderId(pub String);
 
 impl ProviderId {
@@ -94,12 +82,6 @@ impl ProviderId {
 impl From<&str> for ProviderId {
     fn from(value: &str) -> Self {
         Self(value.to_string())
-    }
-}
-
-impl Default for ProviderId {
-    fn default() -> Self {
-        Self(String::new())
     }
 }
 

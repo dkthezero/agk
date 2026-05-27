@@ -61,8 +61,8 @@ mod tests {
     fn sha10_is_deterministic() {
         let dir = tempfile::tempdir().unwrap();
         let f = write_temp_file(dir.path(), "test.md", "deterministic content");
-        let a = compute_sha10(&[f.clone()]).unwrap();
-        let b = compute_sha10(&[f]).unwrap();
+        let a = compute_sha10(std::slice::from_ref(&f)).unwrap();
+        let b = compute_sha10(std::slice::from_ref(&f)).unwrap();
         assert_eq!(a, b);
     }
 

@@ -2,7 +2,6 @@ use crate::domain::identity::AssetIdentity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VaultKind {
@@ -41,7 +40,6 @@ pub struct AssetKey {
 }
 
 impl AssetKey {
-    #[allow(dead_code)]
     pub fn new(name: impl Into<String>, vault_id: impl Into<String>) -> Self {
         Self {
             name: name.into(),

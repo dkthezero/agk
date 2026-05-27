@@ -1,5 +1,5 @@
 use crate::app::ports::McpRegistryPort;
-use crate::domain::mcp::{McpRegistry, McpServer, McpTransport};
+use crate::domain::mcp::McpServer;
 use crate::domain::scope::Scope;
 use anyhow::Result;
 
@@ -36,7 +36,9 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
     }
 
     fn build_providers(
-        &self, workspace_root: &std::path::Path) -> Vec<Box<dyn crate::app::ports::McpProvider>> {
+        &self,
+        workspace_root: &std::path::Path,
+    ) -> Vec<Box<dyn crate::app::ports::McpProvider>> {
         crate::infra::mcp::build_mcp_providers(workspace_root)
     }
 

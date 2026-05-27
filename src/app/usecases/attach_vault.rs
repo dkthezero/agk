@@ -1,5 +1,4 @@
-use crate::app::event::CoreEvent;
-use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::app::outcome::CoreEventSink;
 use crate::app::ports::ConfigStorePort;
 use crate::domain::config::VaultConfig;
 use crate::domain::scope::Scope;

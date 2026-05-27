@@ -1,0 +1,12 @@
+{
+  "_comment": "Golden fixture for contract test: agk profile start --dry-run --json",
+  "profile_id": "opencode-dev",
+  "provider_id": "opencode",
+  "plan_type": "LaunchPlan",
+  "workspace_root": "{{WORKSPACE}}",
+  "provider_config_path": "{{WORKSPACE}}/.opencode/opencode.json",
+  "skills": [],
+  "instructions": [],
+  "mcps": [],
+  "dry_run": true
+}

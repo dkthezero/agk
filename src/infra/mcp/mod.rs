@@ -234,6 +234,8 @@ pub fn disable(
     Ok(())
 }
 
+pub(crate) mod adapter;
+
 pub fn build_mcp_providers(workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>> {
     vec![
         Box::new(
@@ -258,8 +260,6 @@ pub fn build_mcp_providers(workspace_root: &std::path::Path) -> Vec<Box<dyn McpP
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn register_and_load_round_trip() {
         let dir = tempfile::tempdir().unwrap();

@@ -1,172 +1,12 @@
-use crate::app::ports::{ConfigStorePort, ProviderPort};
-use crate::domain::asset::{AssetKind, ScannedPackage};
-use crate::domain::config::{AssetBucket, ConfigFile, VaultConfig};
-use crate::domain::identity::AssetIdentity;
-use crate::domain::scope::Scope;
-use anyhow::{bail, Result};
+pub mod install;
+pub mod remove;
+pub mod sync;
 
-/// Install a scanned package into the active provider for the given scope.
-/// Returns Err if no provider is configured for that scope.
-pub fn install_asset(
-    scope: Scope,
-    pkg: &ScannedPackage,
-    store: &dyn ConfigStorePort,
-    provider: &dyn ProviderPort,
-) -> Result<()> {
-    let mut config = store.load(scope)?;
-    if config.providers.is_empty() {
-        bail!("No provider configured for {:?} scope", scope);
-    }
-    provider.install(pkg, scope, Some(&config), pkg.include_evals)?;
-    let section = config.vault_defs.entry(pkg.vault_id.clone()).or_default();
-    let identity_str = pkg.identity.to_config_string();
-    match pkg.kind {
-        AssetKind::Skill => {
-            let bucket = section.skills.get_or_insert_with(AssetBucket::default);
-            if !bucket.items.contains(&identity_str) {
-                bucket.items.push(identity_str);
-            }
-        }
-        AssetKind::Instruction => {
-            let bucket = section
-                .instructions
-                .get_or_insert_with(AssetBucket::default);
-            if !bucket.items.contains(&identity_str) {
-                bucket.items.push(identity_str);
-            }
-        }
-        AssetKind::McpServer => {}
-    }
-    store.save(scope, &config)
-}
+pub use install::{install_asset, update_asset};
+pub use remove::{detach_vault, remove_asset};
+pub use sync::attach_vault;
 
-/// Remove an installed asset from the provider and config for the given scope.
-pub fn remove_asset(
-    scope: Scope,
-    identity: &AssetIdentity,
-    kind: &AssetKind,
-    vault_id: &str,
-    store: &dyn ConfigStorePort,
-    provider: &dyn ProviderPort,
-) -> Result<()> {
-    let mut config = store.load(scope)?;
-    provider.remove(identity, kind, scope, Some(&config))?;
-    if let Some(section) = config.vault_defs.get_mut(vault_id) {
-        let identity_str = identity.to_config_string();
-        match kind {
-            AssetKind::Skill => {
-                if let Some(bucket) = section.skills.as_mut() {
-                    bucket.items.retain(|s| s != &identity_str);
-                }
-            }
-            AssetKind::Instruction => {
-                if let Some(bucket) = section.instructions.as_mut() {
-                    bucket.items.retain(|s| s != &identity_str);
-                }
-            }
-            &AssetKind::McpServer => {}
-        }
-    }
-    prune_empty_vault_defs(&mut config);
-    store.save(scope, &config)
-}
-
-/// Attach a vault to the global config.
-pub fn attach_vault(
-    vault_id: String,
-    vault_config: VaultConfig,
-    store: &dyn ConfigStorePort,
-) -> Result<()> {
-    let mut config = store.load(Scope::Global)?;
-    if !config.vaults.contains(&vault_id) {
-        config.vaults.push(vault_id.clone());
-    }
-    let section = config.vault_defs.entry(vault_id).or_default();
-    section.vault = Some(vault_config);
-    store.save(Scope::Global, &config)
-}
-
-/// Detach a vault from the global config. Removes from active vaults list.
-/// Only removes the vault definition if no installed assets reference it
-/// in either global or workspace scope.
-pub fn detach_vault(vault_id: &str, store: &dyn ConfigStorePort) -> Result<()> {
-    let mut config = store.load(Scope::Global)?;
-    config.vaults.retain(|v| v != vault_id);
-
-    let mut has_assets = config.has_installed_assets(vault_id);
-    if let Ok(ws_config) = store.load(Scope::Workspace) {
-        has_assets = has_assets || ws_config.has_installed_assets(vault_id);
-    }
-    if !has_assets {
-        config.vault_defs.remove(vault_id);
-    }
-
-    store.save(Scope::Global, &config)
-}
-
-/// Update an installed asset: remove old identity, reinstall from scanned package.
-pub fn update_asset(
-    scope: Scope,
-    pkg: &ScannedPackage,
-    store: &dyn ConfigStorePort,
-    provider: &dyn ProviderPort,
-) -> Result<()> {
-    let mut config = store.load(scope)?;
-    if let Some(section) = config.vault_defs.get_mut(&pkg.vault_id) {
-        let name = &pkg.identity.name;
-        match pkg.kind {
-            AssetKind::Skill => {
-                if let Some(bucket) = section.skills.as_mut() {
-                    bucket.items.retain(|s| {
-                        crate::domain::config::parse_identity(s)
-                            .map(|id| id.name != *name)
-                            .unwrap_or(true)
-                    });
-                }
-            }
-            AssetKind::Instruction => {
-                if let Some(bucket) = section.instructions.as_mut() {
-                    bucket.items.retain(|s| {
-                        crate::domain::config::parse_identity(s)
-                            .map(|id| id.name != *name)
-                            .unwrap_or(true)
-                    });
-                }
-            }
-            AssetKind::McpServer => {}
-        }
-    }
-    store.save(scope, &config)?;
-    install_asset(scope, pkg, store, provider)
-}
-
-/// Register a provider in the scope's config and copy all checked assets into it.
-#[allow(dead_code)]
-pub fn install_provider(
-    scope: Scope,
-    provider_id: &str,
-    checked_pkgs: &[ScannedPackage],
-    store: &dyn ConfigStorePort,
-    provider: &dyn ProviderPort,
-) -> Result<()> {
-    let mut config = store.load(scope)?;
-    if !config.providers.contains(&provider_id.to_string()) {
-        config.providers.push(provider_id.to_string());
-    }
-    store.save(scope, &config)?;
-    for pkg in checked_pkgs {
-        install_asset(scope, pkg, store, provider)?;
-    }
-    Ok(())
-}
-
-/// Remove a provider from the scope's config.
-#[allow(dead_code)]
-pub fn remove_provider(scope: Scope, provider_id: &str, store: &dyn ConfigStorePort) -> Result<()> {
-    let mut config = store.load(scope)?;
-    config.providers.retain(|p| p != provider_id);
-    store.save(scope, &config)
-}
+use crate::domain::config::ConfigFile;
 
 /// Remove empty vault sections / asset buckets so the TOML stays clean.
 pub fn prune_empty_vault_defs(config: &mut ConfigFile) {
@@ -189,8 +29,11 @@ pub fn prune_empty_vault_defs(config: &mut ConfigFile) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::asset::AssetKind;
+    use crate::app::ports::ConfigStorePort;
+    use crate::domain::asset::{AssetKind, ScannedPackage};
     use crate::domain::config::{AssetBucket, ConfigFile, VaultSection};
+    use crate::domain::identity::AssetIdentity;
+    use crate::domain::scope::Scope;
     use anyhow::Result;
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -231,7 +74,7 @@ mod tests {
             }
         }
     }
-    impl ProviderPort for FakeProvider {
+    impl crate::app::ports::ProviderPort for FakeProvider {
         fn id(&self) -> &str {
             "fake"
         }
@@ -292,8 +135,10 @@ mod tests {
     fn install_asset_writes_to_config_and_calls_provider() {
         let store = FakeStore::default();
         let provider = FakeProvider::new();
-        let mut config = ConfigFile::default();
-        config.providers = vec!["fake".to_string()];
+        let config = ConfigFile {
+            providers: vec!["fake".to_string()],
+            ..ConfigFile::default()
+        };
         store.save(Scope::Workspace, &config).unwrap();
 
         let pkg = make_pkg("my-skill", AssetKind::Skill);
@@ -312,8 +157,10 @@ mod tests {
     fn remove_asset_removes_from_config_and_calls_provider() {
         let store = FakeStore::default();
         let provider = FakeProvider::new();
-        let mut config = ConfigFile::default();
-        config.providers = vec!["fake".to_string()];
+        let mut config = ConfigFile {
+            providers: vec!["fake".to_string()],
+            ..Default::default()
+        };
         config.vault_defs.insert(
             "workspace".to_string(),
             VaultSection {
@@ -347,26 +194,14 @@ mod tests {
     }
 
     #[test]
-    fn attach_vault_adds_to_vaults_list() {
-        let store = FakeStore::default();
-        attach_vault(
-            "my-vault".to_string(),
-            VaultConfig::Local(crate::domain::config::LocalVaultSource { path: ".".into() }),
-            &store,
-        )
-        .unwrap();
-        let config = store.load(Scope::Global).unwrap();
-        assert_eq!(config.vaults, vec!["my-vault"]);
-        assert!(config.vault_defs.contains_key("my-vault"));
-    }
-
-    #[test]
     fn update_asset_replaces_identity_in_config() {
         let store = FakeStore::default();
         let provider = FakeProvider::new();
 
-        let mut config = ConfigFile::default();
-        config.providers = vec!["fake".to_string()];
+        let mut config = ConfigFile {
+            providers: vec!["fake".to_string()],
+            ..Default::default()
+        };
         config.vault_defs.insert(
             "workspace".to_string(),
             VaultSection {
@@ -403,8 +238,10 @@ mod tests {
     #[test]
     fn detach_vault_removes_from_vaults_list() {
         let store = FakeStore::default();
-        let mut config = ConfigFile::default();
-        config.vaults = vec!["workspace".to_string()];
+        let mut config = ConfigFile {
+            vaults: vec!["workspace".to_string()],
+            ..Default::default()
+        };
         config.vault_defs.insert(
             "workspace".to_string(),
             VaultSection {
@@ -425,8 +262,10 @@ mod tests {
     #[test]
     fn detach_vault_preserves_defs_when_assets_installed() {
         let store = FakeStore::default();
-        let mut config = ConfigFile::default();
-        config.vaults = vec!["workspace".to_string()];
+        let mut config = ConfigFile {
+            vaults: vec!["workspace".to_string()],
+            ..Default::default()
+        };
         config.vault_defs.insert(
             "workspace".to_string(),
             VaultSection {
@@ -451,8 +290,10 @@ mod tests {
     fn remove_asset_prunes_empty_section() {
         let store = FakeStore::default();
         let provider = FakeProvider::new();
-        let mut config = ConfigFile::default();
-        config.providers = vec!["fake".to_string()];
+        let mut config = ConfigFile {
+            providers: vec!["fake".to_string()],
+            ..Default::default()
+        };
         config.vault_defs.insert(
             "workspace".to_string(),
             VaultSection {
@@ -486,7 +327,7 @@ mod tests {
         config.vault_defs.insert(
             "a".to_string(),
             VaultSection {
-                vault: Some(VaultConfig::Local(
+                vault: Some(crate::domain::config::VaultConfig::Local(
                     crate::domain::config::LocalVaultSource {
                         path: "/tmp".into(),
                     },

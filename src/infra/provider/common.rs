@@ -38,10 +38,9 @@ where
 /// Returns `true` if `rel` is **not** inside a top-level `evals/` directory.
 /// Use with `copy_dir_filtered` to exclude evaluation sub-folders.
 pub fn is_not_evals(rel: &std::path::Path) -> bool {
-    !rel.components().next().map_or(
-        false,
-        |c| matches!(c, std::path::Component::Normal(s) if s == "evals"),
-    )
+    !rel.components()
+        .next()
+        .is_some_and(|c| matches!(c, std::path::Component::Normal(s) if s == "evals"))
 }
 
 /// Remove a directory and prune empty parent directories up to `max_parent_levels`

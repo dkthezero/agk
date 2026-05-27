@@ -4,6 +4,7 @@
 /// validating config) return `Outcome`.  Use cases that stream progress
 /// over time (e.g. sync, refresh) emit [`crate::app::event::CoreEvent`]s via
 /// the event sink instead.
+/// NOTE: Outcomes are returned incrementally as use-cases are wired into core.rs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreOutcome {
     /// Command succeeded with no additional payload.
