@@ -6,6 +6,7 @@ use anyhow::Result;
 /// Concrete [`McpRegistryPort`] adapter that delegates to the existing
 /// `infra::mcp` implementation.
 pub struct InfraMcpRegistryAdapter {
+    #[allow(dead_code)] // needed for future enable/disable use-cases
     workspace_root: std::path::PathBuf,
 }
 

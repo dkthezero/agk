@@ -1,4 +1,3 @@
-use crate::app::bootstrap;
 use crate::app::ports::{ConfigStorePort, ProviderPort};
 use crate::cli::entry::{Cli, Commands, ProfileCommands, ScopeArg};
 use crate::domain::asset::ScannedPackage;
@@ -148,13 +147,10 @@ pub const EXIT_PARTIAL_SUCCESS: i32 = 3;
 // Feature modules
 // ---------------------------------------------------------------------------
 
-pub mod apply;
 pub mod assets;
 pub mod mcps;
 pub mod profiles;
-pub mod providers;
 pub mod telemetry;
-pub mod vaults;
 
 // ---------------------------------------------------------------------------
 // Command dispatcher
@@ -272,24 +268,4 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
             Ok(EXIT_SUCCESS)
         }
     }
-}
-
-// Stub for Apply and Context commands — full wiring lives in core_dispatcher
-pub fn dispatch_core_command(cli: &Cli, workspace: &std::path::Path) -> Result<i32> {
-    use crate::app::core::AgkCore;
-    use std::sync::Arc;
-
-    let (registry, _scan, store) = bootstrap::build(workspace.to_path_buf())?;
-    let context_store = crate::infra::context::TomlContextStore::standard();
-    let core = AgkCore::new(
-        Arc::new(store),
-        Arc::new(context_store),
-        Arc::new(crate::infra::mcp::adapter::InfraMcpRegistryAdapter::new(
-            workspace.to_path_buf(),
-        )),
-        Arc::new(crate::infra::vault::search_adapters::ClawHubSearchAdapter::new("clawhub")),
-        Arc::new(registry),
-        std::collections::HashMap::new(),
-    );
-    crate::cli::core_dispatcher::dispatch(cli, workspace, &core)
 }

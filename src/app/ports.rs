@@ -38,6 +38,7 @@ pub trait VaultPort: Send + Sync {
 }
 
 /// Port for searching remote vaults (e.g. ClawHub).
+#[allow(dead_code)] // wired in core.rs but no actual search implementation yet
 #[async_trait::async_trait]
 pub trait VaultSearchPort: Send + Sync {
     fn vault_id(&self) -> &str;
@@ -57,12 +58,16 @@ pub trait McpRegistryPort: Send + Sync {
     ) -> Result<crate::domain::mcp::McpServer>;
 
     fn test_server(&self, name: &str) -> Result<()>;
+    #[allow(dead_code)] // wired in core_dispatcher but core.rs returns not-yet-wired for EnableMcp/DisableMcp
     fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
+    #[allow(dead_code)]
     fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+    #[allow(dead_code)]
     fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
 }
 
 /// Port for running external processes.
+#[allow(dead_code)] // Phase E process runner port — not yet wired
 pub trait ProcessRunnerPort: Send + Sync {
     fn run(
         &self,
@@ -73,6 +78,7 @@ pub trait ProcessRunnerPort: Send + Sync {
 }
 
 /// Port for configuration format codecs (TOML, YAML, JSON, etc.)
+#[allow(dead_code)] // Phase E config codec port — TomlCodec only impl so far
 pub trait ManifestCodecPort: std::fmt::Debug {
     /// Codec identifier e.g. "toml", "yaml"
     fn id(&self) -> &'static str;
@@ -98,6 +104,7 @@ pub trait ConfigStorePort: Send + Sync {
 pub trait ContextStorePort: Send + Sync {
     fn load_contexts(&self) -> Result<crate::domain::context::ContextFile>;
     fn save_contexts(&self, contexts: &crate::domain::context::ContextFile) -> Result<()>;
+    #[allow(dead_code)] // context switching not yet wired in core.rs
     fn current_context(&self) -> Result<crate::domain::context::ContextId>;
     fn switch_context(&self, id: &crate::domain::context::ContextId) -> Result<()>;
 }
@@ -266,6 +273,7 @@ impl WizardState {
 /// Port for building and executing profile launch plans.
 /// Implemented by provider adapters that support profile sessions.
 pub trait ProfileRuntimePort: Send + Sync {
+    #[allow(dead_code)] // provider runtime port contract
     fn provider_id(&self) -> &str;
 
     /// Build a deterministic launch plan without modifying filesystem state.

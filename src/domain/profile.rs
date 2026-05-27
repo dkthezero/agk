@@ -27,20 +27,6 @@ impl From<String> for ProfileId {
     }
 }
 
-/// Typed wrapper for vault identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct VaultId(pub String);
-
-impl VaultId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
 /// Typed wrapper for skill identifiers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SkillId(pub String);
@@ -66,6 +52,7 @@ impl McpServerId {
 pub struct InstructionId(pub String);
 
 impl InstructionId {
+    #[allow(dead_code)]
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }

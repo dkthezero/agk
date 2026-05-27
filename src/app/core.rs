@@ -20,6 +20,7 @@ pub struct AgkCore {
     store: Arc<dyn ConfigStorePort>,
     context_store: Arc<dyn ContextStorePort>,
     mcp_registry: Arc<dyn McpRegistryPort>,
+    #[allow(dead_code)] // wired in SearchRemoteVault match arm (Phase 3.5)
     vault_search: Arc<dyn VaultSearchPort>,
     registry: Arc<Registry>,
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
@@ -31,6 +32,7 @@ impl AgkCore {
         store: Arc<dyn ConfigStorePort>,
         context_store: Arc<dyn ContextStorePort>,
         mcp_registry: Arc<dyn McpRegistryPort>,
+        #[allow(dead_code)] // wired in SearchRemoteVault match arm (Phase 3.5)
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
         runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
@@ -187,7 +189,6 @@ impl AgkCore {
             CoreCommand::SearchRemoteVault { vault_id, query } => {
                 let _ = vault_id;
                 let _ = query;
-                // Phase 3.5: wire vault_search port
                 sink.on_error("SearchRemoteVault not yet wired in AgkCore".into());
                 Ok(CoreOutcome::Ok)
             }

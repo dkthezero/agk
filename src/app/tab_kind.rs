@@ -25,14 +25,12 @@ pub enum TabKind {
 }
 
 impl TabKind {
-    /// Returns `true` if this tab displays packages that are installed on a per-
-    /// asset basis (Skills / Instructions).
+    #[allow(dead_code)] // tab metadata helpers for render layer
     pub fn is_asset_like(self) -> bool {
         matches!(self, TabKind::Asset)
     }
 
-    /// The tab label that should be shown on the status line when a user tries
-    /// to perform an action that is only valid for asset tabs.
+    #[allow(dead_code)]
     pub fn asset_label(self) -> Option<&'static str> {
         match self {
             TabKind::Asset => Some("Skills/Instructions"),
@@ -42,6 +40,7 @@ impl TabKind {
 }
 
 /// Map a [`FeatureSetPort`] `kind_name` string to a canonical [`TabKind`].
+#[allow(dead_code)] // feature-set metadata helper for render layer
 pub fn tab_kind_for_feature_name(name: &str) -> TabKind {
     match name {
         "vault" => TabKind::Vault,
@@ -58,6 +57,7 @@ pub fn tab_kind_for_feature_name(name: &str) -> TabKind {
 /// Given a scanned package's [`AssetKind`], return the [`TabKind`] that this
 /// package belongs to.  Used when a tab kind must be derived from domain data
 /// rather than feature-set metadata.
+#[allow(dead_code)] // domain-to-tab mapping helper
 pub fn tab_kind_for_asset_kind(kind: &AssetKind) -> TabKind {
     match kind {
         AssetKind::Skill | AssetKind::Instruction => TabKind::Asset,

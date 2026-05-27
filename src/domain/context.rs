@@ -105,16 +105,13 @@ fn default_context() -> String {
 }
 
 impl ContextFile {
+    #[allow(dead_code)] // used in tests, context switching not yet wired in core.rs
     pub fn current_id(&self) -> ContextId {
         ContextId::new(&self.current_context)
     }
 
     pub fn get(&self, id: &ContextId) -> Option<&ContextConfig> {
         self.contexts.get(id.as_str())
-    }
-
-    pub fn get_mut(&mut self, id: &ContextId) -> Option<&mut ContextConfig> {
-        self.contexts.get_mut(id.as_str())
     }
 
     pub fn ensure_default(&mut self) {

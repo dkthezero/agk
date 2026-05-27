@@ -34,6 +34,7 @@ impl CliPresenter {
         }
     }
 
+    #[allow(dead_code)] // pub accessor for tests / future instrumentation
     pub fn mode(&self) -> OutputMode {
         self.mode
     }
@@ -60,6 +61,7 @@ impl CliPresenter {
         eprintln!("{}", msg);
     }
 
+    #[allow(dead_code)] // pub accessor for tests / future instrumentation
     fn print_json_event(&self, event: &CoreEvent) {
         if matches!(self.mode, OutputMode::Json) {
             println!(

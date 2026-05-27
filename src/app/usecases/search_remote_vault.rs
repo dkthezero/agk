@@ -5,6 +5,7 @@ use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 ///
 /// In Phase 3 this delegates to a [`VaultPort`] implementation so the TUI
 /// never calls `infra::vault::clawhub::cli_search` directly.
+#[allow(dead_code)] // search remote vault use-case stub
 pub fn run(vault_id: String, query: String, sink: &mut dyn CoreEventSink) -> CoreResult {
     // Phase 3: this will call VaultPort::search() instead
     sink.on_event(CoreEvent::TaskStarted {
