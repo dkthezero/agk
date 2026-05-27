@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::domain::telemetry::AnalyticsConfig;
+use std::cmp::Reverse;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -75,7 +76,7 @@ pub fn render(frame: &mut Frame, area: Rect, config: &AnalyticsConfig, selected:
     }
 
     // Sort by total_invocations descending
-    items.sort_by(|a, b| b.1.cmp(&a.1));
+    items.sort_by_key(|item| Reverse(item.1));
 
     for (i, (name, invocations, last_used, providers, is_stale)) in items.iter().enumerate() {
         let style = if *is_stale {
@@ -161,7 +162,7 @@ pub fn render_detail(frame: &mut Frame, area: Rect, config: &AnalyticsConfig, se
         })
         .collect();
 
-    items.sort_by(|a, b| b.1.cmp(&a.1));
+    items.sort_by_key(|item| Reverse(item.1));
 
     let Some((name, invocations, last_used, providers, is_stale, breakdown)) = items.get(selected)
     else {

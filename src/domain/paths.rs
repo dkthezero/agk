@@ -74,6 +74,13 @@ pub fn open_file_manager(path: &std::path::Path) -> anyhow::Result<()> {
         );
         std::process::Command::new("cmd").raw_arg(args).spawn()?;
     }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = path;
+        return Err(anyhow::anyhow!(
+            "Opening file manager is not supported on this platform"
+        ));
+    }
     Ok(())
 }
 
@@ -84,6 +91,7 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
         std::process::Command::new("open")
             .args(["-a", "Terminal", &path.to_string_lossy()])
             .spawn()?;
+        return Ok(());
     }
     #[cfg(target_os = "linux")]
     {
@@ -131,7 +139,7 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
                 .spawn()?;
             return Ok(());
         }
-        anyhow::bail!("No suitable terminal emulator found");
+        Err(anyhow::anyhow!("No suitable terminal emulator found"))
     }
     #[cfg(target_os = "windows")]
     {
@@ -141,8 +149,13 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
             escape_cmd_arg(&path_str)
         );
         std::process::Command::new("cmd").raw_arg(args).spawn()?;
+        return Ok(());
     }
-    Ok(())
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        let _ = path;
+        return Err(anyhow::anyhow!("Opening terminal is not supported on this platform"));
+    }
 }
 
 /// Escape a string for embedding inside a cmd.exe double-quoted argument.

@@ -5,20 +5,15 @@ use crossterm::event::KeyCode;
 
 pub fn handle_navigation(state: &mut AppState, code: &KeyCode) {
     match code {
-        KeyCode::Up => {
-            if state.selected_index > 0 {
-                state.selected_index -= 1;
-                state.scroll_offset = 0;
-                state.scroll_tick = 0;
-            }
+        KeyCode::Up if state.selected_index > 0 => {
+            state.selected_index -= 1;
+            state.scroll_offset = 0;
+            state.scroll_tick = 0;
         }
-        KeyCode::Down => {
-            let count = state.list_length();
-            if state.selected_index + 1 < count {
-                state.selected_index += 1;
-                state.scroll_offset = 0;
-                state.scroll_tick = 0;
-            }
+        KeyCode::Down if state.selected_index + 1 < state.list_length() => {
+            state.selected_index += 1;
+            state.scroll_offset = 0;
+            state.scroll_tick = 0;
         }
         _ => {}
     }
@@ -43,10 +38,9 @@ pub fn handle_esc(state: &mut AppState) -> Result<ControlFlow> {
     if state.list_mode == ListMode::Normal && state.search_query.is_empty() {
         if state.esc_pressed_once {
             return Ok(ControlFlow::Quit);
-        } else {
-            state.esc_pressed_once = true;
-            state.status_line = "Press ESC again to quit".to_string();
         }
+        state.esc_pressed_once = true;
+        state.status_line = "Press ESC again to quit".to_string();
     } else if active_kind != Some(crate::app::tab_kind::TabKind::Vault) {
         apply_esc(state);
     }

@@ -259,7 +259,7 @@ src/
 After all phases complete:
 
 - [ ] Architecture tests pass on every PR.
-- [ ] `cargo check --no-default-features --features headless,toml` succeeds.
+- [ ] `cargo check --no-default-features --features tui,pack,vault-clawhub` succeeds.
 - [ ] `tui/event.rs` has < 400 lines.
 - [ ] CLI `agk p <name> --dry-run --json` and TUI profile launch share identical core path and produce matching contracts.
 - [ ] New features are added primarily by writing use-case + tests first.
@@ -304,10 +304,8 @@ Proposed `.github/workflows/ci.yml` additions:
       fail-fast: false
       matrix:
         features:
-          - "--no-default-features --features headless,toml"
-          - "--no-default-features --features headless,toml,yaml"
-          - "--no-default-features --features tui,toml"
-          - "--all-features"
+         - "--no-default-features --features tui,pack,vault-clawhub"
+         - "--all-features"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
