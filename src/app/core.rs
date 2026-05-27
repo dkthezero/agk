@@ -1,6 +1,8 @@
 use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
-use crate::app::ports::{ConfigStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort};
+use crate::app::ports::{
+    ConfigStorePort, ContextStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort,
+};
 use crate::app::registry::Registry;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,6 +18,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AgkCore {
     store: Arc<dyn ConfigStorePort>,
+    context_store: Arc<dyn ContextStorePort>,
     mcp_registry: Arc<dyn McpRegistryPort>,
     vault_search: Arc<dyn VaultSearchPort>,
     registry: Arc<Registry>,
@@ -26,6 +29,7 @@ pub struct AgkCore {
 impl AgkCore {
     pub fn new(
         store: Arc<dyn ConfigStorePort>,
+        context_store: Arc<dyn ContextStorePort>,
         mcp_registry: Arc<dyn McpRegistryPort>,
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
@@ -33,6 +37,7 @@ impl AgkCore {
     ) -> Self {
         Self {
             store,
+            context_store,
             mcp_registry,
             vault_search,
             registry,
@@ -51,7 +56,7 @@ impl AgkCore {
             // Profile commands
             // ===============================================================
             CoreCommand::CreateProfile { input } => {
-                crate::app::usecases::create_profile::run(input, sink)
+                crate::app::usecases::create_profile::run(input, self.store.as_ref(), sink)
             }
             CoreCommand::StartProfile { id, scope, dry_run } => {
                 crate::app::usecases::start_profile::run(
@@ -60,6 +65,51 @@ impl AgkCore {
                     *dry_run,
                     self.store.as_ref(),
                     &self.runtime_ports,
+                    sink,
+                )
+            }
+            CoreCommand::DeleteProfile { id, scope } => {
+                crate::app::usecases::delete_profile::run(id, *scope, self.store.as_ref(), sink)
+            }
+            CoreCommand::AttachSkillToProfile {
+                profile_id,
+                skill_id,
+            } => {
+                crate::app::usecases::attach_skill_to_profile::run(
+                    profile_id,
+                    skill_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::DetachSkillFromProfile {
+                profile_id,
+                skill_id,
+            } => {
+                crate::app::usecases::detach_skill_from_profile::run(
+                    profile_id,
+                    skill_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => {
+                crate::app::usecases::attach_mcp_to_profile::run(
+                    profile_id,
+                    mcp_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => {
+                crate::app::usecases::detach_mcp_from_profile::run(
+                    profile_id,
+                    mcp_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
                     sink,
                 )
             }
@@ -73,12 +123,39 @@ impl AgkCore {
                 self.store.as_ref(),
                 sink,
             )
-            .map(|_| CoreOutcome::Ok)
-            .map_err(Into::into),
+            .map(|_| CoreOutcome::Ok),
 
             // ===============================================================
-            // Provider commands (stubbed — requires ProviderPort lookup)
+            // Context commands
             // ===============================================================
+            CoreCommand::SwitchContext { id, dry_run } => {
+                crate::app::usecases::switch_context::run(
+                    id,
+                    *dry_run,
+                    self.context_store.as_ref(),
+                    sink,
+                    self.store.as_ref(),
+                )
+            }
+            CoreCommand::ListContexts => {
+                crate::app::usecases::list_contexts::run(self.context_store.as_ref(), sink)
+            }
+
+            // ===============================================================
+            // Provider commands
+            // ===============================================================
+            CoreCommand::ActivateProvider { id, scope } => match self.registry.get_provider(id) {
+                Ok(_provider) => crate::app::usecases::activate_provider::run(
+                    id.clone(),
+                    *scope,
+                    self.store.as_ref(),
+                    sink,
+                ),
+                Err(e) => {
+                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
+                    Ok(CoreOutcome::Ok)
+                }
+            },
             CoreCommand::DeactivateProvider { id, scope } => match self.registry.get_provider(id) {
                 Ok(provider) => crate::app::usecases::deactivate_provider::run(
                     id.clone(),
@@ -94,15 +171,56 @@ impl AgkCore {
             },
 
             // ===============================================================
+            // Apply commands
+            // ===============================================================
+            CoreCommand::ApplyConfig {
+                input,
+                scope,
+                environment,
+                context,
+                dry_run,
+            } => crate::app::usecases::apply_config::run(
+                input.clone(),
+                *scope,
+                *environment,
+                context.clone(),
+                *dry_run,
+                self.store.as_ref(),
+                self.context_store.as_ref(),
+                self.registry
+                    .providers
+                    .iter()
+                    .map(|p| p.id().to_string())
+                    .collect(),
+                sink,
+            ),
+
+            // ===============================================================
             // MCP commands (wired)
             // ===============================================================
-            CoreCommand::RegisterMcp { input } => crate::app::usecases::register_mcp::run(
-                input.name.clone(),
-                input.command.clone(),
-                input.args.clone(),
-                format!("{:?}", input.transport),
-                input.description.clone(),
-                input.test_after,
+            CoreCommand::RegisterMcp { input } => {
+                crate::app::usecases::register_mcp::run(input, self.mcp_registry.as_ref(), sink)
+            }
+            CoreCommand::EnableMcp {
+                name,
+                provider_id,
+                scope,
+            } => crate::app::usecases::enable_mcp::run(
+                name,
+                provider_id,
+                *scope,
+                self.mcp_registry.as_ref(),
+                sink,
+            ),
+            CoreCommand::DisableMcp {
+                name,
+                provider_id,
+                scope,
+            } => crate::app::usecases::disable_mcp::run(
+                name,
+                provider_id,
+                *scope,
+                self.mcp_registry.as_ref(),
                 sink,
             ),
 
@@ -110,11 +228,12 @@ impl AgkCore {
             // Asset / search commands
             // ===============================================================
             CoreCommand::SearchRemoteVault { vault_id, query } => {
-                let _ = vault_id;
-                let _ = query;
-                // Phase 3.5: wire vault_search port
-                sink.on_error("SearchRemoteVault not yet wired in AgkCore".into());
-                Ok(CoreOutcome::Ok)
+                crate::app::usecases::search_remote_vault::run(
+                    vault_id.clone(),
+                    query.clone(),
+                    self.vault_search.as_ref(),
+                    sink,
+                )
             }
 
             // Remaining commands: wired incrementally in Phases 1-5.
@@ -209,6 +328,30 @@ mod tests {
         }
     }
 
+    struct FakeCtxStore;
+    impl FakeCtxStore {
+        fn new() -> Self {
+            FakeCtxStore
+        }
+    }
+    impl crate::app::ports::ContextStorePort for FakeCtxStore {
+        fn load_contexts(&self) -> anyhow::Result<crate::domain::context::ContextFile> {
+            Ok(Default::default())
+        }
+        fn save_contexts(
+            &self,
+            _contexts: &crate::domain::context::ContextFile,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn current_context(&self) -> anyhow::Result<crate::domain::context::ContextId> {
+            Ok(crate::domain::context::ContextId::default())
+        }
+        fn switch_context(&self, _id: &crate::domain::context::ContextId) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
     struct StubSink;
     impl CoreEventSink for StubSink {
         fn on_event(&mut self, _event: crate::app::event::CoreEvent) {}
@@ -218,6 +361,7 @@ mod tests {
     fn test_core() -> AgkCore {
         AgkCore::new(
             Arc::new(FakeStore::new()),
+            Arc::new(FakeCtxStore::new()),
             Arc::new(FakeMcp),
             Arc::new(FakeVaultSearch),
             Arc::new(crate::app::registry::Registry::new()),

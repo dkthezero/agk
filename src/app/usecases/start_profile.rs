@@ -48,12 +48,12 @@ pub fn run(
         skill_refs: domain_profile
             .skills
             .iter()
-            .map(|s| crate::domain::profile::SkillId::new(s))
+            .map(crate::domain::profile::SkillId::new)
             .collect(),
         mcp_refs: domain_profile
             .mcps
             .iter()
-            .map(|m| crate::domain::profile::McpServerId::new(m))
+            .map(crate::domain::profile::McpServerId::new)
             .collect(),
         instruction_refs: vec![],
         prompt_overlay_path: None,
@@ -99,7 +99,7 @@ mod tests {
             &ProfileId::new("dev"),
             Scope::Workspace,
             true,
-            &FakeStore::default(),
+            &FakeStore,
             &std::collections::HashMap::new(),
             &mut sink,
         );
@@ -114,7 +114,7 @@ mod tests {
             &ProfileId::new("dev"),
             Scope::Workspace,
             false,
-            &FakeStore::default(),
+            &FakeStore,
             &std::collections::HashMap::new(),
             &mut sink,
         );

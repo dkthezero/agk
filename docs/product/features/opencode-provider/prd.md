@@ -50,6 +50,7 @@ Add [OpenCode](https://github.com/anomalyco/opencode) as a first-class deploymen
 ### Config Merge Semantics
 - [x] `opencode.json` is **never modified** for skill installation or removal.
 - [x] On skill removal, any stale `"skills"` array (from earlier agk versions) is quietly stripped so OpenCode does not throw schema errors.
+- [x] On skill install, any stale `"skills"` array is also stripped as a self-heal for users upgrading from buggy agk versions.
 
 ### Scope Targeting
 - [x] **Global scope:** Installs skills to `~/.config/opencode/skills/`. `opencode.json` is modified only for MCP configuration.

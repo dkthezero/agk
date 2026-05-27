@@ -32,13 +32,11 @@ impl GithubVaultAdapter {
         }
     }
 
-    #[allow(dead_code)]
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_cache_root(mut self, root: PathBuf) -> Self {
         self.cache_root = Some(root);
         self

@@ -1,148 +1,129 @@
-# Proposal Implementation Plan — Product Owner Review
+# Decomposition Plan — P0/P1/P2 File Split + Clippy Cleanup
 
-> **Status:** Engineering complete. All five proposals merged, tested, and documented.
-> **Product North Star:** `agk` is the agent kit for teams to share the way they work with AI agents together. Every proposal must serve team collaboration, reproducible environments, and multi-provider consistency.
-
----
-
-## 1. Executive Summary
-
-| Rank | Proposal | Status | Priority | Effort | Rationale (PO View) |
-|------|----------|--------|----------|--------|---------------------|
-| 1 | **Headless CLI Operations** | ✅ **Done** | P1 | ✅ `sync`, `install`, `validate`, `pack` implemented. `--quiet`, `--verbose`, `--json` on all. Exit codes. | The public API for CI/CD and AI agent automation. |
-| 2 | **Skill Bundling & Meta-Skills** | ✅ **Done** | P2 | ✅ `requires:`/`requires_optional:` in SKILL.md, BFS resolution, cycle detection, diamond dedup. | Enables tech leads to ship standardized "way of work" packs. |
-| 3 | **OpenCode Provider Support** | ✅ **Done** | P3 | ✅ ProviderPort + McpProvider implemented. JSON/JSONC merge. Flat `mcp.<name>` schema. | Another provider in the polyglot stack. |
-| 4 | **Telemetry & Skill Usage Analytics** | ✅ **Done** | P4 | ✅ Tab 5 "Telemetry" with stale dimming. Background scanner. CLI `enable/disable/status`. **Opt-out** (enabled by default). | Local-only observability for human decision-making. |
-| 5 | **MCP Vault Management** | ✅ **Done** | P5 | ✅ Tab 2 "MCP Servers". `F2` registration modal. `Space` toggle per active provider per scope. `agk mcp add/enable/disable/test/list`. Security confirmation warning. | High long-term value — MCP is the USB-C for AI tools. |
-
-> **Tab layout (final):** `[1] Skills [2] MCP Servers [3] Instructions [4] Providers [5] Telemetry    [0] Vault`
+## Status: In Progress — Phase A/C clippy fixes + P0 tui/event.rs decompose active
 
 ---
 
-## 2. Guiding Principles
+## Step 1: Fix all clippy/compilation errors (ZERO BEHAVIOR CHANGE)
 
-1. **Team-first design.** Every feature answers: "Does this make it easier for a team to standardize how they work with AI agents?"
-2. **Three user personas, one interface.** Human (TUI), AI Agent (structured CLI), and CI/CD (deterministic, JSON, exit codes) are all first-class.
-3. **Headless is the API.** The TUI is discoverability; the CLI is the contract.
-4. **Provider parity.** Adding a provider is a 3–5 day task following the `ProviderPort` trait.
-5. **MCP is an AssetKind, not a Vault.** MCP servers are registered in agk's global MCP registry (`~/.config/agk/mcp.toml`), then enabled per-provider per-scope. Not sourced from external repos.
-6. **Documentation is a gate.** Every feature has `prd.md` + `technical_design.md` under `docs/product/features/<feature-name>/`.
+### 1a. tests/architecture.rs (3 warnings)
+- Line 35: `.into_iter()` chain → remove `.into_iter()` + remove `&` from `WalkDir::new(&root)` → `WalkDir::new(root)`
+- Line 121: same `&root` → `root`
+- Line 331: same `&root` → `root`
 
----
+### 1b. src/app/snapshot.rs (1 warning)
+- Lines 2-3: doc comment followed by empty line → merge into single doc comment block
 
-## 3. Persona Legend
+### 1c. Unused import cleanup
+- src/app/usecases/attach_vault.rs: remove `CoreEvent`, `CoreOutcome`, `CoreResult` imports
+- src/app/usecases/register_mcp.rs: add `Scope` to test module imports (fix compilation)
+- src/cli/commands/mod.rs: remove `ConfigStorePort` import
+- src/cli/core_dispatcher.rs: remove `ScopeArg` import, add `ScopeArg` to test module
+- src/app/bundling.rs: remove `AssetBucket`, `VaultSection` imports
 
-| Icon | Persona | Context | Primary Interface |
-|------|---------|---------|-------------------|
-| 👤 | **Human** | Developer, tech lead, individual contributor | TUI + occasional CLI |
-| 🤖 | **AI Agent** | Autonomous coding agent using `agk` as a tool | Headless CLI with `--json` |
-| 🏭 | **CI/CD** | GitHub Actions, pre-commit hooks, team onboarding scripts | Headless CLI with exit codes |
+### 1d. `yaml` feature flag (1 warning)
+- `cargo check` notes that `#[cfg(feature = "yaml")]` references a nonexistent feature
+- Cargo.toml does not define `yaml` feature; add it to `[features]`: `yaml = []`
 
----
+### 1e. Safe auto-fixes (already ran `cargo clippy --fix`)
+- Fixed: needless borrows, useless conversion, redundant closures
+- Remaining to fix manually
 
-## 4. Proposal Summary
+### 1f. OpenCodeProvider `build_launch_plan` compilation error
+- Tests in `src/infra/provider/opencode/mod.rs` reference `.build_launch_plan()` which lives in `session.rs` on the `ProfileRuntimePort` trait
+- Fix: add `use crate::app::ports::ProfileRuntimePort;` in the `#[cfg(test)]` block of opencode/mod.rs
 
-### P1 — Headless CLI Operations
-**Status:** ✅ Merged. `agk sync`, `agk install`, `agk validate`, `agk pack` all implemented with `--quiet`, `--verbose`, `--json` and proper exit codes.
+### 1g. Manual fixes required (field_reassign_with_default, unused variables, dead_code)
+- `src/tui/event.rs` lines 2313-2314: `ConfigFile::default()` + field assign → use struct literal
+- `src/infra/config/toml_store.rs` lines 115-116 + 139-140: same pattern
+- `src/app/bundling.rs` test unused vars (`a`, `b`, `registry`, `_root`)
+- `src/tui/presenter.rs` unused `vault_id` → prefix with `_`
+- `src/tui/reducer.rs` unused functions `handle_modal`, `derive_enter_intent`, `derive_space_intent`, `is_vault_tab_active`, `is_mcp_tab_active`, `is_profile_tab_active` — we won't fix these now (they belong to the reducer/controller migration in a later phase)
+- `src/cli/core_dispatcher.rs` unused `display_name` → `_display_name`
+- Various dead_code warnings → do not fix (these are architecture stubs per the convergence plan)
 
-### P2 — Skill Bundling & Meta-Skills
-**Status:** ✅ Merged. `SKILL.md` frontmatter parses `requires:`/`requires_optional:`. BFS resolution with cycle detection and diamond dedup. `app/bundling.rs` contains `resolve_dependencies()`, `install_bundle()`.
+## Step 2: Split `src/app/bootstrap.rs` (P2)
 
-### P3 — OpenCode Provider Support
-**Status:** ✅ Merged. `ProviderPort` + `McpProvider` both implemented. Flat `mcp.<name>` schema. JSONC comment stripping. Skills install to `.opencode/skills/`.
+Target tree:
+```
+src/app/bootstrap/
+├── mod.rs       # re-export, ~60 lines
+├── registry.rs  # build_registry(), register_providers(), register_vaults(), ~200 lines
+├── scan.rs      # scan(), filter_scan(), ~120 lines
+└── state.rs     # build_vault_entries(), build_provider_entries(), build_profile_entries(), build_tab_kinds(), ~140 lines
+```
 
-### P4 — Telemetry & Skill Usage Analytics
-**Status:** ✅ Merged. Background `LogParser` scanners for Claude/Copilot/ OpenCode. Tab 5 "Telemetry" with stale dimming (>30 days). `agk telemetry enable/disable/status`. **Opt-out** (enabled by default).
+Keep `src/app/bootstrap.rs` as comment-only shim for now (re-export + note).
 
-### P5 — MCP Vault Management
-**Status:** ✅ Merged. Tab 2 "MCP Servers". `AssetKind::McpServer`. `F2` registration modal. `Space` toggles enable/disable per active provider per scope. `agk mcp add/enable/disable/test/list`. Security confirmation warning before registration.
+## Step 3: Split `src/app/actions.rs` (P2)
 
----
+Target tree:
+```
+src/app/actions/
+├── mod.rs       # re-export, prune_empty_vault_defs
+├── install.rs   # install_asset, install_provider, update_asset
+├── remove.rs    # remove_asset, remove_provider, prune_orphans (if any)
+└── sync.rs      # sync helpers (if any inline sync functions exist)
+```
 
-## 5. Milestones Achieved
+Keep `src/app/actions.rs` as comment-only shim.
+Update callers in `cli/commands/assets.rs` and `tui/event.rs` to use new paths.
 
-| Milestone | Delivered |
-|-----------|-----------|
-| **Milestone 1: Foundation** | P1 Headless CLI + P3 OpenCode Provider merged, tested, documented |
-| **Milestone 2: Bundling & Ecosystem** | P2 Skill Bundling + P5 MCP Vault merged |
-| **Milestone 3: Observability** | P4 Telemetry merged (opt-out, not opt-in) |
+## Step 4: Split `src/cli/commands/assets.rs` (P1)
 
----
+Target tree:
+```
+src/cli/commands/assets/
+├── mod.rs      # re-export + shared helpers (find_package_by_identity, resolve_scope)
+├── install.rs  # cmd_install single + bulk
+├── remove.rs   # cmd_remove + sync_remove
+└── search.rs   # local filter, ClawHub search
+```
 
-## 6. Decision Log
+Keep `src/cli/commands/assets.rs` as comment-only shim.
+Update `cli/commands/mod.rs` references.
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-05-03 | Headless CLI is P1 | Public API for all automation personas. |
-| 2026-05-03 | Skill Bundling is P2 | Directly enables the "team pack" user story. |
-| 2026-05-03 | OpenCode is P3 | Small scoped adapter; expands polyglot coverage. |
-| 2026-05-03 | Telemetry is opt-out (enabled by default) | Re-evaluated during implementation. Users expect analytics to "just work" for discoverability; explicit disable is sufficient. |
-| 2026-05-03 | MCP is P5 (strategic) | High long-term value; AssetKind + tab restructure + 2-phase install. |
-| 2026-05-03 | MCP Tab is [2], not [4] | Final layout: `[1] Skills [2] MCP [3] Instructions [4] Providers [5] Telemetry [0] Vault`. MCP placed adjacent to Skills for logical grouping (both are installable assets). |
-| 2026-05-03 | MCP is an AssetKind, not a Vault | Registered in global registry, not sourced from external repos. |
-| 2026-05-03 | Telemetry Tab name is "Telemetry", not "Runs & Logs" | Changed during implementation for clarity and consistency with domain model (`AnalyticsConfig`). |
-| 2026-05-04 | OpenCode MCP schema is flat `mcp.<name>` | OpenCode validates `mcp` as `{ [name]: { type, enabled, ... } }`, not nested `mcp.servers`. Discovered during integration testing and corrected. |
-| 2026-05-04 | Security warning in TUI before MCP registration | User must confirm after seeing the exact command that will be executed. Prevents accidental activation of untrusted binaries. |
+## Step 5: Decompose `src/tui/event.rs` (P0 — THE BIG ONE)
 
----
+Target: event.rs becomes a pure dispatcher (< 150 lines).
 
-## 7. Completed Acceptance Criteria
+### Files to create
+1. `src/tui/features/mod.rs` — re-export all feature modules
+2. `src/tui/features/common/mod.rs` — tab switch, search, esc, backspace, F-keys, nav
+3. `src/tui/features/common/controller.rs` — handle_esc, handle_backspace, handle_f_keys, handle_navigation, handle_space dispatch, handle_enter dispatch
+4. `src/tui/features/common/actions.rs` — apply_tab_switch, apply_search_char, apply_esc, apply_scope_toggle, apply_space_no_provider, apply_enter_attach_vault, apply_enter_register_mcp, apply_enter_add_profile, parse_github_url, active_providers, execute_attach_vault
+5. `src/tui/features/providers/controller.rs` — handle_select_provider_root, handle_deactivate_last_provider_confirm, handle_deactivate_last_provider_cancel, handle_space_provider, toggle_provider
+6. `src/tui/features/vaults/controller.rs` — handle_attach_vault_input, handle_detach_confirm, handle_detach_cancel, handle_space_vault, handle_enter_attach_vault (move from common)
+7. `src/tui/features/mcps/controller.rs` — handle_register_mcp_input, handle_mcp_register_confirm, handle_space_mcp
+8. `src/tui/features/profiles/controller.rs` — handle_profile_wizard_input, handle_delete_profile, handle_delete_profile_no_ctx, handle_delete_profile_confirm
+9. `src/tui/features/assets/controller.rs` — handle_space_asset, handle_enter (asset update), handle_f5_update_all, handle_install_remote_clawhub
+10. `src/tui/features/assets/actions.rs` — dispatch_clawhub_search (async helper)
 
-### P1 — Headless CLI
-- [x] `agk sync`, `agk install`, `agk validate`, `agk pack` subcommands exist.
-- [x] `--quiet`, `--verbose`, `--json` work consistently.
-- [x] Exit codes `0`, `1`, `2`, `3` enforced.
-- [x] Headless mode never spawns Ratatui buffer.
-- [x] `cargo test` includes integration tests for all subcommands.
+### Strategy for migration
+- For each function moved out of event.rs:
+  - Add `pub(crate)` re-export in the target module
+  - Copy function body verbatim into new file
+  - Comment out the original function in event.rs (keep as migration marker)
+  - Add `// use crate::tui::features::common::controller::handle_esc;` in the new event.rs header
+- Once all functions are moved and tests pass, uncomment event.rs and remove commented legacy code.
 
-### P2 — Skill Bundling
-- [x] `SKILL.md` frontmatter parses `requires:` and `requires_optional:`.
-- [x] BFS resolution with cycle detection.
-- [x] Diamond deduplication by `(vault, name, sha10)`.
-- [ ] TUI macro-progress bar for pack install (out of scope for v0.2; background tasks cover basic progress).
-- [ ] `agk validate` detects unresolvable `requires:` (partial — `validate` scans installed assets, not frontmatter dependencies).
+### Tests
+- All inline tests from event.rs move to their respective new controller files (profiles controller gets wizard + delete tests, common gets nav/esc/tab tests, assets gets install/update tests, vaults gets attach/detach tests).
 
-### P3 — OpenCode Provider
-- [x] `infra/provider/opencode.rs` implements `ProviderPort` + `McpProvider`.
-- [x] Global/workspace install paths correct.
-- [x] JSON/JSONC merge with comment stripping.
-- [x] Flat `mcp.<name>` schema with `type`, `enabled`.
-- [x] TUI Providers tab toggle.
-- [x] Headless CLI `--provider opencode` supported.
+## Step 6: Final verification
 
-### P4 — Telemetry
-- [x] Enabled by default (opt-out via `agk telemetry disable`).
-- [x] Log parsers for Claude Code, Copilot, OpenCode.
-- [x] Data stored in `~/.config/agk/analytics.toml`.
-- [x] TUI Tab 5 displays usage stats.
-- [x] Background scan every 60s.
-- [x] `agk telemetry enable|disable|status`.
-- [x] `--json` support for `status`.
-- [ ] TUI toggle in Tab 5 (future enhancement).
+- `cargo fmt --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo test --workspace --all-targets --all-features`
+- `cargo test --test architecture -- --ignored`
+- `cargo check --all-features`
 
-### P5 — MCP Vault
-- [x] `AssetKind::McpServer` exists.
-- [x] Tab `[2]` = MCP Servers.
-- [x] `F2` registration modal (name→command→args→transport→description→confirm).
-- [x] Test phase: MCP `initialize` handshake.
-- [x] Registry in `~/.config/agk/mcp.toml`.
-- [x] `Space` toggles per active provider per scope.
-- [x] Provider config: Claude Code (`.claude/mcp.json`), OpenCode (`mcp.<name>`).
-- [x] Headless CLI: `agk mcp add`, `enable`, `disable`, `list`, `test`.
-- [x] `--json` for `list`.
-- [x] Security warning before executing unknown commands.
-- [ ] TUI edit flow (`Enter` to modify existing MCP) — partially covered by remove + re-register.
-- [ ] `mcp.toml` file permissions `0600` — not yet enforced.
+## Execution Order
 
----
-
-## 8. Open Questions (Outstanding)
-
-1. **`agk pack` fast-follow:** Firebender JSON and tarball targets are stubbed (`PackTarget::Firebender`, `PackTarget::Tarball` exist in CLI enum but not fully implemented).
-2. **MCP edit:** No dedicated TUI edit flow for existing MCP servers — workaround is disable + removed config + re-register.
-3. **MCP permissions:** `~/.config/agk/mcp.toml` should have `0600` on creation (security hardening).
-4. **Telemetry opt-in reconsideration:** Currently opt-out (enabled by default). Should v1.0 switch to opt-in based on user feedback?
+1. **Parallel:** Subagent A fixes clippy + compiles in bootstrap.rs, actions.rs, cli/assets.rs.  
+2. **Parallel:** Subagent B fixes clippy + compiles in tui/event.rs and splits into feature controllers.  
+3. **Central:** Integrate + verify all tests pass.
 
 ---
 
-*End of plan — Engineering complete. All proposals implemented and documented under `docs/product/features/`.*
+*Started: 2026-05-26 — Phase A/C clippy fixes in progress.*

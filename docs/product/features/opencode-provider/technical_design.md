@@ -23,12 +23,14 @@ For MCP, entries are written directly into `opencode.json` as raw `serde_json::V
 1. Determine scope (Global / Workspace).
 2. Compute destination: `provider_root(scope)/skills/{name}/SKILL.md`.
 3. Copy the skill directory to the destination using `infra::provider::common::copy_dir`.
-4. **Do NOT modify** `opencode.json`. OpenCode discovers skills from the directory layout on startup.
+4. **Do NOT modify** `opencode.json**. OpenCode discovers skills from the directory layout on startup.
+5. **Self-heal:** If a stale `"skills"` array exists in `opencode.json` (from earlier agk versions), strip it. This allows users upgrading from buggy agk versions to get a clean config on their first install.
 
 ### Remove Workflow
 1. Determine scope.
 2. Delete the skill directory.
-3. If a stale `"skills"` array exists in `opencode.json` (from earlier agk versions), strip it, because OpenCode rejects this key.
+3. Strip any stale `"skills"` array in `opencode.json` because OpenCode rejects it.
+4. If `opencode.json` is now an empty object `{}`, delete it.
 
 ### JSONC Handling
 - Use `jsonc-parser` crate (or implement a simple comment stripper).

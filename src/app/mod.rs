@@ -1,6 +1,5 @@
 pub(crate) mod actions;
 pub(crate) mod bootstrap;
-pub(crate) mod bundling;
 pub(crate) mod command;
 pub(crate) mod core;
 pub(crate) mod event;

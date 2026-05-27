@@ -27,7 +27,6 @@ pub trait FeatureSetPort: Send + Sync {
 #[async_trait::async_trait]
 pub trait VaultPort: Send + Sync {
     fn id(&self) -> &str;
-    #[allow(dead_code)]
     fn kind_name(&self) -> &str;
 
     async fn refresh(&self) -> Result<()> {
@@ -72,6 +71,18 @@ pub trait ProcessRunnerPort: Send + Sync {
     ) -> Result<std::process::ExitStatus>;
 }
 
+/// Port for configuration format codecs (TOML, YAML, JSON, etc.)
+pub trait ManifestCodecPort: std::fmt::Debug {
+    /// Codec identifier e.g. "toml", "yaml"
+    fn id(&self) -> &'static str;
+    /// Whether this codec can handle files with `ext` (e.g. "toml", "yaml")
+    fn supports_ext(&self, ext: &str) -> bool;
+    /// Decode config file from text
+    fn decode_config(&self, text: &str) -> Result<ConfigFile>;
+    /// Encode config file to text
+    fn encode_config(&self, config: &ConfigFile) -> Result<String>;
+}
+
 pub trait ConfigStorePort: Send + Sync {
     fn load(&self, scope: Scope) -> Result<ConfigFile>;
     fn save(&self, scope: Scope, config: &ConfigFile) -> Result<()>;
@@ -80,6 +91,14 @@ pub trait ConfigStorePort: Send + Sync {
     fn delete_file(&self, _scope: Scope) -> Result<()> {
         Ok(())
     }
+}
+
+/// Port for reading / writing the global contexts file.
+pub trait ContextStorePort: Send + Sync {
+    fn load_contexts(&self) -> Result<crate::domain::context::ContextFile>;
+    fn save_contexts(&self, contexts: &crate::domain::context::ContextFile) -> Result<()>;
+    fn current_context(&self) -> Result<crate::domain::context::ContextId>;
+    fn switch_context(&self, id: &crate::domain::context::ContextId) -> Result<()>;
 }
 
 pub trait ProviderPort: Send + Sync {
@@ -160,7 +179,6 @@ pub enum WizardStep {
     },
     /// Reserved for future providers that want to embed an external interactive
     /// command as a distinct wizard step.  Not currently used by OpenCode.
-    #[allow(dead_code)]
     Interactive {
         title: String,
         command: String,
@@ -195,6 +213,8 @@ pub struct WizardState {
     /// entering a different checklist step always resets state even if
     /// option counts happen to match.
     pub checked_step_index: Option<usize>,
+    /// Vertical scroll offset for the Review step (wrapped lines).
+    pub scroll_offset: usize,
 }
 
 impl WizardState {
@@ -214,6 +234,7 @@ impl WizardState {
             cursor_pos: 0,
             provider_id,
             checked_step_index: None,
+            scroll_offset: 0,
         };
         ws.sync_checklist_state();
         ws
@@ -291,7 +312,6 @@ impl ProfileSession {
 pub trait McpProvider: Send + Sync {
     fn provider_id(&self) -> &str;
     fn supports_mcp(&self) -> bool;
-    #[allow(dead_code)]
     fn mcp_config_path(&self, scope: Scope) -> Option<PathBuf>;
     fn write_mcp_server(&self, server: &McpServer, scope: Scope) -> Result<()>;
     fn remove_mcp_server(&self, name: &str, scope: Scope) -> Result<()>;
