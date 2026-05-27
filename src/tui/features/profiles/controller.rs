@@ -35,19 +35,18 @@ pub fn handle_profile_wizard_input(
                 ws.prompt_buffer.insert(byte_idx, *c);
                 ws.cursor_pos += 1;
             }
-            KeyCode::Backspace => {
-                if ws.cursor_pos > 0 {
-                    ws.cursor_pos -= 1;
-                    let byte_idx = ws
-                        .prompt_buffer
-                        .char_indices()
-                        .nth(ws.cursor_pos)
-                        .map(|(i, _)| i)
-                        .unwrap_or(ws.prompt_buffer.len());
-                    let ch = ws.prompt_buffer[byte_idx..].chars().next().unwrap_or('\n');
-                    ws.prompt_buffer.drain(byte_idx..byte_idx + ch.len_utf8());
-                }
+            KeyCode::Backspace if ws.cursor_pos > 0 => {
+                ws.cursor_pos -= 1;
+                let byte_idx = ws
+                    .prompt_buffer
+                    .char_indices()
+                    .nth(ws.cursor_pos)
+                    .map(|(i, _)| i)
+                    .unwrap_or(ws.prompt_buffer.len());
+                let ch = ws.prompt_buffer[byte_idx..].chars().next().unwrap_or('\n');
+                ws.prompt_buffer.drain(byte_idx..byte_idx + ch.len_utf8());
             }
+            KeyCode::Backspace => {}
             KeyCode::Enter => {
                 let val = std::mem::take(&mut ws.prompt_buffer).trim().to_string();
                 ws.cursor_pos = 0;
@@ -80,53 +79,37 @@ pub fn handle_profile_wizard_input(
                     ws.sync_checklist_state();
                 }
             }
-            KeyCode::Left => {
-                if ws.cursor_pos > 0 {
-                    ws.cursor_pos -= 1;
-                }
-            }
-            KeyCode::Right => {
-                if ws.cursor_pos < ws.prompt_buffer.chars().count() {
-                    ws.cursor_pos += 1;
-                }
-            }
+            KeyCode::Left if ws.cursor_pos > 0 => ws.cursor_pos -= 1,
+            KeyCode::Right if ws.cursor_pos < ws.prompt_buffer.chars().count() => ws.cursor_pos += 1,
             KeyCode::Esc => {
-                if ws.step_index > 0 {
-                    ws.step_index -= 1;
-                    ws.cursor_pos = 0;
-                } else {
+                if ws.step_index == 0 {
                     state.wizard_state = None;
                     state.list_mode = ListMode::Normal;
                     state.status_line = "Cancelled profile creation".to_string();
+                    return Ok(());
                 }
+                ws.step_index -= 1;
+                ws.cursor_pos = 0;
             }
             _ => {}
         },
         WizardStep::Checklist { ref options, .. } => match code {
-            KeyCode::Up => {
-                if ws.selected > 0 {
-                    ws.selected -= 1;
-                }
-            }
-            KeyCode::Down => {
-                if ws.selected + 1 < ws.checked.len() {
-                    ws.selected += 1;
-                }
-            }
+            KeyCode::Up if ws.selected > 0 => ws.selected -= 1,
+            KeyCode::Down if ws.selected + 1 < ws.checked.len() => ws.selected += 1,
             KeyCode::Char(' ') => {
                 if let Some(c) = ws.checked.get_mut(ws.selected) {
                     *c = !*c;
                 }
             }
             KeyCode::Esc => {
-                if ws.step_index > 0 {
-                    ws.step_index -= 1;
-                    ws.sync_checklist_state();
-                } else {
+                if ws.step_index == 0 {
                     state.wizard_state = None;
                     state.list_mode = ListMode::Normal;
                     state.status_line = "Cancelled profile creation".to_string();
+                    return Ok(());
                 }
+                ws.step_index -= 1;
+                ws.sync_checklist_state();
             }
             KeyCode::Enter => {
                 let selected_items: Vec<String> = options
