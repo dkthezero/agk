@@ -31,8 +31,9 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
     }
 
     fn test_server(&self, name: &str) -> Result<()> {
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(crate::infra::mcp::test_server(name))
+        // We are always inside a tokio runtime; use futures::executor::block_on
+        // instead of creating a nested Runtime.
+        futures::executor::block_on(crate::infra::mcp::test_server(name))
     }
 
     fn build_providers(

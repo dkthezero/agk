@@ -127,12 +127,22 @@ pub fn draw_modals(frame: &mut Frame, state: &AppState) {
                             );
                         }
                         WizardStep::Checklist { title, options } => {
+                            let filtered_indices = ws.filtered_indices();
+                            let filtered_options: Vec<String> = filtered_indices
+                                .iter()
+                                .map(|&i| options[i].clone())
+                                .collect();
+                            let filtered_checked: Vec<bool> =
+                                filtered_indices.iter().map(|&i| ws.checked[i]).collect();
+                            let selected_filtered =
+                                ws.selected.min(filtered_options.len().saturating_sub(1));
                             modal::render_checklist_modal(
                                 frame,
                                 title,
-                                options,
-                                &ws.checked,
-                                ws.selected,
+                                &filtered_options,
+                                &filtered_checked,
+                                selected_filtered,
+                                &ws.filter_query,
                             );
                         }
                         WizardStep::Review { title } => {

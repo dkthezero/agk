@@ -11,7 +11,7 @@ The purpose of this document is to catalog the ubiquitous domain terminology and
 - **Workspace Scope:** Project-specific targeting. Saves and overrides the active provider selections in a local directory (`./.agk/config.toml`). Usually injects assets into the current folder root (like `.github/skills/`). The Workspace scopes can override and merge state visually in the TUI alongside global scopes to act dynamically depending on the current active directory.
 
 ### 2. Provider
-A target AI framework or agent ecosystem that executes instructions or uses skills (e.g. GitHub Copilot, Claude Desktop, Firebender, OpenCode). Providers act as endpoints where `agk` syncs or "projects" assets into when they are marked as installed/active.
+A target AI framework or agent ecosystem that executes instructions or uses skills (e.g., GitHub Copilot, Claude Desktop, Firebender, OpenCode). Providers act as endpoints where `agk` syncs or "projects" assets into when they are marked as installed/active.
 
 ### 3. Vault
 A remote or local directory mapping containing managed raw tools, instructions, and schemas. Vaults act as the canonical source of truth for library fetching/discovery before being assigned to target active providers.
@@ -82,7 +82,7 @@ When `agk` assesses packages across vaults to map them, it generates its `sha10`
 For each package discovered:
 1. Collect strictly canonical associated files
 2. Sort strictly by relative path
-3. Normalize line endings natively (CRL/LF -> unified logic)
+3. Normalize line endings natively (CRL/LF → unified logic)
 4. Compute standard `sha256` buffer
 5. Store string of the first 10 hex characters natively as `sha10` attribute
 

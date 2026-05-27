@@ -108,12 +108,14 @@ pub fn run_profile_create(
         store.save(scope, &config)?;
 
         // 5. Invoke opencode agent create headlessly.
+        let profile_dir = workspace.join(".agk").join("profiles").join(name);
+        std::fs::create_dir_all(&profile_dir)?;
         let mut cmd = std::process::Command::new("opencode");
         cmd.args([
             "agent",
             "create",
             "--path",
-            workspace.display().to_string().as_str(),
+            &profile_dir.display().to_string(),
             "--mode",
             "primary",
             "--name",

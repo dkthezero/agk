@@ -7,6 +7,7 @@ Manage vaults of reusable skills and instructions, then install them to Claude C
 ![License](https://img.shields.io/github/license/dkthezero/agk)
 ![Crates.io](https://img.shields.io/crates/v/agk)
 ![GitHub release](https://img.shields.io/github/v/release/dkthezero/agk)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dkthezero/agk)
 
 ## Features
 
@@ -91,19 +92,19 @@ agk
 
 ## Keybindings
 
-| Key | Action |
-|-----|--------|
-| `1`–`4` | Skills, MCP Servers, Instructions, Providers |
-| `0` | Vaults tab |
-| `Up/Down` | Navigate list |
-| `Space` | Install/uninstall asset, toggle provider/vault/MCP |
-| `Enter` | Update selected asset |
-| `F2` | Attach new vault (Vaults tab) or register MCP server (MCP tab) |
-| `F4` | Refresh all vaults from source |
-| `F5` | Update all installed assets |
-| `Tab` | Toggle between Global and Workspace scope |
-| `Type` | Search/filter by name (searches ClawHub in parallel when active) |
-| `Esc` | Clear search / cancel / quit |
+| Key       | Action                                                           |
+| --------- | ---------------------------------------------------------------- |
+| `1`–`4`   | Skills, MCP Servers, Instructions, Providers                     |
+| `0`       | Vaults tab                                                       |
+| `Up/Down` | Navigate list                                                    |
+| `Space`   | Install/uninstall asset, toggle provider/vault/MCP               |
+| `Enter`   | Update selected asset                                            |
+| `F2`      | Attach new vault (Vaults tab) or register MCP server (MCP tab)   |
+| `F4`      | Refresh all vaults from source                                   |
+| `F5`      | Update all installed assets                                      |
+| `Tab`     | Toggle between Global and Workspace scope                        |
+| `Type`    | Search/filter by name (searches ClawHub in parallel when active) |
+| `Esc`     | Clear search / cancel / quit                                     |
 
 ## Vault structure
 
@@ -130,7 +131,9 @@ Skills and instructions support optional YAML frontmatter for metadata:
 name: my-skill
 version: 1.0.0
 ---
+
 # My Skill
+
 ...
 ```
 
@@ -154,15 +157,15 @@ When someone installs `acme-company-pack`, agk recursively resolves and installs
 
 agk uses two configuration scopes:
 
-| Scope | Path | Purpose |
-|-------|------|---------|
-| Global | `~/.config/agk/config.toml` | Vaults, enabled providers |
-| Workspace | `.agk/config.toml` | Installed assets per workspace |
+| Scope     | Path                        | Purpose                        |
+| --------- | --------------------------- | ------------------------------ |
+| Global    | `~/.config/agk/config.toml` | Vaults, enabled providers      |
+| Workspace | `.agk/config.toml`          | Installed assets per workspace |
 
 MCP servers are stored separately:
 
-| File | Purpose |
-|------|---------|
+| File                     | Purpose                                                   |
+| ------------------------ | --------------------------------------------------------- |
 | `~/.config/agk/mcp.toml` | Registered MCP servers with activation state per provider |
 
 ### Clean up
@@ -174,16 +177,16 @@ agk clean --global   # Remove global config
 
 ## Supported providers
 
-| Provider | Skills | Instructions | MCP |
-|----------|--------|-------------|-----|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) | `~/.claude/skills/` | `.claude/instructions/` | `.claude/mcp.json` |
-| [OpenCode](https://github.com/anomalyco/opencode) | `~/.config/opencode/skills/` | (Claude-compatible paths) | Flat `mcp.<name>` in `opencode.json` |
-| [GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions) | `~/.copilot/` | `.github/` | TBD |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md) | Provider-specific | Provider-specific | — |
-| [Letta](https://docs.letta.com/introduction) | Provider-specific | Provider-specific | — |
-| [Snowflake](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents) | Provider-specific | Provider-specific | — |
-| [Firebender](https://docs.firebender.com/get-started/agent) | Provider-specific | Provider-specific | — |
-| [AMP](https://ampcode.com/manual) | Provider-specific | Provider-specific | — |
+| Provider                                                                                   | Skills                       | Instructions              | MCP                                  |
+| ------------------------------------------------------------------------------------------ | ---------------------------- | ------------------------- | ------------------------------------ |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview)                     | `~/.claude/skills/`          | `.claude/instructions/`   | `.claude/mcp.json`                   |
+| [OpenCode](https://github.com/anomalyco/opencode)                                          | `~/.config/opencode/skills/` | (Claude-compatible paths) | Flat `mcp.<name>` in `opencode.json` |
+| [GitHub Copilot](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions) | `~/.copilot/`                | `.github/`                | TBD                                  |
+| [Gemini CLI](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md)  | Provider-specific            | Provider-specific         | —                                    |
+| [Letta](https://docs.letta.com/introduction)                                               | Provider-specific            | Provider-specific         | —                                    |
+| [Snowflake](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents)       | Provider-specific            | Provider-specific         | —                                    |
+| [Firebender](https://docs.firebender.com/get-started/agent)                                | Provider-specific            | Provider-specific         | —                                    |
+| [AMP](https://ampcode.com/manual)                                                          | Provider-specific            | Provider-specific         | —                                    |
 
 ## Headless mode
 

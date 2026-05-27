@@ -91,7 +91,7 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
         std::process::Command::new("open")
             .args(["-a", "Terminal", &path.to_string_lossy()])
             .spawn()?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(target_os = "linux")]
     {
@@ -154,7 +154,9 @@ pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
         let _ = path;
-        return Err(anyhow::anyhow!("Opening terminal is not supported on this platform"));
+        return Err(anyhow::anyhow!(
+            "Opening terminal is not supported on this platform"
+        ));
     }
 }
 

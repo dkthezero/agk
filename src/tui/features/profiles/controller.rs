@@ -80,7 +80,9 @@ pub fn handle_profile_wizard_input(
                 }
             }
             KeyCode::Left if ws.cursor_pos > 0 => ws.cursor_pos -= 1,
-            KeyCode::Right if ws.cursor_pos < ws.prompt_buffer.chars().count() => ws.cursor_pos += 1,
+            KeyCode::Right if ws.cursor_pos < ws.prompt_buffer.chars().count() => {
+                ws.cursor_pos += 1
+            }
             KeyCode::Esc => {
                 if ws.step_index == 0 {
                     state.wizard_state = None;
@@ -93,44 +95,73 @@ pub fn handle_profile_wizard_input(
             }
             _ => {}
         },
-        WizardStep::Checklist { ref options, .. } => match code {
-            KeyCode::Up if ws.selected > 0 => ws.selected -= 1,
-            KeyCode::Down if ws.selected + 1 < ws.checked.len() => ws.selected += 1,
-            KeyCode::Char(' ') => {
-                if let Some(c) = ws.checked.get_mut(ws.selected) {
-                    *c = !*c;
+        WizardStep::Checklist { ref options, .. } => {
+            let filtered = ws.filtered_indices();
+            match code {
+                KeyCode::Up if ws.selected > 0 => {
+                    ws.selected -= 1;
                 }
-            }
-            KeyCode::Esc => {
-                if ws.step_index == 0 {
-                    state.wizard_state = None;
-                    state.list_mode = ListMode::Normal;
-                    state.status_line = "Cancelled profile creation".to_string();
-                    return Ok(());
+                KeyCode::Down if ws.selected + 1 < filtered.len() => {
+                    ws.selected += 1;
                 }
-                ws.step_index -= 1;
-                ws.sync_checklist_state();
-            }
-            KeyCode::Enter => {
-                let selected_items: Vec<String> = options
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| ws.checked.get(*i) == Some(&true))
-                    .map(|(_, name)| name.clone())
-                    .collect();
-
-                if let WizardStep::Checklist { ref title, .. } = current_step {
-                    if title.to_lowercase().contains("skill") {
-                        ws.skills = selected_items;
-                    } else {
-                        ws.mcps = selected_items;
+                KeyCode::Char(' ') => {
+                    if let Some(original_idx) = ws.selected_original_index() {
+                        if let Some(c) = ws.checked.get_mut(original_idx) {
+                            *c = !*c;
+                        }
                     }
                 }
-                ws.step_index += 1;
-                ws.sync_checklist_state();
+                KeyCode::Char(c) if key.modifiers.is_empty() => {
+                    // Type to filter options (only if Ctrl/LAlt/RAlt not pressed)
+                    ws.filter_query.push(*c);
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Backspace if !ws.filter_query.is_empty() => {
+                    ws.filter_query.pop();
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Esc if !ws.filter_query.is_empty() => {
+                    ws.filter_query.clear();
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Esc => {
+                    if ws.step_index == 0 {
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        state.status_line = "Cancelled profile creation".to_string();
+                        return Ok(());
+                    }
+                    ws.step_index -= 1;
+                    ws.filter_query.clear();
+                    ws.scroll_offset = 0;
+                    ws.sync_checklist_state();
+                }
+                KeyCode::Enter => {
+                    let selected_items: Vec<String> = options
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| ws.checked.get(*i) == Some(&true))
+                        .map(|(_, name)| name.clone())
+                        .collect();
+
+                    if let WizardStep::Checklist { ref title, .. } = current_step {
+                        if title.to_lowercase().contains("skill") {
+                            ws.skills = selected_items;
+                        } else {
+                            ws.mcps = selected_items;
+                        }
+                    }
+                    ws.step_index += 1;
+                    ws.filter_query.clear();
+                    ws.scroll_offset = 0;
+                    ws.sync_checklist_state();
+                }
+                _ => {}
             }
-            _ => {}
-        },
+        }
         WizardStep::Review { .. } => match code {
             KeyCode::Enter => {
                 let name = ws.name.clone();
@@ -156,6 +187,8 @@ pub fn handle_profile_wizard_input(
                 let id =
                     crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let workspace_root = ctx.workspace_root.clone();
+                let profile_dir = workspace_root.join(".agk").join("profiles").join(&name);
+                let _ = std::fs::create_dir_all(&profile_dir);
 
                 tokio::task::spawn_blocking(move || {
                     let _ = tx.send(AppEvent::TaskStarted {
@@ -171,7 +204,7 @@ pub fn handle_profile_wizard_input(
                                     "agent".into(),
                                     "create".into(),
                                     "--path".into(),
-                                    workspace_root.display().to_string(),
+                                    profile_dir.display().to_string(),
                                     "--mode".into(),
                                     "primary".into(),
                                     "--description".into(),
@@ -199,10 +232,8 @@ pub fn handle_profile_wizard_input(
                     state.status_line = "Cancelled profile creation".to_string();
                 }
             }
-            KeyCode::Up => {
-                if ws.scroll_offset > 0 {
-                    ws.scroll_offset -= 1;
-                }
+            KeyCode::Up if ws.scroll_offset > 0 => {
+                ws.scroll_offset -= 1;
             }
             KeyCode::Down => {
                 ws.scroll_offset = ws.scroll_offset.saturating_add(1);

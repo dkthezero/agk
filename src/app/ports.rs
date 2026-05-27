@@ -215,6 +215,36 @@ pub struct WizardState {
     pub checked_step_index: Option<usize>,
     /// Vertical scroll offset for the Review step (wrapped lines).
     pub scroll_offset: usize,
+    /// Search query for Checklist steps (filtered options).
+    pub filter_query: String,
+}
+
+impl WizardState {
+    /// Get the indices of options that match the current filter query.
+    pub fn filtered_indices(&self) -> Vec<usize> {
+        if let Some(WizardStep::Checklist { options, .. }) = self.steps.get(self.step_index) {
+            let q = self.filter_query.to_lowercase();
+            if q.is_empty() {
+                (0..options.len()).collect()
+            } else {
+                options
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, opt)| opt.to_lowercase().contains(&q))
+                    .map(|(i, _)| i)
+                    .collect()
+            }
+        } else {
+            vec![]
+        }
+    }
+
+    /// Get the currently selected option index (in the original options array),
+    /// accounting for filtered view.
+    pub fn selected_original_index(&self) -> Option<usize> {
+        let filtered = self.filtered_indices();
+        filtered.get(self.selected).copied()
+    }
 }
 
 impl WizardState {
@@ -235,6 +265,7 @@ impl WizardState {
             provider_id,
             checked_step_index: None,
             scroll_offset: 0,
+            filter_query: String::new(),
         };
         ws.sync_checklist_state();
         ws

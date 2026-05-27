@@ -165,7 +165,7 @@ pub fn handle_mcp_register_confirm(
     let tx = ctx.tx.clone();
     let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-    tokio::task::spawn_blocking(move || {
+    tokio::spawn(async move {
         let _ = tx.send(AppEvent::TaskStarted {
             id,
             name: format!("Registering MCP server '{}'", name),
@@ -184,8 +184,7 @@ pub fn handle_mcp_register_confirm(
         ) {
             Ok(_) => {
                 let _ = tx.send(AppEvent::TaskProgress { id, percent: 50 });
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                match rt.block_on(crate::infra::mcp::test_server(&name)) {
+                match crate::infra::mcp::test_server(&name).await {
                     Ok(()) => {
                         let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
                         let _ = tx.send(AppEvent::TriggerReload);

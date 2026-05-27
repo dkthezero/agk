@@ -7,6 +7,19 @@ pub enum ControlFlow {
     Quit,
 }
 
+/// Snapshot produced by a background `reload_state` and sent atomically to the
+/// async event loop via `AppEvent::ReloadComplete`.
+#[derive(Debug)]
+pub struct ReloadSnapshot {
+    pub vault_entries: Vec<crate::app::snapshot::VaultEntry>,
+    pub provider_entries: Vec<crate::app::snapshot::ProviderEntry>,
+    pub profile_entries: Vec<crate::app::snapshot::ProfileEntry>,
+    pub packages: std::collections::HashMap<usize, Vec<crate::domain::asset::ScannedPackage>>,
+    pub configs:
+        std::collections::HashMap<crate::domain::scope::Scope, crate::domain::config::ConfigFile>,
+    pub mcp_state: crate::tui::widgets::mcp::McpState,
+}
+
 pub enum AppEvent {
     /// Keyboard events from `crossterm` — matched in runtime_loop.rs but never
     /// constructed because the TUI uses direct crossterm polling instead of the
@@ -38,7 +51,8 @@ pub enum AppEvent {
         task_id: usize,
     },
     Tick,
-    /// Request the main loop to suspend TUI, run a child process inheriting stdio,
+    /// Background reload finished atomically so the UI never freezes.
+    ReloadComplete(ReloadSnapshot),
     /// then resume TUI. The child runs interactively (user can type/respond).
     RunInteractiveProcess {
         command: String,

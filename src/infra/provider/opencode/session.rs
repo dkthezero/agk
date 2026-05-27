@@ -4,6 +4,15 @@ use crate::domain::profile::Profile;
 use crate::infra::provider::opencode::OpenCodeProvider;
 use anyhow::{Context, Result};
 
+/// Generate a 6-digit numeric suffix based on nanosecond time.
+fn random_6_digits() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{:06}", nanos % 1_000_000)
+}
+
 impl ProfileRuntimePort for OpenCodeProvider {
     fn provider_id(&self) -> &str {
         "opencode"
@@ -18,8 +27,6 @@ impl ProfileRuntimePort for OpenCodeProvider {
         let base_agent_path = self.profile_agent_path(name);
 
         // Auto-generate a minimal agent markdown if the file is missing.
-        // This can happen when a profile was created via the config-only
-        // headless path (e.g. Phase-B fallback) before agent generation was wired.
         if !base_agent_path.exists() {
             if let Some(parent) = base_agent_path.parent() {
                 std::fs::create_dir_all(parent)?;
@@ -37,7 +44,7 @@ impl ProfileRuntimePort for OpenCodeProvider {
         }
         if let Some(agent_obj) = plan_config["agent"].as_object_mut() {
             agent_obj.insert(
-                name.to_string(),
+                format!("{}{}", name, random_6_digits()),
                 serde_json::json!({
                     "mode": "primary",
                     "description": format!("Session agent for {} profile", name),
@@ -84,26 +91,18 @@ impl ProfileRuntimePort for OpenCodeProvider {
     }
 
     fn run_plan(&self, plan: &LaunchPlan) -> Result<ProfileSession> {
-        let session_key = format!(
-            "{}_{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
-        );
-        let agent_name = format!("{}_{}", plan.profile_id.as_str(), session_key);
+        let agent_name = format!("{}{}", plan.profile_id.as_str(), random_6_digits());
         let agents_dir = self.workspace_root.join(".opencode").join("agents");
         let session_agent_path = agents_dir.join(format!("{}.md", agent_name));
 
-        // 1. Write patched agent markdown
+        // 1. Copy base agent markdown to session agent with patched frontmatter
         let mut agent_content = std::fs::read_to_string(&plan.agent_markdown_source)?;
         agent_content = super::util::patch_agent_frontmatter(&agent_content, &agent_name);
         std::fs::create_dir_all(&agents_dir)?;
         std::fs::write(&session_agent_path, agent_content)?;
 
         // 2. Write patched opencode.json (or restore if plan fails)
-        let original_bytes = plan.original_provider_config_bytes.clone();
+        let _original_bytes = plan.original_provider_config_bytes.clone();
         if let Some(ref value) = plan.patched_provider_config {
             self.write_workspace_config(value)?;
         }
@@ -118,27 +117,45 @@ impl ProfileRuntimePort for OpenCodeProvider {
 
         let cleanup_path = session_agent_path.clone();
         let self_workspace = self.workspace_root.clone();
-        let cleanup_original = original_bytes;
 
         let cleanup = Box::new(move || {
+            // Remove session agent file
             let _ = std::fs::remove_file(&cleanup_path);
-            if let Some(bytes) = cleanup_original {
-                let path = self_workspace.join("opencode.json");
-                let _ = std::fs::write(&path, bytes);
-            } else {
-                let path = self_workspace.join("opencode.json");
-                if path.exists() {
-                    let _ = std::fs::remove_file(&path);
+
+            // Surgical cleanup: remove only the agent entry from opencode.json
+            // instead of wiping the whole file.
+            let json_path = self_workspace.join("opencode.json");
+            if json_path.exists() {
+                let content = std::fs::read_to_string(&json_path).unwrap_or_default();
+                let cleaned = super::util::strip_jsonc_comments(&content);
+                if let Ok(mut config) = serde_json::from_str::<serde_json::Value>(&cleaned) {
+                    if let Some(obj) = config.as_object_mut() {
+                        if let Some(agent_obj) =
+                            obj.get_mut("agent").and_then(|v| v.as_object_mut())
+                        {
+                            agent_obj.remove(&agent_name);
+                            if agent_obj.is_empty() {
+                                obj.remove("agent");
+                            }
+                        }
+                        let _ = super::OpenCodeProvider::new(self_workspace.clone())
+                            .write_workspace_config(&config);
+                    }
                 }
             }
+
+            // Prune .opencode/agents if empty
             let agents = self_workspace.join(".opencode").join("agents");
             if agents.exists() && agents.read_dir()?.next().is_none() {
                 let _ = std::fs::remove_dir(&agents);
             }
+
+            // Prune .opencode if empty
             let opencode = self_workspace.join(".opencode");
             if opencode.exists() && opencode.read_dir()?.next().is_none() {
                 let _ = std::fs::remove_dir(&opencode);
             }
+
             Ok(())
         });
 
@@ -151,15 +168,13 @@ impl OpenCodeProvider {
     pub fn start_opencode_session(
         &self,
         profile: &crate::domain::config::Profile,
-        session_key: &str,
+        _session_key: &str,
     ) -> Result<ProfileSession> {
         super::config::validate_profile_name(&profile.name)?;
 
         let base_agent_path = self.profile_agent_path(&profile.name);
 
         // Auto-generate a minimal agent markdown if the file is missing.
-        // This can happen when a profile was created via the config-only
-        // headless path before agent generation was wired.
         if !base_agent_path.exists() {
             if let Some(parent) = base_agent_path.parent() {
                 std::fs::create_dir_all(parent)?;
@@ -171,7 +186,7 @@ impl OpenCodeProvider {
             std::fs::write(&base_agent_path, content)?;
         }
 
-        let agent_name = format!("{}_{}", profile.name, session_key);
+        let agent_name = format!("{}{}", profile.name, random_6_digits());
         let agents_dir = self.workspace_root.join(".opencode").join("agents");
         let session_agent_path = agents_dir.join(format!("{}.md", agent_name));
 
@@ -182,7 +197,7 @@ impl OpenCodeProvider {
         std::fs::write(&session_agent_path, agent_content)?;
 
         // 2. Read workspace opencode.json with lossless restore capability
-        let (mut config, original_bytes) = self.read_workspace_config()?;
+        let (mut config, _original_bytes) = self.read_workspace_config()?;
         let original_config = config.clone();
 
         // 3. Patch `agent`
@@ -237,7 +252,7 @@ impl OpenCodeProvider {
         {
             Ok(p) => p,
             Err(e) => {
-                // Roll back patches before returning error (PRD #9)
+                // Roll back patches before returning error
                 let _ = std::fs::remove_file(&session_agent_path);
                 self.write_workspace_config(&original_config)?;
                 let agents = self.workspace_root.join(".opencode").join("agents");
@@ -254,21 +269,30 @@ impl OpenCodeProvider {
 
         let cleanup_path = session_agent_path;
         let self_workspace = self.workspace_root.clone();
-        let cleanup_original = original_bytes;
+        let agent_name_cleanup = agent_name.clone();
 
         let cleanup = Box::new(move || {
             // Remove session agent file
             let _ = std::fs::remove_file(&cleanup_path);
 
-            // Restore original opencode.json bytes (lossless: preserves comments/formatting)
-            if let Some(bytes) = cleanup_original {
-                let path = self_workspace.join("opencode.json");
-                let _ = std::fs::write(&path, bytes);
-            } else {
-                // No original file existed; delete if present
-                let path = self_workspace.join("opencode.json");
-                if path.exists() {
-                    let _ = std::fs::remove_file(&path);
+            // Surgical cleanup: remove only the agent entry from opencode.json
+            let json_path = self_workspace.join("opencode.json");
+            if json_path.exists() {
+                let content = std::fs::read_to_string(&json_path).unwrap_or_default();
+                let cleaned = super::util::strip_jsonc_comments(&content);
+                if let Ok(mut config) = serde_json::from_str::<serde_json::Value>(&cleaned) {
+                    if let Some(obj) = config.as_object_mut() {
+                        if let Some(agent_obj) =
+                            obj.get_mut("agent").and_then(|v| v.as_object_mut())
+                        {
+                            agent_obj.remove(&agent_name_cleanup);
+                            if agent_obj.is_empty() {
+                                obj.remove("agent");
+                            }
+                        }
+                        let _ = super::OpenCodeProvider::new(self_workspace.clone())
+                            .write_workspace_config(&config);
+                    }
                 }
             }
 
