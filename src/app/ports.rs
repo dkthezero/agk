@@ -104,7 +104,7 @@ pub trait ConfigStorePort: Send + Sync {
 pub trait ContextStorePort: Send + Sync {
     fn load_contexts(&self) -> Result<crate::domain::context::ContextFile>;
     fn save_contexts(&self, contexts: &crate::domain::context::ContextFile) -> Result<()>;
-    #[allow(dead_code)] // context switching not yet wired in core.rs
+    #[allow(dead_code)] // used by tests and list_contexts view; production callers inline load_contexts().current_context
     fn current_context(&self) -> Result<crate::domain::context::ContextId>;
     fn switch_context(&self, id: &crate::domain::context::ContextId) -> Result<()>;
 }

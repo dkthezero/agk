@@ -95,31 +95,7 @@ impl AgkCore {
                 )
             }
             CoreCommand::ListContexts => {
-                let file = self.context_store.load_contexts()?;
-                for (name, ctx) in &file.contexts {
-                    let marker = if name == &file.current_context {
-                        "* "
-                    } else {
-                        "  "
-                    };
-                    let display = ctx.display_name.as_ref().unwrap_or(name);
-                    let env = ctx
-                        .environment
-                        .map(|e| e.as_str().to_string())
-                        .unwrap_or_default();
-                    sink.on_event(crate::app::event::CoreEvent::TaskCompleted {
-                        id: 0,
-                        message: format!(
-                            "{}{} [{}] (vaults: {}, profiles: {})",
-                            marker,
-                            display,
-                            env,
-                            ctx.vaults.len(),
-                            ctx.profiles.len()
-                        ),
-                    });
-                }
-                Ok(CoreOutcome::Ok)
+                crate::app::usecases::list_contexts::run(self.context_store.as_ref(), sink)
             }
 
             // ===============================================================
