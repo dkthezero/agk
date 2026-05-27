@@ -1,6 +1,5 @@
 use crate::app::command::CreateProfileInput;
 use crate::domain::profile::ProfileId;
-use crate::domain::scope::Scope;
 
 /// Messages emitted by the pure TUI reducer (`tui/reducer.rs`).
 ///

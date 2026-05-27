@@ -1,7 +1,6 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::McpRegistryPort;
-use crate::domain::scope::Scope;
 
 /// Register an MCP server and optionally test it.
 ///
@@ -74,6 +73,7 @@ mod tests {
     use crate::app::event::CoreEvent;
     use crate::app::outcome::CoreEventSink;
     use crate::domain::mcp::McpTransport;
+    use crate::domain::scope::Scope;
 
     struct CollectingSink {
         events: Vec<CoreEvent>,

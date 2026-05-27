@@ -1,5 +1,5 @@
 use crate::app::ports::McpRegistryPort;
-use crate::domain::mcp::{McpRegistry, McpServer, McpTransport};
+use crate::domain::mcp::McpServer;
 use crate::domain::scope::Scope;
 use anyhow::Result;
 

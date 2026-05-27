@@ -1,4 +1,4 @@
-use crate::app::event::{CoreEvent, TaskStatus};
+use crate::app::event::CoreEvent;
 use crate::app::outcome::CoreEventSink;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -66,7 +66,10 @@ impl CoreEventSink for AppEventSink {
                 });
                 self.send(crate::tui::event::AppEvent::TriggerReload);
             }
-            CoreEvent::RemoteVaultSearchResults { vault_id, packages } => {
+            CoreEvent::RemoteVaultSearchResults {
+                vault_id: _,
+                packages,
+            } => {
                 self.send(crate::tui::event::AppEvent::ClawHubSearchResults {
                     packages,
                     task_id: self.task_id(),

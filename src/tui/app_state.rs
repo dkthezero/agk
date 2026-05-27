@@ -1,6 +1,5 @@
 use crate::app::tab_kind::TabKind;
 use crate::domain::scope::Scope;
-use std::collections::HashMap;
 
 /// Pure UI navigation state.  Contains **no domain data** (no ConfigFile,
 /// no ScannedPackage, no ProviderPort references).  All business data lives

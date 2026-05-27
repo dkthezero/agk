@@ -1,4 +1,4 @@
-use crate::app::ports::{ProfileRuntimePort, ProviderPort};
+use crate::app::ports::ProviderPort;
 use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::identity::AssetIdentity;
 use crate::domain::scope::Scope;
@@ -190,6 +190,7 @@ impl OpenCodeProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::ports::ProfileRuntimePort;
     use crate::domain::asset::AssetKind;
     use crate::domain::config::ConfigFile;
 

@@ -1,5 +1,5 @@
 use crate::app::tab_kind::TabKind;
-use crate::tui::app_state::{ListMode, TuiState, WizardState};
+use crate::tui::app_state::{ListMode, TuiState};
 use crate::tui::intent::UiIntent;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -140,13 +140,9 @@ fn handle_modal(state: &mut TuiState, code: &KeyCode, intents: &mut Vec<UiIntent
         KeyCode::Esc => {
             // Cancel modal
             state.list_mode = ListMode::Normal;
-            match &state.list_mode {
-                // This branch is unreachable because we just reset, but
-                // kept for exhaustiveness during refactor.
-                _ => {
-                    state.wizard = None;
-                    intents.push(UiIntent::CloseModal);
-                }
+            {
+                state.wizard = None;
+                intents.push(UiIntent::CloseModal);
             }
         }
         KeyCode::Enter => match &state.list_mode {

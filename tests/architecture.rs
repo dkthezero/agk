@@ -90,7 +90,7 @@ fn forbidden_refs(text: &str, forbidden: &[&str]) -> Vec<String> {
 fn contains_infra_refs(text: &str) -> Vec<String> {
     forbidden_imports(text, &["infra"])
         .into_iter()
-        .chain(forbidden_refs(text, &["infra"]).into_iter())
+        .chain(forbidden_refs(text, &["infra"]))
         .collect()
 }
 
@@ -118,7 +118,7 @@ fn contains_direct_process_spawn(text: &str, path: &Path) -> Vec<String> {
 fn files_exceeding_line_limit(dir: &str, limit: usize) -> Vec<(PathBuf, usize)> {
     let mut offenders = Vec::new();
     let root = Path::new(dir);
-    for entry in walkdir::WalkDir::new(&root)
+    for entry in walkdir::WalkDir::new(root)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
@@ -328,7 +328,7 @@ fn is_process_spawn_allowlisted(path: &Path) -> bool {
 fn process_spawn_must_be_in_infra_process() {
     let mut violations = Vec::new();
     let root = Path::new("src");
-    for entry in walkdir::WalkDir::new(&root)
+    for entry in walkdir::WalkDir::new(root)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())

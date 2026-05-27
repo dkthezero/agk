@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Unique identifier for a profile (display name acts as the key).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct ProfileId(pub String);
 
 impl ProfileId {
@@ -24,12 +24,6 @@ impl From<&str> for ProfileId {
 impl From<String> for ProfileId {
     fn from(value: String) -> Self {
         Self(value)
-    }
-}
-
-impl Default for ProfileId {
-    fn default() -> Self {
-        Self(String::new())
     }
 }
 
@@ -78,7 +72,7 @@ impl InstructionId {
 }
 
 /// Typed wrapper for provider identifiers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct ProviderId(pub String);
 
 impl ProviderId {
@@ -94,12 +88,6 @@ impl ProviderId {
 impl From<&str> for ProviderId {
     fn from(value: &str) -> Self {
         Self(value.to_string())
-    }
-}
-
-impl Default for ProviderId {
-    fn default() -> Self {
-        Self(String::new())
     }
 }
 

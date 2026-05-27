@@ -1,7 +1,7 @@
 use crate::app::command::{CoreCommand, CreateProfileInput};
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
-use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, ScopeArg, TelemetryCommands};
+use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TelemetryCommands};
 use crate::cli::presenter::CliPresenter;
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
@@ -61,11 +61,11 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 input.description = desc;
                 input.skill_refs = skills
                     .iter()
-                    .map(|s| crate::domain::profile::SkillId::new(s))
+                    .map(crate::domain::profile::SkillId::new)
                     .collect();
                 input.mcp_refs = mcps
                     .iter()
-                    .map(|m| crate::domain::profile::McpServerId::new(m))
+                    .map(crate::domain::profile::McpServerId::new)
                     .collect();
                 Ok(CoreCommand::CreateProfile { input })
             }
@@ -170,18 +170,19 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 })
             }
             crate::cli::entry::ContextCommands::List => Ok(CoreCommand::ListContexts),
-            crate::cli::entry::ContextCommands::Create { name, display_name } => {
-                Ok(CoreCommand::ApplyConfig {
-                    input: crate::app::command::ApplyConfigInput::from_url(format!(
-                        "context://{}",
-                        name
-                    )),
-                    scope: crate::domain::scope::Scope::Global,
-                    environment: None,
-                    context: Some(crate::domain::context::ContextId::new(name.clone())),
-                    dry_run: false,
-                })
-            }
+            crate::cli::entry::ContextCommands::Create {
+                name,
+                display_name: _display_name,
+            } => Ok(CoreCommand::ApplyConfig {
+                input: crate::app::command::ApplyConfigInput::from_url(format!(
+                    "context://{}",
+                    name
+                )),
+                scope: crate::domain::scope::Scope::Global,
+                environment: None,
+                context: Some(crate::domain::context::ContextId::new(name.clone())),
+                dry_run: false,
+            }),
         },
         Commands::Apply {
             source,
@@ -229,7 +230,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::entry::Cli;
+    use crate::cli::entry::ScopeArg;
 
     #[test]
     fn to_core_command_profile_start() {

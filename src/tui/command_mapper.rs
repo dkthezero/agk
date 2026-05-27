@@ -8,10 +8,7 @@ use crate::tui::intent::UiIntent;
 /// No side-effects occur here; the caller is responsible for invoking
 /// `AgkCore::execute` with the returned commands.
 pub fn map_intents(intents: Vec<UiIntent>) -> Vec<CoreCommand> {
-    intents
-        .into_iter()
-        .filter_map(|intent| map_single_intent(intent))
-        .collect()
+    intents.into_iter().filter_map(map_single_intent).collect()
 }
 
 fn map_single_intent(intent: UiIntent) -> Option<CoreCommand> {

@@ -277,7 +277,6 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
 // Stub for Apply and Context commands — full wiring lives in core_dispatcher
 pub fn dispatch_core_command(cli: &Cli, workspace: &std::path::Path) -> Result<i32> {
     use crate::app::core::AgkCore;
-    use crate::app::ports::ConfigStorePort;
     use std::sync::Arc;
 
     let (registry, _scan, store) = bootstrap::build(workspace.to_path_buf())?;

@@ -4,23 +4,12 @@
 /// argument produces.  It is **not** the full runtime state — it is a
 /// diff-like request that the `apply_config` use-case merges into the
 /// current [`crate::domain::config::ConfigFile`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ApplyConfig {
     pub source: String,
     pub vaults: Vec<ApplyVault>,
     pub providers: Vec<String>,
     pub profiles: Vec<crate::domain::profile::Profile>,
-}
-
-impl Default for ApplyConfig {
-    fn default() -> Self {
-        Self {
-            source: String::new(),
-            vaults: Vec::new(),
-            providers: Vec::new(),
-            profiles: Vec::new(),
-        }
-    }
 }
 
 /// A vault to attach as part of `apply`.

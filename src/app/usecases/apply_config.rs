@@ -15,6 +15,7 @@ use crate::domain::scope::Scope;
 ///
 /// If `dry_run` is true, no filesystem changes are made and only
 /// events are emitted describing what *would* happen.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     input: ApplyConfigInput,
     scope: Scope,

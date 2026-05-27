@@ -1,7 +1,6 @@
 /// View models derived from the workspace configuration and scan results.
 /// These types live in `app/` (not `domain/`) because they contain UI-oriented
 /// data (counts, display strings) rather than pure domain identity.
-
 /// Display-only struct for the Vaults tab.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VaultEntry {

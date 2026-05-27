@@ -39,7 +39,7 @@ pub fn run_profile_start(name: &str, workspace: &std::path::Path) -> Result<i32>
         })?;
 
     let session_key = generate_profile_session_key();
-    let mut session = provider.start_profile_session(&profile, &session_key, workspace)?;
+    let session = provider.start_profile_session(&profile, &session_key, workspace)?;
 
     let exit_status = session.wait_and_cleanup()?;
 

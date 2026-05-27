@@ -78,8 +78,7 @@ impl AgkCore {
                 self.store.as_ref(),
                 sink,
             )
-            .map(|_| CoreOutcome::Ok)
-            .map_err(Into::into),
+            .map(|_| CoreOutcome::Ok),
 
             // ===============================================================
             // Context commands

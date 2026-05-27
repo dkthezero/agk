@@ -32,15 +32,13 @@ pub struct McpActivation {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum McpTransport {
+    #[default]
     Stdio,
-    Sse { url: String },
-}
-
-impl Default for McpTransport {
-    fn default() -> Self {
-        McpTransport::Stdio
-    }
+    Sse {
+        url: String,
+    },
 }
 
 /// Full MCP registry stored in ~/.config/agk/mcp.toml

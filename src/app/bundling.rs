@@ -204,7 +204,7 @@ pub fn install_bundle(
 mod tests {
     use super::*;
     use crate::domain::asset::{AssetKind, ScannedPackage};
-    use crate::domain::config::{AssetBucket, ConfigFile, VaultSection};
+    use crate::domain::config::ConfigFile;
     use crate::domain::identity::AssetIdentity;
     use crate::domain::scope::Scope;
     use std::collections::HashMap;
@@ -286,25 +286,25 @@ mod tests {
 
     #[test]
     fn resolve_linear_chain() {
-        let root = make_pkg("root", vec!["workspace/a".to_string()]);
-        let a = make_pkg("a", vec!["workspace/b".to_string()]);
-        let b = make_pkg("b", vec![]);
+        let _root = make_pkg("root", vec!["workspace/a".to_string()]);
+        let _a = make_pkg("a", vec!["workspace/b".to_string()]);
+        let _b = make_pkg("b", vec![]);
 
-        let mut registry = crate::app::registry::Registry::new();
+        let _registry = crate::app::registry::Registry::new();
         // We can't easily add fake vaults here, so we just test the cycle detection logic
         // Full integration tests would need real vault adapters
     }
 
     #[test]
     fn circular_dependency_detected() {
-        let a = make_pkg("a", vec!["workspace/b".to_string()]);
-        let b = make_pkg("b", vec!["workspace/a".to_string()]);
+        let _a = make_pkg("a", vec!["workspace/b".to_string()]);
+        let _b = make_pkg("b", vec!["workspace/a".to_string()]);
 
-        let registry = crate::app::registry::Registry::new();
+        let _registry = crate::app::registry::Registry::new();
         // Without vaults, find_dependency returns None, so it would bail on missing dep
         // This test demonstrates the cycle check on the path vector
         let mut path = vec!["a".to_string()];
-        assert!(path.contains(&"b".to_string()) == false);
+        assert!(!path.contains(&"b".to_string()));
         path.push("b".to_string());
         assert!(path.contains(&"a".to_string()));
     }
