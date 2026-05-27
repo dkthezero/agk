@@ -1,8 +1,15 @@
 pub(crate) mod activate_provider;
 pub(crate) mod apply_config;
+pub(crate) mod attach_mcp_to_profile;
+pub(crate) mod attach_skill_to_profile;
 pub(crate) mod attach_vault;
 pub(crate) mod create_profile;
 pub(crate) mod deactivate_provider;
+pub(crate) mod delete_profile;
+pub(crate) mod detach_mcp_from_profile;
+pub(crate) mod detach_skill_from_profile;
+pub(crate) mod disable_mcp;
+pub(crate) mod enable_mcp;
 pub(crate) mod list_contexts;
 pub(crate) mod register_mcp;
 pub(crate) mod search_remote_vault;

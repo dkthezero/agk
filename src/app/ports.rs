@@ -58,11 +58,8 @@ pub trait McpRegistryPort: Send + Sync {
     ) -> Result<crate::domain::mcp::McpServer>;
 
     fn test_server(&self, name: &str) -> Result<()>;
-    #[allow(dead_code)] // wired in core_dispatcher but core.rs returns not-yet-wired for EnableMcp/DisableMcp
     fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
-    #[allow(dead_code)]
     fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
-    #[allow(dead_code)]
     fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
 }
 

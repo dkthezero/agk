@@ -20,7 +20,6 @@ pub struct AgkCore {
     store: Arc<dyn ConfigStorePort>,
     context_store: Arc<dyn ContextStorePort>,
     mcp_registry: Arc<dyn McpRegistryPort>,
-    #[allow(dead_code)] // wired in SearchRemoteVault match arm (Phase 3.5)
     vault_search: Arc<dyn VaultSearchPort>,
     registry: Arc<Registry>,
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
@@ -32,7 +31,6 @@ impl AgkCore {
         store: Arc<dyn ConfigStorePort>,
         context_store: Arc<dyn ContextStorePort>,
         mcp_registry: Arc<dyn McpRegistryPort>,
-        #[allow(dead_code)] // wired in SearchRemoteVault match arm (Phase 3.5)
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
         runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
@@ -67,6 +65,51 @@ impl AgkCore {
                     *dry_run,
                     self.store.as_ref(),
                     &self.runtime_ports,
+                    sink,
+                )
+            }
+            CoreCommand::DeleteProfile { id, scope } => {
+                crate::app::usecases::delete_profile::run(id, *scope, self.store.as_ref(), sink)
+            }
+            CoreCommand::AttachSkillToProfile {
+                profile_id,
+                skill_id,
+            } => {
+                crate::app::usecases::attach_skill_to_profile::run(
+                    profile_id,
+                    skill_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::DetachSkillFromProfile {
+                profile_id,
+                skill_id,
+            } => {
+                crate::app::usecases::detach_skill_from_profile::run(
+                    profile_id,
+                    skill_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => {
+                crate::app::usecases::attach_mcp_to_profile::run(
+                    profile_id,
+                    mcp_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
+                    sink,
+                )
+            }
+            CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => {
+                crate::app::usecases::detach_mcp_from_profile::run(
+                    profile_id,
+                    mcp_id,
+                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
+                    self.store.as_ref(),
                     sink,
                 )
             }
@@ -158,15 +201,39 @@ impl AgkCore {
             CoreCommand::RegisterMcp { input } => {
                 crate::app::usecases::register_mcp::run(input, self.mcp_registry.as_ref(), sink)
             }
+            CoreCommand::EnableMcp {
+                name,
+                provider_id,
+                scope,
+            } => crate::app::usecases::enable_mcp::run(
+                name,
+                provider_id,
+                *scope,
+                self.mcp_registry.as_ref(),
+                sink,
+            ),
+            CoreCommand::DisableMcp {
+                name,
+                provider_id,
+                scope,
+            } => crate::app::usecases::disable_mcp::run(
+                name,
+                provider_id,
+                *scope,
+                self.mcp_registry.as_ref(),
+                sink,
+            ),
 
             // ===============================================================
             // Asset / search commands
             // ===============================================================
             CoreCommand::SearchRemoteVault { vault_id, query } => {
-                let _ = vault_id;
-                let _ = query;
-                sink.on_error("SearchRemoteVault not yet wired in AgkCore".into());
-                Ok(CoreOutcome::Ok)
+                crate::app::usecases::search_remote_vault::run(
+                    vault_id.clone(),
+                    query.clone(),
+                    self.vault_search.as_ref(),
+                    sink,
+                )
             }
 
             // Remaining commands: wired incrementally in Phases 1-5.

@@ -35,6 +35,10 @@ impl SkillId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Typed wrapper for MCP server identifiers.
@@ -44,6 +48,10 @@ pub struct McpServerId(pub String);
 impl McpServerId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

@@ -4,10 +4,7 @@ use crate::app::ports::ContextStorePort;
 
 /// List all available contexts, emitting one [`CoreEvent::TaskCompleted`]
 /// per context, with the active one marked by an asterisk.
-pub fn run(
-    context_store: &dyn ContextStorePort,
-    sink: &mut dyn CoreEventSink,
-) -> CoreResult {
+pub fn run(context_store: &dyn ContextStorePort, sink: &mut dyn CoreEventSink) -> CoreResult {
     let file = context_store.load_contexts()?;
     for (name, ctx) in &file.contexts {
         let marker = if name == &file.current_context {

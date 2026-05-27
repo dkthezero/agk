@@ -1,22 +1,39 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::app::ports::VaultSearchPort;
 
 /// Search a remote vault (e.g. ClawHub) for packages matching a query.
 ///
 /// In Phase 3 this delegates to a [`VaultPort`] implementation so the TUI
 /// never calls `infra::vault::clawhub::cli_search` directly.
-#[allow(dead_code)] // search remote vault use-case stub
-pub fn run(vault_id: String, query: String, sink: &mut dyn CoreEventSink) -> CoreResult {
-    // Phase 3: this will call VaultPort::search() instead
+pub fn run(
+    vault_id: String,
+    query: String,
+    vault_search: &dyn VaultSearchPort,
+    sink: &mut dyn CoreEventSink,
+) -> CoreResult {
     sink.on_event(CoreEvent::TaskStarted {
         id: 0,
         name: format!("Searching '{}' in {}", query, vault_id),
     });
-    // Placeholder: emit empty results
-    sink.on_event(CoreEvent::RemoteVaultSearchResults {
-        vault_id,
-        packages: vec![],
-    });
+
+    // Attempt to search through the port.
+    // For now the search is async; we block on a Tokio runtime.
+    let rt = tokio::runtime::Runtime::new()?;
+    let results = rt.block_on(vault_search.search(&query));
+
+    let packages = match results {
+        Ok(pkgs) => pkgs,
+        Err(e) => {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Search failed: {}", e),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+    };
+
+    sink.on_event(CoreEvent::RemoteVaultSearchResults { vault_id, packages });
     Ok(CoreOutcome::Ok)
 }
 
@@ -25,6 +42,7 @@ mod tests {
     use super::*;
     use crate::app::event::CoreEvent;
     use crate::app::outcome::CoreEventSink;
+    use crate::domain::asset::ScannedPackage;
 
     struct CollectingSink {
         events: Vec<CoreEvent>,
@@ -37,10 +55,24 @@ mod tests {
         fn on_error(&mut self, _error: String) {}
     }
 
+    struct FakeVaultSearch;
+
+    #[async_trait::async_trait]
+    impl VaultSearchPort for FakeVaultSearch {
+        fn vault_id(&self) -> &str {
+            "clawhub"
+        }
+
+        async fn search(&self, _query: &str) -> anyhow::Result<Vec<ScannedPackage>> {
+            Ok(vec![])
+        }
+    }
+
     #[test]
     fn search_emits_results_event() {
         let mut sink = CollectingSink { events: vec![] };
-        let result = run("clawhub".into(), "rust".into(), &mut sink);
+        let searcher = FakeVaultSearch;
+        let result = run("clawhub".into(), "rust".into(), &searcher, &mut sink);
         assert!(result.is_ok());
         assert!(sink
             .events
