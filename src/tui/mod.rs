@@ -1,13 +1,8 @@
 pub mod app;
-pub mod app_state;
-pub mod command_mapper;
 pub mod entry;
 pub mod event;
 pub mod features;
-pub mod intent;
 pub mod layout;
-pub mod presenter;
-pub mod reducer;
 pub mod render;
 pub mod runtime_loop;
 pub mod widgets;

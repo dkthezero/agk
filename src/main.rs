@@ -1,8 +1,3 @@
-// Architecture convergence phase: many CoreCommand / CoreEvent / port
-// variants are wired incrementally.  Dead-code warnings would drown
-// out real issues, so we allow them crate-wide until Phase G.
-#![allow(dead_code)]
-
 mod app;
 mod cli;
 mod domain;
