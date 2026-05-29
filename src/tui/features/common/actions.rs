@@ -7,13 +7,13 @@ pub fn apply_tab_switch(state: &mut AppState, idx: usize, tab_count: usize) {
         state.selected_index = 0;
         state.search_query.clear();
         state.status_line.clear();
-        state.list_mode = crate::tui::app::ListMode::Normal;
+        state.list_mode = crate::tui::list_mode::ListMode::Normal;
     }
 }
 
 pub fn apply_search_char(state: &mut AppState, c: char) {
     state.search_query.push(c);
-    state.list_mode = crate::tui::app::ListMode::Searching;
+    state.list_mode = crate::tui::list_mode::ListMode::Searching;
     state.selected_index = 0;
     state.status_line.clear();
 }
@@ -29,13 +29,13 @@ pub fn apply_space_no_provider(state: &mut AppState, providers_tab_idx: usize) {
 }
 
 pub fn apply_enter_attach_vault(state: &mut AppState) {
-    state.list_mode = crate::tui::app::ListMode::AttachVault;
+    state.list_mode = crate::tui::list_mode::ListMode::AttachVault;
     state.prompt_buffer = String::new();
     state.status_line.clear();
 }
 
 pub fn apply_enter_register_mcp(state: &mut AppState) {
-    state.list_mode = crate::tui::app::ListMode::RegisterMcpStepName;
+    state.list_mode = crate::tui::list_mode::ListMode::RegisterMcpStepName;
     state.prompt_buffer = String::new();
     state.pending_mcp_name.clear();
     state.pending_mcp_command.clear();
@@ -46,8 +46,9 @@ pub fn apply_enter_register_mcp(state: &mut AppState) {
 }
 
 pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
-    let (provider_id, steps) = if ctx.store.load(state.active_scope).is_ok() {
-        ctx.registry
+    let (provider_id, steps) = if ctx.core.store.load(state.active_scope).is_ok() {
+        ctx.core
+            .registry
             .providers
             .iter()
             .find(|p| p.supports_profiles())
@@ -99,7 +100,7 @@ pub fn apply_enter_add_profile(state: &mut AppState, ctx: &EventContext) {
     }
 
     state.wizard_state = Some(ws);
-    state.list_mode = crate::tui::app::ListMode::ProfileWizard;
+    state.list_mode = crate::tui::list_mode::ListMode::ProfileWizard;
     state.prompt_buffer = String::new();
     state.status_line = "Profile name: ".to_string();
 }
@@ -143,7 +144,7 @@ pub async fn refresh_all_vaults(
     tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
     message_prefix: &str,
 ) -> anyhow::Result<()> {
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let id = crate::tui::progress::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let _ = tx.send(AppEvent::TaskStarted {
         id,
         name: format!("{}refreshing vaults...", message_prefix),
@@ -175,7 +176,7 @@ pub async fn refresh_all_vaults(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::app::ListMode;
+    use crate::tui::list_mode::ListMode;
     use std::collections::HashMap;
 
     fn empty_state(tab_count: usize) -> AppState {

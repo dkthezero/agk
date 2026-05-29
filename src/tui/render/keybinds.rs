@@ -1,6 +1,7 @@
 use crate::app::ports::WizardStep;
 use crate::app::tab_kind::TabKind;
-use crate::tui::app::{AppState, ListMode};
+use crate::tui::app::AppState;
+use crate::tui::list_mode::ListMode;
 
 pub fn resolve_keybinds(state: &AppState) -> &'static str {
     let active_kind = state

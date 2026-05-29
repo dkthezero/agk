@@ -1,5 +1,6 @@
 use crate::app::ports::WizardStep;
-use crate::tui::app::{AppState, ListMode};
+use crate::tui::app::AppState;
+use crate::tui::list_mode::ListMode;
 use crate::tui::widgets::modal;
 use ratatui::Frame;
 
@@ -77,7 +78,7 @@ pub fn draw_modals(frame: &mut Frame, state: &AppState) {
             modal::render_input_modal(
                 frame,
                 "Register MCP Server",
-                "Arguments (space-separated, optional):",
+                "Arguments (space-separated, optional) — for SSE this is the URL:",
                 &state.prompt_buffer,
                 state.prompt_buffer.chars().count(),
             );

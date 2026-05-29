@@ -118,6 +118,31 @@ impl CoreEventSink for CliPresenter {
                     name, provider_id
                 ));
             }
+            CoreEvent::McpListed(servers) => {
+                if matches!(self.mode, OutputMode::Json) {
+                    self.print_json_event(&event);
+                } else if servers.is_empty() {
+                    self.print("No MCP servers registered.");
+                } else {
+                    for s in servers {
+                        let tested = if s.tested { "[✓]" } else { "[ ]" };
+                        let transport = match s.transport {
+                            crate::domain::mcp::McpTransport::Stdio => "stdio",
+                            crate::domain::mcp::McpTransport::Sse { .. } => "sse",
+                        };
+                        self.print(&format!("{} {} ({})", tested, s.name, transport));
+                    }
+                }
+            }
+            CoreEvent::McpTested {
+                healthy, message, ..
+            } => {
+                if *healthy {
+                    self.print(message);
+                } else {
+                    self.eprint(message);
+                }
+            }
             CoreEvent::ProfileLaunchPlan { id, plan } => {
                 if matches!(self.mode, OutputMode::Json) {
                     self.print(
@@ -143,6 +168,45 @@ impl CoreEventSink for CliPresenter {
                 } else {
                     self.eprint(&format!("Validation failed: {}", message));
                 }
+            }
+            CoreEvent::TelemetryEnabled => {
+                self.print("Telemetry enabled. Background scanner started.");
+            }
+            CoreEvent::TelemetryDisabled => {
+                self.print("Telemetry disabled.");
+            }
+            CoreEvent::TelemetryStatusReport(status) => {
+                if matches!(self.mode, OutputMode::Json) {
+                    self.print_json_event(&CoreEvent::TelemetryStatusReport(status.clone()));
+                } else {
+                    self.print(&format!(
+                        "Telemetry: {} | Skills tracked: {} | Last scan: {}",
+                        if status.enabled {
+                            "enabled"
+                        } else {
+                            "disabled"
+                        },
+                        status.skills_tracked,
+                        status.last_scan.as_deref().unwrap_or("never")
+                    ));
+                }
+            }
+            CoreEvent::TelemetryExported {
+                content,
+                output_path,
+            } => {
+                if let Some(path) = output_path {
+                    if let Err(e) = std::fs::write(path, content) {
+                        self.eprint(&format!("Failed to write export file: {}", e));
+                    } else {
+                        self.print(&format!("Telemetry exported to {}", path));
+                    }
+                } else {
+                    println!("{}", content);
+                }
+            }
+            CoreEvent::Info(msg) => {
+                self.print(msg);
             }
             // Other events are silent in CLI mode
             _ => {}
@@ -217,6 +281,30 @@ fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::McpDisabled { name, provider_id } => {
             serde_json::json!({ "type": "McpDisabled", "name": name, "provider_id": provider_id })
         }
+        CoreEvent::McpListed(servers) => {
+            serde_json::json!({
+                "type": "McpListed",
+                "servers": servers.iter().map(|s| {
+                    serde_json::json!({
+                        "name": s.name,
+                        "command": s.command,
+                        "transport": match s.transport {
+                            crate::domain::mcp::McpTransport::Stdio => "stdio",
+                            crate::domain::mcp::McpTransport::Sse { .. } => "sse",
+                        },
+                        "tested": s.tested,
+                        "tested_at": s.tested_at,
+                    })
+                }).collect::<Vec<_>>()
+            })
+        }
+        CoreEvent::McpTested {
+            name,
+            healthy,
+            message,
+        } => {
+            serde_json::json!({ "type": "McpTested", "name": name, "healthy": healthy, "message": message })
+        }
         CoreEvent::AssetInstalled {
             identity,
             providers,
@@ -257,6 +345,33 @@ fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         }
         CoreEvent::ValidationReport { passed, message } => {
             serde_json::json!({ "type": "ValidationReport", "passed": passed, "message": message })
+        }
+        CoreEvent::TelemetryEnabled => {
+            serde_json::json!({ "type": "TelemetryEnabled" })
+        }
+        CoreEvent::TelemetryDisabled => {
+            serde_json::json!({ "type": "TelemetryDisabled" })
+        }
+        CoreEvent::TelemetryStatusReport(status) => {
+            serde_json::json!({
+                "type": "TelemetryStatusReport",
+                "enabled": status.enabled,
+                "skills_tracked": status.skills_tracked,
+                "last_scan": status.last_scan
+            })
+        }
+        CoreEvent::TelemetryExported {
+            content,
+            output_path,
+        } => {
+            serde_json::json!({
+                "type": "TelemetryExported",
+                "content": content,
+                "output_path": output_path
+            })
+        }
+        CoreEvent::Info(msg) => {
+            serde_json::json!({ "type": "Info", "message": msg })
         }
         CoreEvent::Error(msg) => {
             serde_json::json!({ "type": "Error", "message": msg })

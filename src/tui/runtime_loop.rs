@@ -1,9 +1,15 @@
 use anyhow::Result;
 use ratatui::{backend::Backend, Terminal};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 
+use crate::app::outcome::CoreEventSink;
+use crate::app::ports::ProcessRunnerPort;
 use crate::tui::app::AppState;
-use crate::tui::event::{handle, AppEvent, ControlFlow, EventContext, ReloadSnapshot};
+use crate::tui::core_event_reducer::apply_core_event;
+use crate::tui::event::{handle, AppEvent, ControlFlow, EventContext};
+use crate::tui::presenter::TuiPresenter;
+use crate::tui::reload::{apply_reload_snapshot, compute_reload_snapshot};
 
 /// Run the TUI event loop until `ControlFlow::Quit` is returned.
 ///
@@ -31,15 +37,15 @@ where
                 state.latest_task_id = Some(id);
                 state.active_tasks.insert(
                     id,
-                    crate::tui::app::Progress {
+                    crate::tui::progress::Progress {
                         name,
-                        status: crate::tui::app::ProgressStatus::Starting,
+                        status: crate::tui::progress::ProgressStatus::Starting,
                     },
                 );
             }
             AppEvent::TaskProgress { id, percent } => {
                 if let Some(task) = state.active_tasks.get_mut(&id) {
-                    task.status = crate::tui::app::ProgressStatus::Running(percent);
+                    task.status = crate::tui::progress::ProgressStatus::Running(percent);
                 }
             }
             AppEvent::TaskCompleted { id, message } => {
@@ -54,10 +60,10 @@ where
                 let tx = ctx.tx.clone();
                 let active_scope = state.active_scope;
                 let ctx2 = EventContext {
-                    store: ctx.store.clone(),
-                    registry: ctx.registry.clone(),
                     tx: ctx.tx.clone(),
                     workspace_root: ctx.workspace_root.clone(),
+                    file_opener: ctx.file_opener.clone(),
+                    core: ctx.core.clone(),
                 };
                 let mut existing_mcp = state.mcp_state.clone();
                 tokio::task::spawn_blocking(move || {
@@ -76,12 +82,6 @@ where
                     state.scroll_offset = state.scroll_offset.wrapping_add(1);
                 }
             }
-            AppEvent::VaultRefreshRequired {
-                id: vault_id,
-                config: vault_config,
-            } => {
-                handle_vault_refresh(vault_id, vault_config, ctx).await;
-            }
             AppEvent::RunInteractiveProcess {
                 command,
                 args,
@@ -92,6 +92,7 @@ where
                     terminal,
                     state,
                     rx,
+                    ctx.core.process_runner.clone(),
                     &command,
                     &args,
                     &current_dir,
@@ -102,134 +103,31 @@ where
             AppEvent::ReloadComplete(snapshot) => {
                 apply_reload_snapshot(state, snapshot);
             }
+            AppEvent::ExecuteCommand(cmd) => {
+                let core = ctx.core.clone();
+                let tx = ctx.tx.clone();
+                tokio::task::spawn_blocking(move || {
+                    let mut presenter = TuiPresenter::new(tx);
+                    if let Err(e) = core.execute(cmd, &mut presenter) {
+                        presenter.on_error(format!("{}", e));
+                    }
+                });
+            }
+            AppEvent::CoreEvent(evt) => {
+                apply_core_event(state, &evt);
+            }
         }
         terminal.draw(|frame| crate::tui::render::draw(frame, state))?;
     }
     Ok(())
 }
-
-fn apply_reload_snapshot(state: &mut AppState, snapshot: ReloadSnapshot) {
-    state.vault_entries = snapshot.vault_entries;
-    state.provider_entries = snapshot.provider_entries;
-    state.profile_entries = snapshot.profile_entries;
-    state.packages = snapshot.packages;
-    state.configs = snapshot.configs;
-    state.mcp_state = snapshot.mcp_state;
-}
-
-fn compute_reload_snapshot(
-    active_scope: crate::domain::scope::Scope,
-    ctx: &EventContext,
-    mcp_state: &mut crate::tui::widgets::mcp::McpState,
-) -> ReloadSnapshot {
-    mcp_state.refresh();
-
-    let active_config_for_entries = ctx.store.load(active_scope).unwrap_or_default();
-    let global_config = ctx
-        .store
-        .load(crate::domain::scope::Scope::Global)
-        .unwrap_or_default();
-    let workspace_config = ctx
-        .store
-        .load(crate::domain::scope::Scope::Workspace)
-        .unwrap_or_default();
-
-    let active_vaults = crate::app::bootstrap::build_vaults(&global_config, &ctx.workspace_root);
-
-    let mut vault_entries = Vec::new();
-    let mut provider_entries = Vec::new();
-    let mut profile_entries = Vec::new();
-    let mut packages = std::collections::HashMap::new();
-
-    if let Ok(mut scan) = crate::app::bootstrap::scan(&ctx.registry, &active_vaults) {
-        let opt_workspace_config = if active_scope == crate::domain::scope::Scope::Workspace {
-            Some(&workspace_config)
-        } else {
-            None
-        };
-        crate::app::bootstrap::filter_scan(&mut scan, &global_config, opt_workspace_config);
-        vault_entries = crate::app::bootstrap::build_vault_entries(
-            &global_config,
-            &active_config_for_entries,
-            &scan,
-            &ctx.registry,
-            &ctx.workspace_root,
-        );
-        provider_entries = crate::app::bootstrap::build_provider_entries(
-            &active_config_for_entries,
-            &ctx.registry,
-        );
-        profile_entries = crate::app::bootstrap::build_profile_entries(&active_config_for_entries);
-        packages = scan.packages_by_tab.into_iter().enumerate().collect();
-    }
-
-    let mut configs = std::collections::HashMap::new();
-    configs.insert(crate::domain::scope::Scope::Global, global_config);
-    configs.insert(crate::domain::scope::Scope::Workspace, workspace_config);
-
-    ReloadSnapshot {
-        vault_entries,
-        provider_entries,
-        profile_entries,
-        packages,
-        configs,
-        mcp_state: mcp_state.clone(),
-    }
-}
-
-/// Spawn a background vault refresh task.
-async fn handle_vault_refresh(
-    vault_id: String,
-    vault_config: crate::domain::config::VaultConfig,
-    ctx: &EventContext,
-) {
-    let tx = ctx.tx.clone();
-    tokio::spawn(async move {
-        let vault: Box<dyn crate::app::ports::VaultPort> = match vault_config {
-            crate::domain::config::VaultConfig::Github(g) => {
-                Box::new(crate::infra::vault::github::GithubVaultAdapter::new(
-                    vault_id.clone(),
-                    g.repo,
-                    g.r#ref,
-                    g.path,
-                ))
-            }
-            crate::domain::config::VaultConfig::Local(l) => {
-                Box::new(crate::infra::vault::local::LocalVaultAdapter::new(
-                    vault_id.clone(),
-                    std::path::PathBuf::from(l.path),
-                ))
-            }
-            crate::domain::config::VaultConfig::Clawhub(_) => Box::new(
-                crate::infra::vault::clawhub::ClawHubVaultAdapter::new(vault_id.clone()),
-            ),
-        };
-        let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let _ = tx.send(AppEvent::TaskStarted {
-            id,
-            name: format!("Pulling vault '{}'...", vault_id),
-        });
-        if let Err(e) = vault.refresh().await {
-            let _ = tx.send(AppEvent::TaskFailed {
-                id,
-                error: e.to_string(),
-            });
-        } else {
-            let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-            let _ = tx.send(AppEvent::TriggerReload);
-            let _ = tx.send(AppEvent::TaskCompleted {
-                id,
-                message: format!("Pulled vault '{}'", vault_id),
-            });
-        }
-    });
-}
-
 /// Suspend the TUI, run an interactive child process, then resume.
+#[allow(clippy::too_many_arguments)]
 async fn handle_interactive_process<B: Backend>(
     terminal: &mut Terminal<B>,
     state: &mut AppState,
     rx: &mut UnboundedReceiver<AppEvent>,
+    runner: Arc<dyn ProcessRunnerPort>,
     command: &str,
     args: &[String],
     current_dir: &std::path::Path,
@@ -251,23 +149,19 @@ where
     let _ = disable_raw_mode();
 
     // Run the blocking .status() call on a dedicated thread so the async
-    // event loop is never frozen.
+    // event loop is never frozen. The runner port owns the actual
+    // std::process::Command call so this file stays free of process-spawn
+    // primitives (ADR-001).
     let cmd = command.to_string();
     let args = args.to_vec();
     let current_dir = current_dir.to_path_buf();
     let args_for_status = args.clone();
     let current_dir_for_status = current_dir.clone();
     let status = tokio::task::spawn_blocking(move || {
-        std::process::Command::new(&cmd)
-            .current_dir(&current_dir_for_status)
-            .args(&args_for_status)
-            .stdin(std::process::Stdio::inherit())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status()
+        runner.run_interactive(&cmd, &args_for_status, &current_dir_for_status)
     })
     .await
-    .unwrap_or(Err(std::io::Error::other("spawn_blocking panicked")));
+    .unwrap_or_else(|e| Err(anyhow::anyhow!("spawn_blocking panicked: {}", e)));
 
     let _ = enable_raw_mode();
 

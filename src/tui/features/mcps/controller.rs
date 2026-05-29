@@ -1,89 +1,23 @@
-use crate::tui::app::{AppState, ListMode};
+use crate::app::command::CoreCommand;
+use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, ControlFlow, EventContext};
+use crate::tui::list_mode::ListMode;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
 pub fn handle_space_mcp(state: &mut AppState, ctx: &EventContext) -> Result<()> {
     let items = state.mcp_state.servers_list();
-    let Some((id, server)) = items.get(state.selected_index).copied() else {
+    let Some((id, _server)) = items.get(state.selected_index).copied() else {
         return Ok(());
     };
     let name = id.clone();
 
-    let mcp_providers = crate::infra::mcp::build_mcp_providers(&ctx.workspace_root);
-    let supported_ids: std::collections::HashSet<&str> =
-        mcp_providers.iter().map(|p| p.provider_id()).collect();
-
-    let target_providers: Vec<String> = state
-        .provider_entries
-        .iter()
-        .filter(|p| p.active && supported_ids.contains(p.id.as_str()))
-        .map(|p| p.id.clone())
-        .collect();
-
-    if target_providers.is_empty() {
-        state.status_line =
-            "No MCP-capable providers active. Activate Claude Code or OpenCode in Providers tab."
-                .to_string();
-        return Ok(());
-    }
-
-    let is_enabled = target_providers.iter().any(|pid| {
-        server
-            .activation
-            .get(pid)
-            .map(|a| match state.active_scope {
-                crate::domain::scope::Scope::Global => a.global,
-                crate::domain::scope::Scope::Workspace => a.workspace,
-            })
-            .unwrap_or(false)
-    });
-
-    let scope = state.active_scope;
-    let tx = ctx.tx.clone();
-    let ws = ctx.workspace_root.clone();
-
-    let task_id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-    tokio::task::spawn_blocking(move || {
-        let action = if is_enabled { "Disabling" } else { "Enabling" };
-        let _ = tx.send(AppEvent::TaskStarted {
-            id: task_id,
-            name: format!("{} MCP server '{}'", action, name),
-        });
-
-        let providers = crate::infra::mcp::build_mcp_providers(&ws);
-
-        let mut success = true;
-        for pid in &target_providers {
-            let result = if is_enabled {
-                crate::infra::mcp::disable(&name, pid, scope, &providers)
-            } else {
-                crate::infra::mcp::enable(&name, pid, scope, &providers)
-            };
-            if let Err(e) = result {
-                let _ = tx.send(AppEvent::TaskFailed {
-                    id: task_id,
-                    error: format!("Failed for {}: {}", pid, e),
-                });
-                success = false;
-                break;
-            }
-        }
-
-        let _ = tx.send(AppEvent::TaskProgress {
-            id: task_id,
-            percent: 100,
-        });
-        let _ = tx.send(AppEvent::TriggerReload);
-        if success {
-            let done = if is_enabled { "Disabled" } else { "Enabled" };
-            let _ = tx.send(AppEvent::TaskCompleted {
-                id: task_id,
-                message: format!("{} MCP server '{}'", done, name),
-            });
-        }
-    });
+    let _ = ctx
+        .tx
+        .send(AppEvent::ExecuteCommand(CoreCommand::ToggleMcp {
+            name,
+            scope: state.active_scope,
+        }));
 
     Ok(())
 }
@@ -156,59 +90,48 @@ pub fn handle_mcp_register_confirm(
     ctx: &EventContext,
 ) -> Result<ControlFlow> {
     state.list_mode = ListMode::Normal;
-    let name = state.pending_mcp_name.clone();
-    let command = state.pending_mcp_command.clone();
-    let args = state.pending_mcp_args.clone();
-    let transport = state.pending_mcp_transport.clone();
-    let description = state.pending_mcp_description.clone();
 
-    let tx = ctx.tx.clone();
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-    tokio::spawn(async move {
-        let _ = tx.send(AppEvent::TaskStarted {
-            id,
-            name: format!("Registering MCP server '{}'", name),
-        });
-        match crate::infra::mcp::register(
-            &name,
-            &command,
-            if args.is_empty() { None } else { Some(&args) },
-            None,
-            &transport,
-            if description.is_empty() {
-                None
-            } else {
-                Some(&description)
-            },
-        ) {
-            Ok(_) => {
-                let _ = tx.send(AppEvent::TaskProgress { id, percent: 50 });
-                match crate::infra::mcp::test_server(&name).await {
-                    Ok(()) => {
-                        let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                        let _ = tx.send(AppEvent::TriggerReload);
-                        let _ = tx.send(AppEvent::TaskCompleted {
-                            id,
-                            message: format!("MCP server '{}' registered and tested", name),
-                        });
-                    }
-                    Err(e) => {
-                        let _ = tx.send(AppEvent::TaskFailed {
-                            id,
-                            error: format!("MCP test failed: {}", e),
-                        });
-                    }
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(AppEvent::TaskFailed {
-                    id,
-                    error: format!("Registration failed: {}", e),
-                });
-            }
+    let is_sse = state.pending_mcp_transport.as_str() == "sse";
+    let sse_url = if is_sse {
+        let trimmed = state.pending_mcp_args.trim();
+        if trimmed.is_empty() {
+            "http://localhost:3000".to_string()
+        } else {
+            trimmed.to_string()
         }
-    });
+    } else {
+        String::new()
+    };
+
+    let input = crate::app::features::mcp::command::RegisterMcpInput {
+        name: state.pending_mcp_name.clone(),
+        command: state.pending_mcp_command.clone(),
+        args: if is_sse {
+            vec![]
+        } else {
+            state
+                .pending_mcp_args
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect()
+        },
+        env: vec![],
+        transport: if is_sse {
+            crate::domain::mcp::McpTransport::Sse { url: sse_url }
+        } else {
+            crate::domain::mcp::McpTransport::Stdio
+        },
+        description: if state.pending_mcp_description.is_empty() {
+            None
+        } else {
+            Some(state.pending_mcp_description.clone())
+        },
+        test_after: true,
+    };
+
+    let _ = ctx
+        .tx
+        .send(AppEvent::ExecuteCommand(CoreCommand::RegisterMcp { input }));
 
     let name = state.pending_mcp_name.clone();
     state.status_line = format!("Registering MCP server '{}'...", name);

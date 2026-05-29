@@ -60,6 +60,12 @@ pub enum CoreEvent {
         name: String,
         provider_id: String,
     },
+    McpListed(Vec<crate::domain::mcp::McpServer>),
+    McpTested {
+        name: String,
+        healthy: bool,
+        message: String,
+    },
 
     // -----------------------------------------------------------------------
     // Assets
@@ -108,6 +114,22 @@ pub enum CoreEvent {
         passed: bool,
         message: String,
     },
+
+    // -----------------------------------------------------------------------
+    // Telemetry
+    // -----------------------------------------------------------------------
+    TelemetryEnabled,
+    TelemetryDisabled,
+    TelemetryStatusReport(crate::domain::telemetry::TelemetryStatus),
+    TelemetryExported {
+        content: String,
+        output_path: Option<String>,
+    },
+
+    // -----------------------------------------------------------------------
+    // General info
+    // -----------------------------------------------------------------------
+    Info(String),
 
     // -----------------------------------------------------------------------
     // Errors

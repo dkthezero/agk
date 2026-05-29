@@ -1,6 +1,7 @@
 use crate::app::ports::WizardStep;
-use crate::tui::app::{AppState, ListMode};
+use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, ControlFlow, EventContext};
+use crate::tui::list_mode::ListMode;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -182,10 +183,10 @@ pub fn handle_profile_wizard_input(
                 });
 
                 let scope = state.active_scope;
-                let store = ctx.store.clone();
+                let store = ctx.core.store.clone();
                 let tx = ctx.tx.clone();
-                let id =
-                    crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let id = crate::tui::progress::NEXT_TASK_ID
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 let workspace_root = ctx.workspace_root.clone();
                 let profile_dir = workspace_root.join(".agk").join("profiles").join(&name);
                 let _ = std::fs::create_dir_all(&profile_dir);
@@ -274,50 +275,12 @@ pub fn handle_delete_profile_confirm(
         }
     };
 
-    let scope = state.active_scope;
-    let store = ctx.store.clone();
-    let tx = ctx.tx.clone();
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-    tokio::task::spawn_blocking(move || {
-        let _ = tx.send(AppEvent::TaskStarted {
-            id,
-            name: format!("Deleting profile '{}'", &name),
-        });
-        match store.load(scope) {
-            Ok(mut config) => {
-                if config.remove_profile(&name) {
-                    match store.save(scope, &config) {
-                        Ok(()) => {
-                            let _ = tx.send(AppEvent::TriggerReload);
-                            let _ = tx.send(AppEvent::TaskCompleted {
-                                id,
-                                message: format!("Profile '{}' deleted", &name),
-                            });
-                        }
-                        Err(e) => {
-                            let _ = tx.send(AppEvent::TaskFailed {
-                                id,
-                                error: format!("Failed to save config: {}", e),
-                            });
-                        }
-                    }
-                } else {
-                    let _ = tx.send(AppEvent::TaskFailed {
-                        id,
-                        error: format!("Profile '{}' not found", &name),
-                    });
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(AppEvent::TaskFailed {
-                    id,
-                    error: format!("Failed to load config: {}", e),
-                });
-            }
-        }
-    });
-
+    let _ = ctx.tx.send(AppEvent::ExecuteCommand(
+        crate::app::command::CoreCommand::DeleteProfile {
+            id: crate::domain::profile::ProfileId::new(name),
+            scope: state.active_scope,
+        },
+    ));
     state.list_mode = ListMode::Normal;
     Ok(ControlFlow::Continue)
 }

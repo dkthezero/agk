@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// MCP server configuration stored in agk's global registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct McpServer {
     pub name: String,
     pub command: String,
@@ -20,7 +20,7 @@ pub struct McpServer {
     pub activation: HashMap<String, McpActivation>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct McpActivation {
     #[serde(default)]
     pub global: bool,
@@ -46,59 +46,35 @@ pub struct McpRegistry {
     pub servers: HashMap<String, McpServer>,
 }
 
-impl McpRegistry {
-    pub fn load(path: &std::path::Path) -> anyhow::Result<Self> {
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let content = std::fs::read_to_string(path)?;
-        let registry: Self = toml::from_str(&content)?;
-        Ok(registry)
-    }
-
-    pub fn save(&self, path: &std::path::Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let content = toml::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
-        Ok(())
-    }
-}
+// File-backed `McpRegistry::{load, save}` inherent impls were moved to
+// `infra/mcp/registry_io.rs` by ADR-001 Commit 1 to keep the domain pure.
+// The `mcp_registry_round_trip` integration test moved alongside the impl.
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn mcp_registry_round_trip() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("mcp.toml");
-
+    fn mcp_server_serialize_round_trip() {
         let mut registry = McpRegistry::default();
         registry.servers.insert(
             "fs".to_string(),
             McpServer {
                 name: "fs".to_string(),
                 command: "npx".to_string(),
-                args: vec![
-                    "@modelcontextprotocol/server-filesystem".to_string(),
-                    "/tmp".to_string(),
-                ],
+                args: vec!["server".to_string()],
                 env: HashMap::new(),
                 transport: McpTransport::Stdio,
-                description: Some("Filesystem access".to_string()),
-                tested: true,
-                tested_at: Some("2026-05-01T00:00:00Z".to_string()),
+                description: None,
+                tested: false,
+                tested_at: None,
                 activation: HashMap::new(),
             },
         );
-        registry.save(&path).unwrap();
 
-        let loaded = McpRegistry::load(&path).unwrap();
-        assert!(loaded.servers.contains_key("fs"));
-        let fs = loaded.servers.get("fs").unwrap();
-        assert_eq!(fs.command, "npx");
-        assert!(fs.tested);
+        let toml_text = toml::to_string_pretty(&registry).unwrap();
+        let parsed: McpRegistry = toml::from_str(&toml_text).unwrap();
+        assert!(parsed.servers.contains_key("fs"));
+        assert_eq!(parsed.servers.get("fs").unwrap().command, "npx");
     }
 }

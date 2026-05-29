@@ -30,6 +30,14 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
         crate::infra::mcp::register(name, command, args, env, transport, description)
     }
 
+    fn list(&self) -> Result<Vec<McpServer>> {
+        let path = crate::domain::paths::mcp_path();
+        let registry = crate::domain::mcp::McpRegistry::load(&path).unwrap_or_default();
+        let mut servers: Vec<McpServer> = registry.servers.into_values().collect();
+        servers.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(servers)
+    }
+
     fn test_server(&self, name: &str) -> Result<()> {
         // We are always inside a tokio runtime; use futures::executor::block_on
         // instead of creating a nested Runtime.
