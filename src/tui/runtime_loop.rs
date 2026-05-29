@@ -58,6 +58,7 @@ where
                     registry: ctx.registry.clone(),
                     tx: ctx.tx.clone(),
                     workspace_root: ctx.workspace_root.clone(),
+                    file_opener: ctx.file_opener.clone(),
                 };
                 let mut existing_mcp = state.mcp_state.clone();
                 tokio::task::spawn_blocking(move || {

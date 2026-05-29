@@ -82,24 +82,6 @@ impl SkillAnalytics {
 }
 
 impl AnalyticsConfig {
-    pub fn load(path: &std::path::Path) -> anyhow::Result<Self> {
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-        let content = std::fs::read_to_string(path)?;
-        let config: Self = toml::from_str(&content)?;
-        Ok(config)
-    }
-
-    pub fn save(&self, path: &std::path::Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let content = toml::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
-        Ok(())
-    }
-
     pub fn increment_invocation(&mut self, skill_name: &str, provider_id: &str) {
         let entry = self.skills.entry(skill_name.to_string()).or_default();
         entry.total_invocations += 1;
@@ -107,6 +89,10 @@ impl AnalyticsConfig {
         entry.increment_provider(provider_id);
     }
 }
+
+// File-backed `AnalyticsConfig::{load, save}` inherent impls were moved to
+// `infra/telemetry/store.rs` by ADR-001 Commit 1 to keep the domain pure.
+// The `round_trip` integration test moved alongside the impl.
 
 #[cfg(test)]
 mod tests {
@@ -119,20 +105,15 @@ mod tests {
     }
 
     #[test]
-    fn round_trip() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("analytics.toml");
-
+    fn increment_invocation_updates_counters() {
         let mut config = AnalyticsConfig::default();
-        config.settings.enabled = true;
         config.increment_invocation("web-browser", "claude-code");
-        config.save(&path).unwrap();
+        config.increment_invocation("web-browser", "claude-code");
+        config.increment_invocation("web-browser", "opencode");
 
-        let loaded = AnalyticsConfig::load(&path).unwrap();
-        assert!(loaded.settings.enabled);
-        let skill = loaded.skills.get("web-browser").unwrap();
-        assert_eq!(skill.total_invocations, 1);
-        assert!(skill.providers().contains(&"claude-code".to_string()));
-        assert_eq!(skill.provider_counts.get("claude-code"), Some(&1));
+        let skill = config.skills.get("web-browser").unwrap();
+        assert_eq!(skill.total_invocations, 3);
+        assert_eq!(skill.provider_counts.get("claude-code"), Some(&2));
+        assert_eq!(skill.provider_counts.get("opencode"), Some(&1));
     }
 }

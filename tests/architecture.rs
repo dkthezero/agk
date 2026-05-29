@@ -382,10 +382,6 @@ fn is_process_spawn_allowlisted(path: &Path) -> bool {
     if s.starts_with("infra/vault/") {
         return true;
     }
-    // Phase E: domain/paths.rs opens directories externally.
-    if s == "domain/paths.rs" {
-        return true;
-    }
     false
 }
 

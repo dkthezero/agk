@@ -172,7 +172,7 @@ pub fn apply_esc(state: &mut AppState) {
 
 pub fn handle_open_location(
     state: &mut AppState,
-    _ctx: &EventContext,
+    ctx: &EventContext,
     in_terminal: bool,
 ) -> Result<()> {
     let active_kind = state
@@ -203,9 +203,9 @@ pub fn handle_open_location(
 
     let path = &pkg.path;
     let result = if in_terminal {
-        crate::domain::paths::open_terminal(path)
+        ctx.file_opener.open_terminal(path)
     } else {
-        crate::domain::paths::open_file_manager(path)
+        ctx.file_opener.open_file_manager(path)
     };
 
     match result {

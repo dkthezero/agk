@@ -305,12 +305,22 @@ pub fn toggle_provider(state: &mut AppState, ctx: &EventContext) -> Result<Contr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::ports::{ConfigStorePort, ProviderPort};
+    use crate::app::ports::{ConfigStorePort, FileOpenerPort, ProviderPort};
     use crate::domain::config::ConfigFile;
     use crate::domain::identity::AssetIdentity;
     use crate::domain::scope::Scope;
     use std::collections::HashMap;
     use std::sync::Arc;
+
+    struct StubFileOpener;
+    impl FileOpenerPort for StubFileOpener {
+        fn open_file_manager(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn open_terminal(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
 
     fn empty_state(tab_count: usize) -> AppState {
         AppState::new(
@@ -414,6 +424,7 @@ mod tests {
             registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
+            file_opener: Arc::new(StubFileOpener),
         };
 
         let res = toggle_provider(&mut state, &ctx).unwrap();

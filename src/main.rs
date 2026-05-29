@@ -82,11 +82,14 @@ async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
     let mut state = tui::entry::build_state(&registry_arc, store_arc.as_ref(), scan, &workspace);
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let file_opener: Arc<dyn app::ports::FileOpenerPort> =
+        Arc::new(infra::process::opener::OsFileOpener);
     let ctx = tui::event::EventContext {
         store: store_arc.clone(),
         registry: registry_arc.clone(),
         tx: tx.clone(),
         workspace_root: workspace.clone(),
+        file_opener: file_opener.clone(),
     };
 
     // Spawn a keyboard input reader that forwards crossterm events into the

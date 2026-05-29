@@ -71,6 +71,27 @@ pub trait ProcessRunnerPort: Send + Sync {
     ) -> Result<std::process::ExitStatus>;
 }
 
+/// Port for OS-level file/folder open operations (Finder, file managers,
+/// terminal emulators). Implemented by `infra/process/opener.rs`.
+pub trait FileOpenerPort: Send + Sync {
+    fn open_file_manager(&self, path: &std::path::Path) -> Result<()>;
+    fn open_terminal(&self, path: &std::path::Path) -> Result<()>;
+}
+
+/// Port for analytics/telemetry config storage. The concrete `FileTelemetryStore`
+/// in `infra/telemetry/store.rs` reads and writes the analytics.toml file.
+pub trait TelemetryStorePort: Send + Sync {
+    fn load(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<crate::domain::telemetry::AnalyticsConfig>;
+    fn save(
+        &self,
+        path: &std::path::Path,
+        config: &crate::domain::telemetry::AnalyticsConfig,
+    ) -> Result<()>;
+}
+
 /// Port for configuration format codecs (TOML, YAML, JSON, etc.)
 pub trait ManifestCodecPort: std::fmt::Debug {
     /// Codec identifier e.g. "toml", "yaml"

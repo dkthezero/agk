@@ -46,7 +46,14 @@ impl VaultPort for LocalVaultAdapter {
                 continue;
             }
             let files = feature.hash_files(&path);
-            let sha10 = compute_sha10(&files)?;
+            let hashed: Vec<(std::path::PathBuf, Vec<u8>)> = files
+                .into_iter()
+                .map(|p| {
+                    let bytes = std::fs::read(&p).unwrap_or_default();
+                    (p, bytes)
+                })
+                .collect();
+            let sha10 = compute_sha10(&hashed)?;
             let dir_name = path
                 .file_name()
                 .unwrap_or_default()

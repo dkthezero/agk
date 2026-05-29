@@ -1,8 +1,5 @@
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 /// Resolve the global configuration root according to OS standards and user preference.
 /// - **macOS**: `~/.config/agk` (overriding default Library/Application Support)
 /// - **Linux**: `~/.config/agk` (standard XDG path via dirs_next)
@@ -50,126 +47,8 @@ pub fn mcp_path() -> PathBuf {
     global_config_root().join("mcp.toml")
 }
 
-/// Open the given path in the system file manager (Finder on macOS,
-/// explorer on Windows, xdg-open on Linux).
-pub fn open_file_manager(path: &std::path::Path) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .args([path.as_os_str()])
-            .spawn()?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .args([path.as_os_str()])
-            .spawn()?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let path_str = path.to_string_lossy().into_owned();
-        let args = format!(
-            "/c start cmd /k \"cd /d \"{}\"\"",
-            escape_cmd_arg(&path_str)
-        );
-        std::process::Command::new("cmd").raw_arg(args).spawn()?;
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    {
-        let _ = path;
-        return Err(anyhow::anyhow!(
-            "Opening file manager is not supported on this platform"
-        ));
-    }
-    Ok(())
-}
-
-/// Open a terminal at the given path.
-pub fn open_terminal(path: &std::path::Path) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .args(["-a", "Terminal", &path.to_string_lossy()])
-            .spawn()?;
-        Ok(())
-    }
-    #[cfg(target_os = "linux")]
-    {
-        let path_str = path.to_string_lossy().into_owned();
-        let emulators = [
-            (
-                "gnome-terminal",
-                vec!["--working-directory".into(), path_str.clone()],
-            ),
-            ("konsole", vec!["--workdir".into(), path_str.clone()]),
-            (
-                "xfce4-terminal",
-                vec!["--working-directory".into(), path_str.clone()],
-            ),
-            (
-                "alacritty",
-                vec!["--working-directory".into(), path_str.clone()],
-            ),
-        ];
-        for (term, args) in emulators {
-            if std::process::Command::new("which")
-                .arg(term)
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-            {
-                std::process::Command::new(term).args(&args).spawn()?;
-                return Ok(());
-            }
-        }
-        // xterm fallback via -e
-        if std::process::Command::new("which")
-            .arg("xterm")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            std::process::Command::new("xterm")
-                .args([
-                    "-e",
-                    "sh",
-                    "-lc",
-                    &format!("cd \"{}\" && exec $SHELL", shell_escape(&path_str)),
-                ])
-                .spawn()?;
-            return Ok(());
-        }
-        Err(anyhow::anyhow!("No suitable terminal emulator found"))
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let path_str = path.to_string_lossy().into_owned();
-        let args = format!(
-            "/c start cmd /k \"cd /d \"{}\"\"",
-            escape_cmd_arg(&path_str)
-        );
-        std::process::Command::new("cmd").raw_arg(args).spawn()?;
-        return Ok(());
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    {
-        let _ = path;
-        return Err(anyhow::anyhow!(
-            "Opening terminal is not supported on this platform"
-        ));
-    }
-}
-
-/// Escape a string for embedding inside a cmd.exe double-quoted argument.
-/// Replaces each backslash with `\\`, then replaces each `"` with `\"`.
-fn escape_cmd_arg(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
-/// Minimal shell-escape for paths inside `sh -lc 'cd "..." && exec $SHELL'`.
-fn shell_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
-}
+// `open_file_manager` and `open_terminal` were moved to `infra/process/opener.rs`
+// (concrete `OsFileOpener` implementing `FileOpenerPort`) by ADR-001 Commit 1.
 
 #[cfg(test)]
 mod tests {

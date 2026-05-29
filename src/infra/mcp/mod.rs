@@ -1,3 +1,5 @@
+mod registry_io;
+
 use crate::app::ports::McpProvider;
 use crate::domain::mcp::{McpRegistry, McpServer, McpTransport};
 use anyhow::{bail, Context, Result};

@@ -2,3 +2,4 @@
 
 pub mod parser;
 pub(crate) mod scanner;
+pub(crate) mod store;

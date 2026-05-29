@@ -67,6 +67,7 @@ pub struct EventContext {
     pub registry: Arc<crate::app::registry::Registry>,
     pub tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
     pub workspace_root: std::path::PathBuf,
+    pub file_opener: Arc<dyn crate::app::ports::FileOpenerPort>,
 }
 
 use std::sync::Arc;
@@ -275,6 +276,20 @@ mod tests {
 
     use std::collections::HashMap;
 
+    struct StubFileOpener;
+    impl crate::app::ports::FileOpenerPort for StubFileOpener {
+        fn open_file_manager(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn open_terminal(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn stub_opener() -> Arc<dyn crate::app::ports::FileOpenerPort> {
+        Arc::new(StubFileOpener)
+    }
+
     fn empty_state(tab_count: usize) -> AppState {
         AppState::new(
             (0..tab_count).map(|i| format!("Tab{}", i)).collect(),
@@ -330,6 +345,7 @@ mod tests {
             registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
+            file_opener: stub_opener(),
         };
 
         let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
@@ -355,6 +371,7 @@ mod tests {
             registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
+            file_opener: stub_opener(),
         };
 
         let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
