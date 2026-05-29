@@ -54,7 +54,7 @@ pub fn run(
             b.items.clear();
         }
     }
-    crate::app::actions::prune_empty_vault_defs(&mut config);
+    crate::app::features::common::prune_empty_vault_defs(&mut config);
 
     // If the entire config is now default (empty), delete the file
     if config == ConfigFile::default() {

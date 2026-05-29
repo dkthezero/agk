@@ -148,7 +148,7 @@ pub fn sync_single_asset(
     if let Some(pkg) = latest_pkg {
         if pkg.identity.sha10 != identity.sha10 {
             for provider in providers {
-                crate::app::actions::update_asset(scope, &pkg, store, *provider)
+                crate::app::features::asset::update::update_asset(scope, &pkg, store, *provider)
                     .with_context(|| format!("update via {}", provider.name()))?;
             }
             Ok(SyncAction::Updated)

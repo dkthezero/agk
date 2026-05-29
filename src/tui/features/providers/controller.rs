@@ -127,7 +127,7 @@ pub fn handle_deactivate_last_provider_confirm(
                     b.items.clear();
                 }
             }
-            crate::app::actions::prune_empty_vault_defs(&mut config);
+            crate::app::features::common::prune_empty_vault_defs(&mut config);
 
             if config == crate::domain::config::ConfigFile::default() {
                 if let Err(e) = store.delete_file(scope) {
@@ -248,7 +248,7 @@ pub fn toggle_provider(state: &mut AppState, ctx: &EventContext) -> Result<Contr
                                 b.items.clear();
                             }
                         }
-                        crate::app::actions::prune_empty_vault_defs(&mut config);
+                        crate::app::features::common::prune_empty_vault_defs(&mut config);
 
                         if config == crate::domain::config::ConfigFile::default() {
                             if let Err(e) = store.delete_file(scope) {
@@ -281,7 +281,7 @@ pub fn toggle_provider(state: &mut AppState, ctx: &EventContext) -> Result<Contr
                     let _ = store.save(scope, &config);
 
                     for (i, pkg) in installed_pkgs.iter().enumerate() {
-                        let _ = crate::app::actions::install_asset(
+                        let _ = crate::app::features::asset::install::install_asset(
                             scope,
                             pkg,
                             store.as_ref(),

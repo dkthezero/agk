@@ -84,7 +84,7 @@ pub fn run(
         if scope == Scope::Global {
             if !dry_run {
                 if let Err(e) =
-                    crate::app::actions::attach_vault(vault.id.clone(), vault.config.clone(), store)
+                    crate::app::features::asset::sync::attach_vault(vault.id.clone(), vault.config.clone(), store)
                 {
                     sink.on_error(format!("Failed to attach vault '{}': {}", vault.id, e));
                     continue;

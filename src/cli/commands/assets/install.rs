@@ -102,7 +102,7 @@ pub fn cmd_install(
     let provider_names: Vec<String> = providers.iter().map(|p| p.name().to_string()).collect();
 
     for provider in &providers {
-        if let Err(e) = crate::app::actions::install_asset(scope, &pkg, &store, *provider) {
+        if let Err(e) = crate::app::features::asset::install::install_asset(scope, &pkg, &store, *provider) {
             eprintln_if_not_quiet(
                 &mode,
                 &format!("Failed to install to {}: {}", provider.name(), e),

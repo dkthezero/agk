@@ -13,7 +13,7 @@ use std::sync::Arc;
 ///
 /// Architecture rules enforced here:
 /// - The façade receives **what** the user wants (`CoreCommand`).
-/// - It delegates **how** to the private use-case implementations in `app/usecases/`.
+/// - It delegates **how** to the private use-case implementations in `app/features/`.
 /// - It emits facts back via [`CoreEventSink`] so adapters can render outcomes.
 #[derive(Clone)]
 pub struct AgkCore {
@@ -56,10 +56,10 @@ impl AgkCore {
             // Profile commands
             // ===============================================================
             CoreCommand::CreateProfile { input } => {
-                crate::app::usecases::create_profile::run(input, self.store.as_ref(), sink)
+                crate::app::features::profile::create::run(input, self.store.as_ref(), sink)
             }
             CoreCommand::StartProfile { id, scope, dry_run } => {
-                crate::app::usecases::start_profile::run(
+                crate::app::features::profile::start::run(
                     id,
                     *scope,
                     *dry_run,
@@ -69,13 +69,13 @@ impl AgkCore {
                 )
             }
             CoreCommand::DeleteProfile { id, scope } => {
-                crate::app::usecases::delete_profile::run(id, *scope, self.store.as_ref(), sink)
+                crate::app::features::profile::delete::run(id, *scope, self.store.as_ref(), sink)
             }
             CoreCommand::AttachSkillToProfile {
                 profile_id,
                 skill_id,
             } => {
-                crate::app::usecases::attach_skill_to_profile::run(
+                crate::app::features::profile::attach_skill::run(
                     profile_id,
                     skill_id,
                     crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
@@ -87,7 +87,7 @@ impl AgkCore {
                 profile_id,
                 skill_id,
             } => {
-                crate::app::usecases::detach_skill_from_profile::run(
+                crate::app::features::profile::detach_skill::run(
                     profile_id,
                     skill_id,
                     crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
@@ -96,7 +96,7 @@ impl AgkCore {
                 )
             }
             CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => {
-                crate::app::usecases::attach_mcp_to_profile::run(
+                crate::app::features::profile::attach_mcp::run(
                     profile_id,
                     mcp_id,
                     crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
@@ -105,7 +105,7 @@ impl AgkCore {
                 )
             }
             CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => {
-                crate::app::usecases::detach_mcp_from_profile::run(
+                crate::app::features::profile::detach_mcp::run(
                     profile_id,
                     mcp_id,
                     crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
@@ -117,7 +117,7 @@ impl AgkCore {
             // ===============================================================
             // Vault commands (wired)
             // ===============================================================
-            CoreCommand::AttachVault { input } => crate::app::usecases::attach_vault::run(
+            CoreCommand::AttachVault { input } => crate::app::features::vault::attach::run(
                 input.vault_id.clone(),
                 input.config.clone(),
                 self.store.as_ref(),
@@ -129,7 +129,7 @@ impl AgkCore {
             // Context commands
             // ===============================================================
             CoreCommand::SwitchContext { id, dry_run } => {
-                crate::app::usecases::switch_context::run(
+                crate::app::features::context::switch::run(
                     id,
                     *dry_run,
                     self.context_store.as_ref(),
@@ -138,14 +138,14 @@ impl AgkCore {
                 )
             }
             CoreCommand::ListContexts => {
-                crate::app::usecases::list_contexts::run(self.context_store.as_ref(), sink)
+                crate::app::features::context::list::run(self.context_store.as_ref(), sink)
             }
 
             // ===============================================================
             // Provider commands
             // ===============================================================
             CoreCommand::ActivateProvider { id, scope } => match self.registry.get_provider(id) {
-                Ok(_provider) => crate::app::usecases::activate_provider::run(
+                Ok(_provider) => crate::app::features::provider::activate::run(
                     id.clone(),
                     *scope,
                     self.store.as_ref(),
@@ -157,7 +157,7 @@ impl AgkCore {
                 }
             },
             CoreCommand::DeactivateProvider { id, scope } => match self.registry.get_provider(id) {
-                Ok(provider) => crate::app::usecases::deactivate_provider::run(
+                Ok(provider) => crate::app::features::provider::deactivate::run(
                     id.clone(),
                     *scope,
                     self.store.as_ref(),
@@ -179,7 +179,7 @@ impl AgkCore {
                 environment,
                 context,
                 dry_run,
-            } => crate::app::usecases::apply_config::run(
+            } => crate::app::features::apply::run::run(
                 input.clone(),
                 *scope,
                 *environment,
@@ -199,13 +199,13 @@ impl AgkCore {
             // MCP commands (wired)
             // ===============================================================
             CoreCommand::RegisterMcp { input } => {
-                crate::app::usecases::register_mcp::run(input, self.mcp_registry.as_ref(), sink)
+                crate::app::features::mcp::register::run(input, self.mcp_registry.as_ref(), sink)
             }
             CoreCommand::EnableMcp {
                 name,
                 provider_id,
                 scope,
-            } => crate::app::usecases::enable_mcp::run(
+            } => crate::app::features::mcp::enable::run(
                 name,
                 provider_id,
                 *scope,
@@ -216,7 +216,7 @@ impl AgkCore {
                 name,
                 provider_id,
                 scope,
-            } => crate::app::usecases::disable_mcp::run(
+            } => crate::app::features::mcp::disable::run(
                 name,
                 provider_id,
                 *scope,
@@ -228,7 +228,7 @@ impl AgkCore {
             // Asset / search commands
             // ===============================================================
             CoreCommand::SearchRemoteVault { vault_id, query } => {
-                crate::app::usecases::search_remote_vault::run(
+                crate::app::features::asset::search_remote::run(
                     vault_id.clone(),
                     query.clone(),
                     self.vault_search.as_ref(),

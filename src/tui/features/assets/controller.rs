@@ -44,7 +44,7 @@ pub fn handle_space_asset(state: &mut AppState, ctx: &EventContext) -> Result<()
             let mut success = true;
             for provider in providers {
                 if is_installed {
-                    if crate::app::actions::remove_asset(
+                    if crate::app::features::asset::remove::remove_asset(
                         active_scope,
                         &pkg.identity,
                         &pkg.kind,
@@ -56,7 +56,7 @@ pub fn handle_space_asset(state: &mut AppState, ctx: &EventContext) -> Result<()
                     {
                         success = false;
                     }
-                } else if crate::app::actions::install_asset(
+                } else if crate::app::features::asset::install::install_asset(
                     active_scope,
                     &pkg,
                     store.as_ref(),
@@ -172,7 +172,7 @@ pub fn handle_install_remote_clawhub(
             }
             let mut success = true;
             for provider in providers {
-                if crate::app::actions::install_asset(active_scope, pkg, store.as_ref(), provider)
+                if crate::app::features::asset::install::install_asset(active_scope, pkg, store.as_ref(), provider)
                     .is_err()
                 {
                     success = false;
@@ -241,7 +241,7 @@ pub fn handle_enter_update(state: &mut AppState, ctx: &EventContext) -> Result<(
                 } else {
                     let mut success = true;
                     for provider in providers {
-                        if let Err(e) = crate::app::actions::update_asset(
+                        if let Err(e) = crate::app::features::asset::update::update_asset(
                             state.active_scope,
                             &pkg,
                             ctx.store.as_ref(),
@@ -310,7 +310,7 @@ pub fn handle_f5_update_all(state: &mut AppState, ctx: &EventContext) -> Result<
         let mut success = 0;
         for pkg in pkgs_to_update {
             for provider in &providers {
-                if crate::app::actions::update_asset(scope, &pkg, store.as_ref(), *provider).is_ok()
+                if crate::app::features::asset::update::update_asset(scope, &pkg, store.as_ref(), *provider).is_ok()
                 {
                     success += 1;
                 }

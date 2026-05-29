@@ -124,7 +124,7 @@ pub fn handle_detach_confirm(state: &mut AppState, ctx: &EventContext) -> Result
                 id,
                 name: format!("Detaching vault '{}'", vault_id),
             });
-            match crate::app::actions::detach_vault(&vault_id, store.as_ref()) {
+            match crate::app::features::vault::detach::detach_vault(&vault_id, store.as_ref()) {
                 Ok(()) => {
                     let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
                     let _ = tx.send(AppEvent::TriggerReload);
@@ -239,7 +239,7 @@ pub fn execute_attach_vault(
 
     tokio::task::spawn_blocking(move || {
         let vault_config_clone = vault_config.clone();
-        match crate::app::actions::attach_vault(vault_id.clone(), vault_config, store.as_ref()) {
+        match crate::app::features::asset::sync::attach_vault(vault_id.clone(), vault_config, store.as_ref()) {
             Ok(()) => {
                 let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
                 let _ = tx.send(AppEvent::TriggerReload);
