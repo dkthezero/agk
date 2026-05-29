@@ -114,6 +114,75 @@ fn contains_direct_process_spawn(text: &str, path: &Path) -> Vec<String> {
     violations
 }
 
+/// Strip `#[cfg(test)] mod ... { ... }` blocks from `text`.
+///
+/// Test modules legitimately contain `std::fs` / `std::process` calls (temp
+/// dirs, fixtures). Domain purity scans must ignore them. This is a brace-
+/// depth scanner — sufficient for well-formed Rust where `{` / `}` inside
+/// strings or comments are not expected in domain test fixtures.
+fn strip_cfg_test_modules(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut pending_cfg_test = false;
+    let mut in_test_mod = false;
+    let mut depth: i32 = 0;
+
+    for line in text.lines() {
+        if in_test_mod {
+            for ch in line.chars() {
+                if ch == '{' {
+                    depth += 1;
+                } else if ch == '}' {
+                    depth -= 1;
+                    if depth == 0 {
+                        in_test_mod = false;
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        let trimmed = line.trim();
+        if pending_cfg_test {
+            if trimmed.starts_with("mod ") || trimmed.starts_with("pub mod ") {
+                let opens = line.chars().filter(|c| *c == '{').count() as i32;
+                let closes = line.chars().filter(|c| *c == '}').count() as i32;
+                let line_depth = opens - closes;
+                if line_depth > 0 {
+                    in_test_mod = true;
+                    depth = line_depth;
+                }
+                pending_cfg_test = false;
+                continue;
+            }
+            pending_cfg_test = false;
+        }
+        if trimmed.starts_with("#[cfg(test)]") {
+            pending_cfg_test = true;
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Return non-test lines under `path` that match `needle`. Honors single-line
+/// comment skipping.
+fn matching_non_test_lines(text: &str, needle: &str) -> Vec<String> {
+    let stripped = strip_cfg_test_modules(text);
+    let mut violations = Vec::new();
+    for line in stripped.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("*") {
+            continue;
+        }
+        if trimmed.contains(needle) {
+            violations.push(format!("  {}", trimmed));
+        }
+    }
+    violations
+}
+
 /// Return true if any non-test `.rs` file under `src/` exceeds `limit` lines.
 fn files_exceeding_line_limit(dir: &str, limit: usize) -> Vec<(PathBuf, usize)> {
     let mut offenders = Vec::new();
@@ -362,6 +431,67 @@ fn process_spawn_must_be_in_infra_process() {
         violations.is_empty(),
         "Architecture violation: direct `std::process::Command::new` found outside `infra/process/`:\n{}",
         violations.join("\n")
+    );
+}
+
+/// Domain purity (process): no `std::process::Command` may appear in
+/// `src/domain/` outside `#[cfg(test)]` modules. Side effects belong in
+/// `infra/`, exposed via a port.
+///
+/// Added by ADR-001 Commit 0. Will fail until Commit 1 lands
+/// `FileOpenerPort` and moves `domain/paths.rs` open helpers.
+#[test]
+#[ignore]
+fn domain_must_not_spawn_processes() {
+    let files = collect_rust_files("domain");
+    let mut all_violations = Vec::new();
+    for path in &files {
+        let text = read_file(path);
+        let refs = matching_non_test_lines(&text, "std::process::Command");
+        if !refs.is_empty() {
+            all_violations.push(format!(
+                "{}\n{}",
+                path.strip_prefix("src/").unwrap_or(path).display(),
+                refs.join("\n")
+            ));
+        }
+    }
+    assert!(
+        all_violations.is_empty(),
+        "Domain purity violation: `std::process::Command` found in domain/ outside #[cfg(test)].\n\
+         Domain must be pure: extract the side effect to a port in app/ports/ \
+         with an impl in infra/.\n{}",
+        all_violations.join("\n")
+    );
+}
+
+/// Domain purity (fs): no `std::fs::` may appear in `src/domain/` outside
+/// `#[cfg(test)]` modules.
+///
+/// Added by ADR-001 Commit 0. Will fail until Commit 1 lands
+/// `TelemetryStorePort` and removes file I/O from `domain/telemetry.rs`,
+/// `domain/mcp.rs`, and `domain/hashing.rs`.
+#[test]
+#[ignore]
+fn domain_must_not_use_fs() {
+    let files = collect_rust_files("domain");
+    let mut all_violations = Vec::new();
+    for path in &files {
+        let text = read_file(path);
+        let refs = matching_non_test_lines(&text, "std::fs::");
+        if !refs.is_empty() {
+            all_violations.push(format!(
+                "{}\n{}",
+                path.strip_prefix("src/").unwrap_or(path).display(),
+                refs.join("\n")
+            ));
+        }
+    }
+    assert!(
+        all_violations.is_empty(),
+        "Domain purity violation: `std::fs::` found in domain/ outside #[cfg(test)].\n\
+         Domain must be pure: file I/O belongs in infra/, behind a port.\n{}",
+        all_violations.join("\n")
     );
 }
 
