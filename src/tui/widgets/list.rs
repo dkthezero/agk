@@ -1,4 +1,3 @@
-use crate::app::snapshot::{ProfileEntry, ProviderEntry, VaultEntry};
 use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::config::ConfigFile;
 use ratatui::{
@@ -8,6 +7,11 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+
+// Re-export per-entity renderers extracted to `list_entity.rs` so
+// `crate::tui::widgets::list::render_vaults` (etc.) still resolves for
+// existing callers (`src/tui/render/content.rs`).
+pub use crate::tui::widgets::list_entity::{render_profiles, render_providers, render_vaults};
 
 fn truncate_name(name: &str, max_width: usize) -> String {
     if name.len() <= max_width {
@@ -181,108 +185,6 @@ pub fn render(
         state.select(Some(selected));
     }
 
-    frame.render_stateful_widget(list, area, &mut state);
-}
-
-pub fn render_vaults(frame: &mut Frame, area: Rect, vaults: &[VaultEntry], selected: usize) {
-    let block = Block::default().borders(Borders::ALL).title("Vaults");
-    if vaults.is_empty() {
-        let items = vec![ListItem::new(Line::from(
-            "  No vaults attached. Press 'a' to add one.",
-        ))];
-        frame.render_widget(List::new(items).block(block), area);
-        return;
-    }
-    let items: Vec<ListItem> = vaults
-        .iter()
-        .map(|v| {
-            let check = if v.enabled { "[x]" } else { "[ ]" };
-            ListItem::new(Line::from(format!(
-                "{} {:<20} {:<8} {}",
-                check,
-                v.id,
-                v.kind,
-                v.counts_label()
-            )))
-        })
-        .collect();
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("> ");
-    let mut state = ListState::default();
-    if !vaults.is_empty() {
-        state.select(Some(selected));
-    }
-    frame.render_stateful_widget(list, area, &mut state);
-}
-
-pub fn render_providers(
-    frame: &mut Frame,
-    area: Rect,
-    providers: &[ProviderEntry],
-    selected: usize,
-) {
-    let block = Block::default().borders(Borders::ALL).title("Providers");
-    if providers.is_empty() {
-        let items = vec![ListItem::new(Line::from("  No providers installed."))];
-        frame.render_widget(List::new(items).block(block), area);
-        return;
-    }
-    let items: Vec<ListItem> = providers
-        .iter()
-        .map(|p| {
-            let checkbox = if p.active { "[x]" } else { "[ ]" };
-            ListItem::new(Line::from(format!("{} {}", checkbox, p.name)))
-        })
-        .collect();
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("> ");
-    let mut state = ListState::default();
-    if !providers.is_empty() {
-        state.select(Some(selected));
-    }
-    frame.render_stateful_widget(list, area, &mut state);
-}
-
-pub fn render_profiles(frame: &mut Frame, area: Rect, profiles: &[ProfileEntry], selected: usize) {
-    let block = Block::default().borders(Borders::ALL).title("Profiles");
-    if profiles.is_empty() {
-        let items = vec![ListItem::new(Line::from(
-            "  No profiles. Press F2 to add one.",
-        ))];
-        frame.render_widget(List::new(items).block(block), area);
-        return;
-    }
-    let items: Vec<ListItem> = profiles
-        .iter()
-        .map(|p| ListItem::new(Line::from(format!("{} ({})", p.name, p.provider_id))))
-        .collect();
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol("> ");
-    let mut state = ListState::default();
-    if !profiles.is_empty() {
-        state.select(Some(selected));
-    }
     frame.render_stateful_widget(list, area, &mut state);
 }
 

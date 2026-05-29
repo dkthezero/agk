@@ -1,6 +1,9 @@
 pub(crate) mod detail;
+pub(crate) mod detail_entity;
 pub(crate) mod list;
+pub(crate) mod list_entity;
 pub(crate) mod mcp;
 pub(crate) mod modal;
+pub(crate) mod modal_long;
 pub(crate) mod status;
 pub(crate) mod tabs;

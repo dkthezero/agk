@@ -472,9 +472,6 @@ fn file_size_lint() {
     // Out-of-scope for ADR-001: widgets, CLI presenter, and legacy asset mod
     // are scheduled for decomposition in follow-up work.
     let allowlisted: std::collections::HashSet<&str> = [
-        "tui/widgets/modal.rs",
-        "tui/widgets/detail.rs",
-        "tui/widgets/list.rs",
         "app/features/asset/mod.rs",
         "cli/presenter.rs",
         "cli/entry.rs",
