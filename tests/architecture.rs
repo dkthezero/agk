@@ -467,50 +467,23 @@ fn file_size_lint() {
     const LIMIT: usize = 300;
 
     let offenders = files_exceeding_line_limit("src", LIMIT);
-    let mut violations = Vec::new();
-
-    // Out-of-scope for ADR-001: widgets, CLI presenter, and legacy asset mod
-    // are scheduled for decomposition in follow-up work.
-    let allowlisted: std::collections::HashSet<&str> = [
-        "tui/widgets/modal.rs",
-        "tui/widgets/detail.rs",
-        "tui/widgets/list.rs",
-        "app/features/asset/mod.rs",
-        "cli/presenter.rs",
-        "cli/entry.rs",
-        "infra/provider/opencode/session.rs",
-    ]
-    .iter()
-    .cloned()
-    .collect();
-
-    for (path, lines) in offenders {
-        let relative = path
-            .strip_prefix("src/")
-            .unwrap_or(&path)
-            .display()
-            .to_string();
-        if allowlisted.contains(relative.as_str()) {
-            violations.push(format!(
-                "  {} ({} lines) – allow-listed, assigned to later phase",
-                relative, lines
-            ));
-            continue;
-        }
-        violations.push(format!("  {} ({} lines)", relative, lines));
-    }
-
-    let real_violations: Vec<_> = violations
-        .iter()
-        .filter(|v| !v.contains("allow-listed"))
-        .cloned()
+    let violations: Vec<String> = offenders
+        .into_iter()
+        .map(|(path, lines)| {
+            let relative = path
+                .strip_prefix("src/")
+                .unwrap_or(&path)
+                .display()
+                .to_string();
+            format!("  {} ({} lines)", relative, lines)
+        })
         .collect();
 
     assert!(
-        real_violations.is_empty(),
+        violations.is_empty(),
         "File-size lint: the following source files exceed {} non-test lines:\n{}\n\
          Split into smaller modules per AGENTS.md guidelines.",
         LIMIT,
-        real_violations.join("\n")
+        violations.join("\n")
     );
 }
