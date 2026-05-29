@@ -338,26 +338,16 @@ fn cli_must_not_import_tui() {
 // assigned convergence phase completes.  New violations must not be added.
 // ---------------------------------------------------------------------------
 
-/// Files that are allowed to directly spawn processes outside infra/process/.
-fn is_process_spawn_allowlisted(path: &Path) -> bool {
-    let relative = path.strip_prefix("src/").unwrap_or(path);
-    let s = relative.to_string_lossy();
-    // Phase B/D: cli/commands.rs was deleted after all commands wired through AgkCore.
-    // Kept as documentation that the allowlist must be pruned when phases complete.
-    // if s == "cli/commands.rs" { return true; }
-    // Phase C: tui/runtime_loop.rs handles interactive child process launching.
-    if s == "tui/runtime_loop.rs" {
-        return true;
-    }
-    // Phase E: provider adapters will move spawning into infra/process/.
-    if s.starts_with("infra/provider/") {
-        return true;
-    }
-    // Phase E: vault adapters clone git / install binaries remotely.
-    if s.starts_with("infra/vault/") {
-        return true;
-    }
-    false
+/// Out-of-scope-by-design exemptions from Rule 6.
+///
+/// Both entries are explicitly Phase E (out of ADR-001 scope): provider and
+/// vault adapters still spawn `git`, `npx`, `brew`, and provider binaries
+/// directly. A follow-up will route them through `ProcessRunnerPort`; until
+/// then the allowlist documents the boundary so new violations elsewhere are
+/// still caught.
+fn is_phase_e_provider_vault_debt(path: &Path) -> bool {
+    let s = path.strip_prefix("src/").unwrap_or(path).to_string_lossy();
+    s.starts_with("infra/provider/") || s.starts_with("infra/vault/")
 }
 
 /// Rule 6: No direct std::process::Command outside infra/process/.
@@ -384,8 +374,8 @@ fn process_spawn_must_be_in_infra_process() {
         {
             continue;
         }
-        // Phase-A allowlist: known violations with assigned future phases.
-        if is_process_spawn_allowlisted(path) {
+        // Phase E follow-up: provider + vault adapters still spawn directly.
+        if is_phase_e_provider_vault_debt(path) {
             continue;
         }
         let text = read_file(path);

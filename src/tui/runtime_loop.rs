@@ -1,8 +1,10 @@
 use anyhow::Result;
 use ratatui::{backend::Backend, Terminal};
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::app::outcome::CoreEventSink;
+use crate::app::ports::ProcessRunnerPort;
 use crate::tui::app::AppState;
 use crate::tui::core_event_reducer::apply_core_event;
 use crate::tui::event::{handle, AppEvent, ControlFlow, EventContext};
@@ -90,6 +92,7 @@ where
                     terminal,
                     state,
                     rx,
+                    ctx.core.process_runner.clone(),
                     &command,
                     &args,
                     &current_dir,
@@ -124,6 +127,7 @@ async fn handle_interactive_process<B: Backend>(
     terminal: &mut Terminal<B>,
     state: &mut AppState,
     rx: &mut UnboundedReceiver<AppEvent>,
+    runner: Arc<dyn ProcessRunnerPort>,
     command: &str,
     args: &[String],
     current_dir: &std::path::Path,
@@ -145,23 +149,19 @@ where
     let _ = disable_raw_mode();
 
     // Run the blocking .status() call on a dedicated thread so the async
-    // event loop is never frozen.
+    // event loop is never frozen. The runner port owns the actual
+    // std::process::Command call so this file stays free of process-spawn
+    // primitives (ADR-001).
     let cmd = command.to_string();
     let args = args.to_vec();
     let current_dir = current_dir.to_path_buf();
     let args_for_status = args.clone();
     let current_dir_for_status = current_dir.clone();
     let status = tokio::task::spawn_blocking(move || {
-        std::process::Command::new(&cmd)
-            .current_dir(&current_dir_for_status)
-            .args(&args_for_status)
-            .stdin(std::process::Stdio::inherit())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            .status()
+        runner.run_interactive(&cmd, &args_for_status, &current_dir_for_status)
     })
     .await
-    .unwrap_or(Err(std::io::Error::other("spawn_blocking panicked")));
+    .unwrap_or_else(|e| Err(anyhow::anyhow!("spawn_blocking panicked: {}", e)));
 
     let _ = enable_raw_mode();
 
