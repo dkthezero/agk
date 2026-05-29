@@ -1,9 +1,9 @@
-use crate::app::ports::{ConfigStorePort, ProviderPort};
-use crate::cli::entry::{Cli, Commands, ProfileCommands, ScopeArg};
+use crate::app::ports::ProviderPort;
+use crate::cli::entry::{Cli, Commands, ScopeArg};
 use crate::domain::asset::ScannedPackage;
 use crate::domain::config::ConfigFile;
 use crate::domain::scope::Scope;
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 #[cfg(test)]
 mod commands_tests;
@@ -148,8 +148,6 @@ pub const EXIT_PARTIAL_SUCCESS: i32 = 3;
 // ---------------------------------------------------------------------------
 
 pub mod assets;
-pub mod mcps;
-pub mod profiles;
 pub mod telemetry;
 
 // ---------------------------------------------------------------------------
@@ -217,35 +215,17 @@ pub fn run(cli: Cli, workspace: &std::path::Path) -> Result<i32> {
             stdout,
         }) => assets::cmd_pack(&cli, identity, target, stdout, workspace),
 
-        Some(Commands::Mcp { ref command }) => mcps::dispatch_mcp(&cli, command, workspace),
+        Some(Commands::Mcp { .. }) => {
+            println!("MCP commands are wired to AgkCore; run via `cli::core_dispatcher` instead.");
+            Ok(EXIT_SUCCESS)
+        }
 
         Some(Commands::Telemetry { ref command }) => telemetry::dispatch_telemetry(&cli, command),
 
-        Some(Commands::Profile { command }) => match command {
-            ProfileCommands::Start {
-                ref name,
-                dry_run: _,
-            } => profiles::run_profile_start(name, workspace),
-            ProfileCommands::Create {
-                ref name,
-                provider,
-                skills,
-                mcps,
-                ref description,
-                ref description_file,
-                scope,
-                dry_run: _,
-            } => profiles::run_profile_create(
-                name,
-                provider.as_str(),
-                skills.as_slice(),
-                mcps.as_slice(),
-                description.as_deref(),
-                description_file.as_deref(),
-                scope.into_domain_scope(),
-                workspace,
-            ),
-        },
+        Some(Commands::Profile { .. }) => {
+            println!("Profile commands are wired to AgkCore; run via `cli::core_dispatcher` instead.");
+            Ok(EXIT_SUCCESS)
+        }
 
         Some(Commands::Apply {
             source: _,

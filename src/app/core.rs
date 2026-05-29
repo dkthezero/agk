@@ -1,7 +1,8 @@
 use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{
-    ConfigStorePort, ContextStorePort, McpRegistryPort, ProfileRuntimePort, VaultSearchPort,
+    ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort, ProfileRuntimePort,
+    VaultSearchPort,
 };
 use crate::app::registry::Registry;
 use std::collections::HashMap;
@@ -24,6 +25,8 @@ pub struct AgkCore {
     pub(crate) registry: Arc<Registry>,
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
     pub(crate) runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
+    pub(crate) process_runner: Arc<dyn ProcessRunnerPort>,
+    pub(crate) workspace_root: std::path::PathBuf,
 }
 
 impl AgkCore {
@@ -34,6 +37,8 @@ impl AgkCore {
         vault_search: Arc<dyn VaultSearchPort>,
         registry: Arc<Registry>,
         runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
+        process_runner: Arc<dyn ProcessRunnerPort>,
+        workspace_root: std::path::PathBuf,
     ) -> Self {
         Self {
             store,
@@ -42,6 +47,8 @@ impl AgkCore {
             vault_search,
             registry,
             runtime_ports,
+            process_runner,
+            workspace_root,
         }
     }
 
@@ -119,6 +126,9 @@ mod tests {
 
     struct FakeMcp;
     impl McpRegistryPort for FakeMcp {
+        fn list(&self) -> anyhow::Result<Vec<crate::domain::mcp::McpServer>> {
+            Ok(vec![])
+        }
         fn register(
             &self,
             _name: &str,
@@ -191,14 +201,62 @@ mod tests {
         fn on_error(&mut self, _error: String) {}
     }
 
+    struct FakeProcessRunner;
+    impl ProcessRunnerPort for FakeProcessRunner {
+        fn run(
+            &self,
+            _command: &str,
+            _args: &[&str],
+            _cwd: Option<&std::path::Path>,
+            _env: Option<&[(String, String)]>,
+        ) -> anyhow::Result<String> {
+            Ok(String::new())
+        }
+    }
+
+    struct FakeProvider;
+    impl crate::app::ports::ProviderPort for FakeProvider {
+        fn id(&self) -> &str {
+            "opencode"
+        }
+        fn name(&self) -> &str {
+            "OpenCode"
+        }
+        fn install(
+            &self,
+            _: &crate::domain::asset::ScannedPackage,
+            _: crate::domain::scope::Scope,
+            _: Option<&crate::domain::config::ConfigFile>,
+            _: bool,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn remove(
+            &self,
+            _: &crate::domain::identity::AssetIdentity,
+            _: &crate::domain::asset::AssetKind,
+            _: crate::domain::scope::Scope,
+            _: Option<&crate::domain::config::ConfigFile>,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn supports_profiles(&self) -> bool {
+            true
+        }
+    }
+
     fn test_core() -> AgkCore {
+        let mut registry = crate::app::registry::Registry::new();
+        registry.register_provider(Box::new(FakeProvider));
         AgkCore::new(
             Arc::new(FakeStore::new()),
             Arc::new(FakeCtxStore::new()),
             Arc::new(FakeMcp),
             Arc::new(FakeVaultSearch),
-            Arc::new(crate::app::registry::Registry::new()),
+            Arc::new(registry),
             HashMap::new(),
+            Arc::new(FakeProcessRunner),
+            std::path::PathBuf::from("."),
         )
     }
 

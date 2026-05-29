@@ -91,6 +91,9 @@ mod tests {
     }
 
     impl McpRegistryPort for FakeMcpRegistry {
+        fn list(&self) -> anyhow::Result<Vec<crate::domain::mcp::McpServer>> {
+            Ok(vec![])
+        }
         fn register(
             &self,
             name: &str,

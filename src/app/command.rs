@@ -94,6 +94,8 @@ pub enum CoreCommand {
         provider_id: String,
         scope: crate::domain::scope::Scope,
     },
+    ListMcp,
+    TestMcp { name: String },
 
     // -----------------------------------------------------------------------
     // Asset commands

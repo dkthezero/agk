@@ -170,6 +170,9 @@ fn build_core(
         crate::infra::provider::opencode::OpenCodeProvider::new(workspace.to_path_buf());
     runtime_ports.insert("opencode".to_string(), Arc::new(opencode_provider));
 
+    let process_runner: Arc<dyn app::ports::ProcessRunnerPort> =
+        Arc::new(infra::process::runner::OsProcessRunner);
+
     let core = AgkCore::new(
         store_arc.clone(),
         context_store,
@@ -177,6 +180,8 @@ fn build_core(
         vault_search,
         Arc::new(registry),
         runtime_ports,
+        process_runner,
+        workspace.to_path_buf(),
     );
 
     Ok(core)

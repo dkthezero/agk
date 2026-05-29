@@ -15,6 +15,7 @@ pub trait McpRegistryPort: Send + Sync {
         description: Option<&str>,
     ) -> Result<McpServer>;
 
+    fn list(&self) -> Result<Vec<McpServer>>;
     fn test_server(&self, name: &str) -> Result<()>;
     fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
     fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;

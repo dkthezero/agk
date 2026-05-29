@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// MCP server configuration stored in agk's global registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct McpServer {
     pub name: String,
     pub command: String,
@@ -20,7 +20,7 @@ pub struct McpServer {
     pub activation: HashMap<String, McpActivation>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct McpActivation {
     #[serde(default)]
     pub global: bool,

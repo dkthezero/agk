@@ -5,3 +5,4 @@
 //! capabilities via the port traits in `app/ports.rs`.
 
 pub mod opener;
+pub mod runner;

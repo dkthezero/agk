@@ -1,7 +1,9 @@
 pub mod command;
 pub mod disable;
 pub mod enable;
+pub mod list;
 pub mod register;
+pub mod test;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -31,6 +33,10 @@ pub fn dispatch(
             scope,
         } => {
             Some(disable::run(name, provider_id, *scope, core.mcp_registry.as_ref(), sink))
+        }
+        CoreCommand::ListMcp => Some(list::run(core.mcp_registry.as_ref(), sink)),
+        CoreCommand::TestMcp { ref name } => {
+            Some(test::run(name, core.mcp_registry.as_ref(), sink))
         }
         _ => None,
     }

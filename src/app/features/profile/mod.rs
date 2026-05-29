@@ -20,7 +20,14 @@ pub fn dispatch(
 ) -> Option<CoreResult> {
     match cmd {
         CoreCommand::CreateProfile { ref input } => {
-            Some(create::run(input, core.store.as_ref(), sink))
+            Some(create::run(
+                input,
+                core.store.as_ref(),
+                core.process_runner.as_ref(),
+                core.registry.as_ref(),
+                &core.workspace_root,
+                sink,
+            ))
         }
         CoreCommand::StartProfile { id, scope, dry_run } => {
             Some(start::run(
