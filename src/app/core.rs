@@ -17,13 +17,13 @@ use std::sync::Arc;
 /// - It emits facts back via [`CoreEventSink`] so adapters can render outcomes.
 #[derive(Clone)]
 pub struct AgkCore {
-    store: Arc<dyn ConfigStorePort>,
-    context_store: Arc<dyn ContextStorePort>,
-    mcp_registry: Arc<dyn McpRegistryPort>,
-    vault_search: Arc<dyn VaultSearchPort>,
-    registry: Arc<Registry>,
+    pub(crate) store: Arc<dyn ConfigStorePort>,
+    pub(crate) context_store: Arc<dyn ContextStorePort>,
+    pub(crate) mcp_registry: Arc<dyn McpRegistryPort>,
+    pub(crate) vault_search: Arc<dyn VaultSearchPort>,
+    pub(crate) registry: Arc<Registry>,
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
-    runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
+    pub(crate) runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
 }
 
 impl AgkCore {
@@ -51,197 +51,30 @@ impl AgkCore {
     /// The TUI passes a presenter that updates `TuiState`; the CLI passes a
     /// presenter that writes JSON / text to stdout.
     pub fn execute(&self, command: CoreCommand, sink: &mut dyn CoreEventSink) -> CoreResult {
-        match &command {
-            // ===============================================================
-            // Profile commands
-            // ===============================================================
-            CoreCommand::CreateProfile { input } => {
-                crate::app::features::profile::create::run(input, self.store.as_ref(), sink)
-            }
-            CoreCommand::StartProfile { id, scope, dry_run } => {
-                crate::app::features::profile::start::run(
-                    id,
-                    *scope,
-                    *dry_run,
-                    self.store.as_ref(),
-                    &self.runtime_ports,
-                    sink,
-                )
-            }
-            CoreCommand::DeleteProfile { id, scope } => {
-                crate::app::features::profile::delete::run(id, *scope, self.store.as_ref(), sink)
-            }
-            CoreCommand::AttachSkillToProfile {
-                profile_id,
-                skill_id,
-            } => {
-                crate::app::features::profile::attach_skill::run(
-                    profile_id,
-                    skill_id,
-                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
-                    self.store.as_ref(),
-                    sink,
-                )
-            }
-            CoreCommand::DetachSkillFromProfile {
-                profile_id,
-                skill_id,
-            } => {
-                crate::app::features::profile::detach_skill::run(
-                    profile_id,
-                    skill_id,
-                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
-                    self.store.as_ref(),
-                    sink,
-                )
-            }
-            CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => {
-                crate::app::features::profile::attach_mcp::run(
-                    profile_id,
-                    mcp_id,
-                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
-                    self.store.as_ref(),
-                    sink,
-                )
-            }
-            CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => {
-                crate::app::features::profile::detach_mcp::run(
-                    profile_id,
-                    mcp_id,
-                    crate::domain::scope::Scope::Workspace, // todo: allow passing scope in command
-                    self.store.as_ref(),
-                    sink,
-                )
-            }
-
-            // ===============================================================
-            // Vault commands (wired)
-            // ===============================================================
-            CoreCommand::AttachVault { input } => crate::app::features::vault::attach::run(
-                input.vault_id.clone(),
-                input.config.clone(),
-                self.store.as_ref(),
-                sink,
-            )
-            .map(|_| CoreOutcome::Ok),
-
-            // ===============================================================
-            // Context commands
-            // ===============================================================
-            CoreCommand::SwitchContext { id, dry_run } => {
-                crate::app::features::context::switch::run(
-                    id,
-                    *dry_run,
-                    self.context_store.as_ref(),
-                    sink,
-                    self.store.as_ref(),
-                )
-            }
-            CoreCommand::ListContexts => {
-                crate::app::features::context::list::run(self.context_store.as_ref(), sink)
-            }
-
-            // ===============================================================
-            // Provider commands
-            // ===============================================================
-            CoreCommand::ActivateProvider { id, scope } => match self.registry.get_provider(id) {
-                Ok(_provider) => crate::app::features::provider::activate::run(
-                    id.clone(),
-                    *scope,
-                    self.store.as_ref(),
-                    sink,
-                ),
-                Err(e) => {
-                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                    Ok(CoreOutcome::Ok)
-                }
-            },
-            CoreCommand::DeactivateProvider { id, scope } => match self.registry.get_provider(id) {
-                Ok(provider) => crate::app::features::provider::deactivate::run(
-                    id.clone(),
-                    *scope,
-                    self.store.as_ref(),
-                    provider,
-                    sink,
-                ),
-                Err(e) => {
-                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                    Ok(CoreOutcome::Ok)
-                }
-            },
-
-            // ===============================================================
-            // Apply commands
-            // ===============================================================
-            CoreCommand::ApplyConfig {
-                input,
-                scope,
-                environment,
-                context,
-                dry_run,
-            } => crate::app::features::apply::run::run(
-                input.clone(),
-                *scope,
-                *environment,
-                context.clone(),
-                *dry_run,
-                self.store.as_ref(),
-                self.context_store.as_ref(),
-                self.registry
-                    .providers
-                    .iter()
-                    .map(|p| p.id().to_string())
-                    .collect(),
-                sink,
-            ),
-
-            // ===============================================================
-            // MCP commands (wired)
-            // ===============================================================
-            CoreCommand::RegisterMcp { input } => {
-                crate::app::features::mcp::register::run(input, self.mcp_registry.as_ref(), sink)
-            }
-            CoreCommand::EnableMcp {
-                name,
-                provider_id,
-                scope,
-            } => crate::app::features::mcp::enable::run(
-                name,
-                provider_id,
-                *scope,
-                self.mcp_registry.as_ref(),
-                sink,
-            ),
-            CoreCommand::DisableMcp {
-                name,
-                provider_id,
-                scope,
-            } => crate::app::features::mcp::disable::run(
-                name,
-                provider_id,
-                *scope,
-                self.mcp_registry.as_ref(),
-                sink,
-            ),
-
-            // ===============================================================
-            // Asset / search commands
-            // ===============================================================
-            CoreCommand::SearchRemoteVault { vault_id, query } => {
-                crate::app::features::asset::search_remote::run(
-                    vault_id.clone(),
-                    query.clone(),
-                    self.vault_search.as_ref(),
-                    sink,
-                )
-            }
-
-            // Remaining commands: wired incrementally in Phases 1-5.
-            _ => {
-                sink.on_error(format!("Command {:?} not yet implemented", command));
-                Ok(CoreOutcome::Ok)
-            }
+        if let Some(r) = crate::app::features::profile::dispatch(&command, self, sink) {
+            return r;
         }
+        if let Some(r) = crate::app::features::vault::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::context::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::provider::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::apply::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::mcp::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::asset::dispatch(&command, self, sink) {
+            return r;
+        }
+
+        sink.on_error(format!("Command {:?} not yet implemented", command));
+        Ok(CoreOutcome::Ok)
     }
 }
 
