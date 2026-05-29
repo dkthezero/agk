@@ -479,7 +479,6 @@ fn file_size_lint() {
         "cli/presenter.rs",
         "cli/entry.rs",
         "infra/provider/opencode/session.rs",
-        "infra/telemetry/parser.rs",
     ]
     .iter()
     .cloned()
