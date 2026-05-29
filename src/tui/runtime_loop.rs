@@ -121,8 +121,8 @@ where
     }
     Ok(())
 }
-
 /// Suspend the TUI, run an interactive child process, then resume.
+#[allow(clippy::too_many_arguments)]
 async fn handle_interactive_process<B: Backend>(
     terminal: &mut Terminal<B>,
     state: &mut AppState,

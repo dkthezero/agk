@@ -15,9 +15,8 @@ pub enum ControlFlow {
 
 #[derive(Debug)]
 pub enum AppEvent {
-    /// Keyboard events from `crossterm` — matched in runtime_loop.rs but never
-    /// constructed because the TUI uses direct crossterm polling instead of the
-    /// async channel for keyboard input.
+    /// Keyboard events from `crossterm` forwarded by `main.rs` into the async
+    /// channel consumed by `runtime_loop::run_loop`.
     Input(crossterm::event::Event),
     TaskStarted {
         id: usize,

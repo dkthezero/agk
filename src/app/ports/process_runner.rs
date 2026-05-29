@@ -23,12 +23,7 @@ pub trait ProcessRunnerPort: Send + Sync {
     ///
     /// The default implementation bails: only adapters that genuinely support
     /// terminal-inheriting processes (e.g. `OsProcessRunner`) should override.
-    fn run_interactive(
-        &self,
-        command: &str,
-        args: &[String],
-        cwd: &Path,
-    ) -> Result<ExitStatus> {
+    fn run_interactive(&self, command: &str, args: &[String], cwd: &Path) -> Result<ExitStatus> {
         let _ = (command, args, cwd);
         anyhow::bail!("interactive process not supported by this runner")
     }

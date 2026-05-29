@@ -39,12 +39,7 @@ impl ProcessRunnerPort for OsProcessRunner {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
-    fn run_interactive(
-        &self,
-        command: &str,
-        args: &[String],
-        cwd: &Path,
-    ) -> Result<ExitStatus> {
+    fn run_interactive(&self, command: &str, args: &[String], cwd: &Path) -> Result<ExitStatus> {
         Command::new(command)
             .current_dir(cwd)
             .args(args)

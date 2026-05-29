@@ -91,20 +91,35 @@ pub fn handle_mcp_register_confirm(
 ) -> Result<ControlFlow> {
     state.list_mode = ListMode::Normal;
 
+    let is_sse = state.pending_mcp_transport.as_str() == "sse";
+    let sse_url = if is_sse {
+        let trimmed = state.pending_mcp_args.trim();
+        if trimmed.is_empty() {
+            "http://localhost:3000".to_string()
+        } else {
+            trimmed.to_string()
+        }
+    } else {
+        String::new()
+    };
+
     let input = crate::app::features::mcp::command::RegisterMcpInput {
         name: state.pending_mcp_name.clone(),
         command: state.pending_mcp_command.clone(),
-        args: state
-            .pending_mcp_args
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect(),
+        args: if is_sse {
+            vec![]
+        } else {
+            state
+                .pending_mcp_args
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect()
+        },
         env: vec![],
-        transport: match state.pending_mcp_transport.as_str() {
-            "sse" => crate::domain::mcp::McpTransport::Sse {
-                url: "http://localhost:3000".to_string(),
-            },
-            _ => crate::domain::mcp::McpTransport::Stdio,
+        transport: if is_sse {
+            crate::domain::mcp::McpTransport::Sse { url: sse_url }
+        } else {
+            crate::domain::mcp::McpTransport::Stdio
         },
         description: if state.pending_mcp_description.is_empty() {
             None
