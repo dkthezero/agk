@@ -6,7 +6,7 @@ use crate::app::ports::McpRegistryPort;
 ///
 /// Delegates to [`McpRegistryPort`] instead of calling infra directly.
 pub fn run(
-    input: &crate::app::command::RegisterMcpInput,
+    input: &crate::app::features::mcp::command::RegisterMcpInput,
     mcp_registry: &dyn McpRegistryPort,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
@@ -69,7 +69,7 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::command::RegisterMcpInput;
+    use crate::app::features::mcp::command::RegisterMcpInput;
     use crate::app::event::CoreEvent;
     use crate::app::outcome::CoreEventSink;
     use crate::domain::mcp::McpTransport;

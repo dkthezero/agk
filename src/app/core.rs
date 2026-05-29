@@ -374,7 +374,7 @@ mod tests {
         let core = test_core();
         let mut sink = StubSink;
         let cmd = CoreCommand::CreateProfile {
-            input: crate::app::command::CreateProfileInput::new(
+            input: crate::app::features::profile::command::CreateProfileInput::new(
                 "test-core",
                 "opencode",
                 crate::domain::scope::Scope::Workspace,
@@ -389,7 +389,7 @@ mod tests {
         let core = test_core();
         let mut sink = StubSink;
         let cmd = CoreCommand::AttachVault {
-            input: crate::app::command::AttachVaultInput {
+            input: crate::app::features::vault::command::AttachVaultInput {
                 vault_id: "test".into(),
                 config: crate::domain::config::VaultConfig::Local(
                     crate::domain::config::LocalVaultSource {

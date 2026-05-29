@@ -1,4 +1,4 @@
-use crate::app::command::CreateProfileInput;
+use crate::app::features::profile::command::CreateProfileInput;
 use crate::app::event::{CoreEvent, WorkspaceSnapshot};
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::ConfigStorePort;

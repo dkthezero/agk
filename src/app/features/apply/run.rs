@@ -1,4 +1,4 @@
-use crate::app::command::ApplyConfigInput;
+use crate::app::features::apply::command::ApplyConfigInput;
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{ConfigStorePort, ContextStorePort};
@@ -131,7 +131,7 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::command::ApplyConfigInput;
+    use crate::app::features::apply::command::ApplyConfigInput;
     use crate::app::outcome::CoreEventSink;
     use crate::app::ports::ConfigStorePort;
     use crate::domain::config::{ConfigFile, Profile, VaultConfig};

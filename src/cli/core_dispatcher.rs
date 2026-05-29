@@ -51,7 +51,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 description,
                 no_test,
             } => Ok(CoreCommand::RegisterMcp {
-                input: crate::app::command::RegisterMcpInput {
+                input: crate::app::features::mcp::command::RegisterMcpInput {
                     name: name.clone(),
                     command: command.clone(),
                     args: args
@@ -145,7 +145,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 name,
                 display_name: _display_name,
             } => Ok(CoreCommand::ApplyConfig {
-                input: crate::app::command::ApplyConfigInput::from_url(format!(
+                input: crate::app::features::apply::command::ApplyConfigInput::from_url(format!(
                     "context://{}",
                     name
                 )),
@@ -162,7 +162,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             environment,
             dry_run,
         } => Ok(CoreCommand::ApplyConfig {
-            input: crate::app::command::ApplyConfigInput::from_url(source.clone()),
+            input: crate::app::features::apply::command::ApplyConfigInput::from_url(source.clone()),
             scope: scope.into_domain_scope(),
             environment: environment
                 .as_ref()

@@ -1,5 +1,6 @@
 pub mod attach_mcp;
 pub mod attach_skill;
+pub mod command;
 pub mod create;
 pub mod delete;
 pub mod detach_mcp;
