@@ -1,3 +1,15 @@
+/// Generate a 6-digit numeric suffix based on nanosecond time.
+///
+/// Shared by `session.rs` and `legacy_session.rs` to mint per-session
+/// agent names.
+pub fn random_6_digits() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{:06}", nanos % 1_000_000)
+}
+
 /// Patch frontmatter in an agent markdown to set the correct name and mode.
 pub fn patch_agent_frontmatter(content: &str, agent_name: &str) -> String {
     let lines: Vec<&str> = content.lines().collect();

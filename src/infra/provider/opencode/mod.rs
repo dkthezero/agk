@@ -8,6 +8,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 pub mod config;
+pub mod legacy_session;
 pub mod mcp;
 pub mod session;
 pub mod util;
