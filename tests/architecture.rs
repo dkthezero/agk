@@ -471,14 +471,8 @@ fn file_size_lint() {
 
     // Out-of-scope for ADR-001: widgets, CLI presenter, and legacy asset mod
     // are scheduled for decomposition in follow-up work.
-    let allowlisted: std::collections::HashSet<&str> = [
-        "app/features/asset/mod.rs",
-        "cli/presenter.rs",
-        "cli/entry.rs",
-    ]
-    .iter()
-    .cloned()
-    .collect();
+    let allowlisted: std::collections::HashSet<&str> =
+        ["app/features/asset/mod.rs"].iter().cloned().collect();
 
     for (path, lines) in offenders {
         let relative = path
