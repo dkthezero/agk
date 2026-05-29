@@ -1,0 +1,27 @@
+//! Port traits — the application's boundary contracts.
+//!
+//! One trait per file, grouped by capability. All public traits and types are
+//! re-exported from this module so callers can continue to write
+//! `use crate::app::ports::FooPort` without caring how the file is split.
+
+pub mod config_store;
+pub mod context_store;
+pub mod feature_set;
+pub mod file_opener;
+pub mod manifest_codec;
+pub mod mcp_registry;
+pub mod profile_runtime;
+pub mod provider;
+pub mod telemetry_store;
+pub mod vault;
+
+pub use config_store::ConfigStorePort;
+pub use context_store::ContextStorePort;
+pub use feature_set::FeatureSetPort;
+pub use file_opener::FileOpenerPort;
+pub use manifest_codec::ManifestCodecPort;
+pub use mcp_registry::{McpProvider, McpRegistryPort};
+pub use profile_runtime::{ProfileRuntimePort, ProfileSession};
+pub use provider::{ProviderPort, WizardState, WizardStep};
+pub use telemetry_store::TelemetryStorePort;
+pub use vault::{VaultPort, VaultSearchPort};

@@ -387,7 +387,7 @@ fn is_process_spawn_allowlisted(path: &Path) -> bool {
 
 /// Rule 6: No direct std::process::Command outside infra/process/.
 /// This protects testability and ensures all child-process execution is
-/// funnelled through a `ProcessRunnerPort`.
+/// concentrated in one infra module where it can be audited and replaced.
 #[test]
 #[ignore]
 fn process_spawn_must_be_in_infra_process() {
