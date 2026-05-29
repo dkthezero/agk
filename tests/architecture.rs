@@ -478,7 +478,6 @@ fn file_size_lint() {
         "app/features/asset/mod.rs",
         "cli/presenter.rs",
         "cli/entry.rs",
-        "infra/provider/opencode/session.rs",
     ]
     .iter()
     .cloned()
