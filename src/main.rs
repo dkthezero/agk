@@ -49,47 +49,34 @@ async fn try_main() -> Result<()> {
 
 /// Run the headless CLI path.
 ///
-/// Phase B: Routes through `cli::core_dispatcher::dispatch` first.  If the
-/// dispatcher returns an error signalling "not yet wired", falls back to the
-/// legacy `cli::commands::run` path.  This preserves behaviour while
-/// incrementally wiring commands through `AgkCore`.
+/// All commands are now routed through `AgkCore` via `cli::core_dispatcher`.
 fn run_headless(cli: cli::entry::Cli, workspace: &std::path::Path) -> Result<i32> {
     let (registry, _scan, store) = app::bootstrap::build(workspace.to_path_buf())?;
     let core = build_core(workspace, registry, store)?;
-
-    match cli::core_dispatcher::dispatch(&cli, workspace, &core) {
-        Ok(exit_code) => Ok(exit_code),
-        Err(e) => {
-            let msg = format!("{}", e);
-            if msg.contains("not yet wired") || msg.contains("not yet") {
-                eprintln!(
-                    "[Phase B fallback] Command not yet routed through AgkCore; using legacy path."
-                );
-                cli::commands::run(cli, workspace)
-            } else {
-                Err(e)
-            }
-        }
-    }
+    cli::core_dispatcher::dispatch(&cli, workspace, &core)
 }
 
 /// Run the interactive TUI.
 async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
     let (registry, scan, store) = app::bootstrap::build(workspace.clone())?;
-    let registry_arc = Arc::new(registry);
-    let store_arc: Arc<dyn ConfigStorePort> = Arc::new(store);
+    let core = build_core(&workspace, registry, store)?;
 
-    let mut state = tui::entry::build_state(&registry_arc, store_arc.as_ref(), scan, &workspace);
+    let mut state = tui::entry::build_state(
+        core.registry.as_ref(),
+        core.store.as_ref(),
+        scan,
+        &workspace,
+    );
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
     let file_opener: Arc<dyn app::ports::FileOpenerPort> =
         Arc::new(infra::process::opener::OsFileOpener);
+    let core_arc = Arc::new(core);
     let ctx = tui::event::EventContext {
-        store: store_arc.clone(),
-        registry: registry_arc.clone(),
         tx: tx.clone(),
         workspace_root: workspace.clone(),
         file_opener: file_opener.clone(),
+        core: core_arc,
     };
 
     // Spawn a keyboard input reader that forwards crossterm events into the

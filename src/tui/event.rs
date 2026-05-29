@@ -1,25 +1,19 @@
-use crate::tui::app::{AppState, ListMode};
+use crate::app::command::CoreCommand;
+use crate::app::core::AgkCore;
+use crate::app::event::CoreEvent;
+use crate::tui::app::AppState;
+use crate::tui::list_mode::ListMode;
+use crate::tui::reload::ReloadSnapshot;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
+use std::sync::Arc;
 
 pub enum ControlFlow {
     Continue,
     Quit,
 }
 
-/// Snapshot produced by a background `reload_state` and sent atomically to the
-/// async event loop via `AppEvent::ReloadComplete`.
 #[derive(Debug)]
-pub struct ReloadSnapshot {
-    pub vault_entries: Vec<crate::app::snapshot::VaultEntry>,
-    pub provider_entries: Vec<crate::app::snapshot::ProviderEntry>,
-    pub profile_entries: Vec<crate::app::snapshot::ProfileEntry>,
-    pub packages: std::collections::HashMap<usize, Vec<crate::domain::asset::ScannedPackage>>,
-    pub configs:
-        std::collections::HashMap<crate::domain::scope::Scope, crate::domain::config::ConfigFile>,
-    pub mcp_state: crate::tui::widgets::mcp::McpState,
-}
-
 pub enum AppEvent {
     /// Keyboard events from `crossterm` — matched in runtime_loop.rs but never
     /// constructed because the TUI uses direct crossterm polling instead of the
@@ -42,10 +36,6 @@ pub enum AppEvent {
         error: String,
     },
     TriggerReload,
-    VaultRefreshRequired {
-        id: String,
-        config: crate::domain::config::VaultConfig,
-    },
     ClawHubSearchResults {
         packages: Vec<crate::domain::asset::ScannedPackage>,
         task_id: usize,
@@ -60,20 +50,24 @@ pub enum AppEvent {
         current_dir: std::path::PathBuf,
         profile_name: Option<String>,
     },
+    /// Execute a [`CoreCommand`] through [`AgkCore`] in a blocking task.
+    ExecuteCommand(CoreCommand),
+    /// A [`CoreEvent`] emitted by [`AgkCore`] back to the TUI.
+    CoreEvent(CoreEvent),
 }
 
 pub struct EventContext {
-    pub store: Arc<dyn crate::app::ports::ConfigStorePort>,
-    pub registry: Arc<crate::app::registry::Registry>,
     pub tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
     pub workspace_root: std::path::PathBuf,
     pub file_opener: Arc<dyn crate::app::ports::FileOpenerPort>,
+    /// Reference to the shared [`AgkCore`] façade so controllers can dispatch
+    /// commands and the runtime loop can execute them.
+    pub core: Arc<AgkCore>,
 }
 
-use std::sync::Arc;
-
 fn is_clawhub_active(ctx: &EventContext) -> bool {
-    ctx.store
+    ctx.core
+        .store
         .load(crate::domain::scope::Scope::Global)
         .map(|c| c.vaults.contains(&"clawhub".to_string()))
         .unwrap_or(false)
@@ -335,17 +329,11 @@ mod tests {
         state.tab_kinds = vec![crate::app::tab_kind::TabKind::Asset];
 
         let (tx, _) = tokio::sync::mpsc::unbounded_channel();
-        let registry = Arc::new(crate::app::registry::Registry::new());
-        let store = Arc::new(crate::infra::config::toml_store::TomlConfigStore::new(
-            std::path::PathBuf::from("g"),
-            std::path::PathBuf::from("w"),
-        ));
         let ctx = EventContext {
-            store,
-            registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
             file_opener: stub_opener(),
+            core: Arc::new(crate::app::core::test_core()),
         };
 
         let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
@@ -361,17 +349,11 @@ mod tests {
         let mut state = empty_state(1);
         state.esc_pressed_once = true;
         let (tx, _) = tokio::sync::mpsc::unbounded_channel();
-        let registry = Arc::new(crate::app::registry::Registry::new());
-        let store = Arc::new(crate::infra::config::toml_store::TomlConfigStore::new(
-            std::path::PathBuf::from("g"),
-            std::path::PathBuf::from("w"),
-        ));
         let ctx = EventContext {
-            store,
-            registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
             file_opener: stub_opener(),
+            core: Arc::new(crate::app::core::test_core()),
         };
 
         let event = crossterm::event::Event::Key(crossterm::event::KeyEvent::new(

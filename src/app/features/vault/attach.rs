@@ -7,12 +7,38 @@ use anyhow::Result;
 /// Attach a vault definition to the global config.
 ///
 /// Phase 3: Uses [`ConfigStorePort`] only — no direct filesystem access.
+/// For ClawHub vaults, verifies the CLI is available and attempts
+/// Homebrew installation when missing.
 pub fn run(
     vault_id: String,
     vault_config: VaultConfig,
     store: &dyn ConfigStorePort,
-    _sink: &mut dyn CoreEventSink,
+    sink: &mut dyn CoreEventSink,
 ) -> Result<()> {
+    // ClawHub auto-install: if the CLI is missing and Homebrew is present,
+    // install automatically before attaching.
+    if matches!(vault_config, VaultConfig::Clawhub(_))
+        && !crate::infra::vault::clawhub::is_cli_available()
+    {
+        if crate::infra::vault::clawhub::is_homebrew_available() {
+            sink.on_event(crate::app::event::CoreEvent::Info(
+                "ClawHub CLI not found — installing via Homebrew...".to_string(),
+            ));
+            if let Err(e) = crate::infra::vault::clawhub::install_cli_via_homebrew() {
+                anyhow::bail!(
+                    "ClawHub CLI is required but installation failed: {}. \
+                     Install manually from https://clawhub.ai",
+                    e
+                );
+            }
+        } else {
+            anyhow::bail!(
+                "ClawHub CLI not found and Homebrew is unavailable. \
+                 Install manually from https://clawhub.ai"
+            );
+        }
+    }
+
     let mut config = store.load(Scope::Global)?;
     if !config.vaults.contains(&vault_id) {
         config.vaults.push(vault_id.clone());
@@ -20,6 +46,7 @@ pub fn run(
     let section = config.vault_defs.entry(vault_id.clone()).or_default();
     section.vault = Some(vault_config);
     store.save(Scope::Global, &config)?;
+    sink.on_event(crate::app::event::CoreEvent::VaultAttached(vault_id));
     Ok(())
 }
 

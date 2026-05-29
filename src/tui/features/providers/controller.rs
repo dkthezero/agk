@@ -1,5 +1,7 @@
-use crate::tui::app::{AppState, ListMode};
+use crate::app::command::CoreCommand;
+use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, ControlFlow, EventContext};
+use crate::tui::list_mode::ListMode;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
@@ -34,14 +36,21 @@ pub fn handle_select_provider_root(
             } = &state.list_mode
             {
                 let chosen = options[*selected].0.clone();
+                let provider_id = provider_id.clone();
                 let mut config = state.active_config().clone();
                 config.provider_roots.insert(provider_id.clone(), chosen);
                 let scope = state.active_scope;
-                match ctx.store.save(scope, &config) {
+                match ctx.core.store.save(scope, &config) {
                     Ok(()) => {
                         state.configs.insert(scope, config);
                         state.list_mode = ListMode::Normal;
-                        return toggle_provider(state, ctx);
+                        let _ =
+                            ctx.tx
+                                .send(AppEvent::ExecuteCommand(CoreCommand::ActivateProvider {
+                                    id: provider_id,
+                                    scope,
+                                }));
+                        return Ok(ControlFlow::Continue);
                     }
                     Err(e) => {
                         state.status_line = format!("Failed to save config: {}", e);
@@ -66,89 +75,12 @@ pub fn handle_deactivate_last_provider_confirm(
 ) -> Result<ControlFlow> {
     let provider_id = std::mem::take(&mut state.pending_deactivate_provider_id);
     state.list_mode = ListMode::Normal;
-
-    let scope = state.active_scope;
-    let store = ctx.store.clone();
-    let tx = ctx.tx.clone();
-    let registry = ctx.registry.clone();
-
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    tokio::task::spawn_blocking(move || {
-        let _ = tx.send(AppEvent::TaskStarted {
-            id,
-            name: format!("Deactivating '{}'", provider_id),
-        });
-
-        let mut config = store.load(scope).unwrap_or_default();
-        if !config.providers.contains(&provider_id) {
-            let _ = tx.send(AppEvent::TaskFailed {
-                id,
-                error: "Provider already deactivated".into(),
-            });
-            return;
-        }
-
-        if let Ok(provider) = registry.get_provider(&provider_id) {
-            config.providers.retain(|p| p != &provider_id);
-            config.provider_roots.remove(&provider_id);
-
-            for section in config.vault_defs.values() {
-                if let Some(ref skills) = section.skills {
-                    for item in &skills.items {
-                        if let Some(identity) = crate::domain::config::parse_identity(item) {
-                            let _ = provider.remove(
-                                &identity,
-                                &crate::domain::asset::AssetKind::Skill,
-                                scope,
-                                Some(&config),
-                            );
-                        }
-                    }
-                }
-                if let Some(ref instructions) = section.instructions {
-                    for item in &instructions.items {
-                        if let Some(identity) = crate::domain::config::parse_identity(item) {
-                            let _ = provider.remove(
-                                &identity,
-                                &crate::domain::asset::AssetKind::Instruction,
-                                scope,
-                                Some(&config),
-                            );
-                        }
-                    }
-                }
-            }
-
-            for section in config.vault_defs.values_mut() {
-                if let Some(ref mut b) = section.skills {
-                    b.items.clear();
-                }
-                if let Some(ref mut b) = section.instructions {
-                    b.items.clear();
-                }
-            }
-            crate::app::features::common::prune_empty_vault_defs(&mut config);
-
-            if config == crate::domain::config::ConfigFile::default() {
-                if let Err(e) = store.delete_file(scope) {
-                    let _ = tx.send(AppEvent::TaskFailed {
-                        id,
-                        error: format!("Failed to delete empty config file: {}", e),
-                    });
-                    return;
-                }
-            } else {
-                let _ = store.save(scope, &config);
-            }
-        }
-
-        let _ = tx.send(AppEvent::TriggerReload);
-        let _ = tx.send(AppEvent::TaskCompleted {
-            id,
-            message: format!("Deactivated '{}'", provider_id),
-        });
-    });
-
+    let _ = ctx
+        .tx
+        .send(AppEvent::ExecuteCommand(CoreCommand::DeactivateProvider {
+            id: provider_id,
+            scope: state.active_scope,
+        }));
     Ok(ControlFlow::Continue)
 }
 
@@ -161,7 +93,12 @@ pub fn handle_deactivate_last_provider_cancel(state: &mut AppState) -> Result<Co
 
 pub fn handle_space_provider(state: &mut AppState, ctx: &EventContext) -> Result<()> {
     if let Some(entry) = state.provider_entries.get(state.selected_index) {
-        let provider = ctx.registry.providers.iter().find(|p| p.id() == entry.id);
+        let provider = ctx
+            .core
+            .registry
+            .providers
+            .iter()
+            .find(|p| p.id() == entry.id);
         if let Some(p) = provider {
             if !entry.active && state.active_scope == crate::domain::scope::Scope::Workspace {
                 let roots = p.available_config_roots();
@@ -184,20 +121,7 @@ pub fn toggle_provider(state: &mut AppState, ctx: &EventContext) -> Result<Contr
     if let Some(p) = state.provider_entries.get(state.selected_index) {
         let provider_id = p.id.clone();
         let scope = state.active_scope;
-        let store = ctx.store.clone();
-        let tx = ctx.tx.clone();
-        let registry = ctx.registry.clone();
-
-        let mut installed_pkgs = Vec::new();
-        for tab_pkgs in state.packages.values() {
-            for pkg in tab_pkgs {
-                if state.is_installed(&pkg.vault_id, &pkg.identity.name, &pkg.kind) {
-                    installed_pkgs.push(pkg.clone());
-                }
-            }
-        }
-
-        let config = store.load(scope).unwrap_or_default();
+        let config = state.active_config().clone();
         let is_last_provider =
             config.providers.len() == 1 && config.providers.contains(&provider_id);
         let has_installed_assets = config.vault_defs.values().any(|section| {
@@ -220,84 +144,18 @@ pub fn toggle_provider(state: &mut AppState, ctx: &EventContext) -> Result<Contr
             return Ok(ControlFlow::Continue);
         }
 
-        let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        tokio::task::spawn_blocking(move || {
-            let mut config = store.load(scope).unwrap_or_default();
-            if config.providers.contains(&provider_id) {
-                let _ = tx.send(AppEvent::TaskStarted {
-                    id,
-                    name: "Deactivating Provider".into(),
-                });
-                let total = installed_pkgs.len();
-                if let Ok(provider) = registry.get_provider(&provider_id) {
-                    config.providers.retain(|p| p != &provider_id);
-                    config.provider_roots.remove(&provider_id);
-
-                    for (i, pkg) in installed_pkgs.iter().enumerate() {
-                        let _ = provider.remove(&pkg.identity, &pkg.kind, scope, Some(&config));
-                        let percent = (((i + 1) as f32 / total.max(1) as f32) * 100.0) as u8;
-                        let _ = tx.send(AppEvent::TaskProgress { id, percent });
-                    }
-
-                    if config.providers.is_empty() {
-                        for section in config.vault_defs.values_mut() {
-                            if let Some(ref mut b) = section.skills {
-                                b.items.clear();
-                            }
-                            if let Some(ref mut b) = section.instructions {
-                                b.items.clear();
-                            }
-                        }
-                        crate::app::features::common::prune_empty_vault_defs(&mut config);
-
-                        if config == crate::domain::config::ConfigFile::default() {
-                            if let Err(e) = store.delete_file(scope) {
-                                let _ = tx.send(AppEvent::TaskFailed {
-                                    id,
-                                    error: format!("Failed to delete empty config file: {}", e),
-                                });
-                                return;
-                            }
-                        } else {
-                            let _ = store.save(scope, &config);
-                        }
-                    } else {
-                        let _ = store.save(scope, &config);
-                    }
-                }
-                let _ = tx.send(AppEvent::TriggerReload);
-                let _ = tx.send(AppEvent::TaskCompleted {
-                    id,
-                    message: format!("Deactivated '{}'", provider_id),
-                });
-            } else {
-                let _ = tx.send(AppEvent::TaskStarted {
-                    id,
-                    name: "Activating Provider".into(),
-                });
-                let total = installed_pkgs.len();
-                if let Ok(provider) = registry.get_provider(&provider_id) {
-                    config.providers.push(provider_id.clone());
-                    let _ = store.save(scope, &config);
-
-                    for (i, pkg) in installed_pkgs.iter().enumerate() {
-                        let _ = crate::app::features::asset::install::install_asset(
-                            scope,
-                            pkg,
-                            store.as_ref(),
-                            provider,
-                        );
-                        let percent = (((i + 1) as f32 / total.max(1) as f32) * 100.0) as u8;
-                        let _ = tx.send(AppEvent::TaskProgress { id, percent });
-                    }
-                }
-                let _ = tx.send(AppEvent::TriggerReload);
-                let _ = tx.send(AppEvent::TaskCompleted {
-                    id,
-                    message: format!("Activated '{}'", provider_id),
-                });
+        let cmd = if config.providers.contains(&provider_id) {
+            CoreCommand::DeactivateProvider {
+                id: provider_id,
+                scope,
             }
-        });
+        } else {
+            CoreCommand::ActivateProvider {
+                id: provider_id,
+                scope,
+            }
+        };
+        let _ = ctx.tx.send(AppEvent::ExecuteCommand(cmd));
     }
     Ok(ControlFlow::Continue)
 }
@@ -413,18 +271,17 @@ mod tests {
         );
         state.configs.insert(Scope::Workspace, config.clone());
 
-        let (tx, _) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let mut registry = crate::app::registry::Registry::new();
         registry.register_provider(Box::new(FakeProvider { id: "fake".into() }));
         let registry = Arc::new(registry);
 
         let store = Arc::new(FakeStore::new(config));
         let ctx = EventContext {
-            store,
-            registry,
             tx,
             workspace_root: std::path::PathBuf::from("."),
             file_opener: Arc::new(StubFileOpener),
+            core: Arc::new(crate::app::core::test_core_with(store, registry)),
         };
 
         let res = toggle_provider(&mut state, &ctx).unwrap();

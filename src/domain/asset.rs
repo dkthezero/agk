@@ -8,6 +8,13 @@ pub enum AssetKind {
     McpServer,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PackTarget {
+    ClaudeDesktop,
+    Firebender,
+    Tarball,
+}
+
 /// Metadata from ClawHub for remote packages.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RemoteMetadata {

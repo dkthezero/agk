@@ -1,0 +1,175 @@
+use crate::tui::app::AppState;
+
+/// Apply a [`CoreEvent`] to the TUI [`AppState`].
+///
+/// Task events mirror the existing [`AppEvent`] task arms.
+/// Other events update the status line; detailed controller-specific state
+/// mutations happen in Commit 9.
+pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEvent) {
+    use crate::app::event::CoreEvent;
+    match event {
+        CoreEvent::TaskStarted { id, name } => {
+            state.latest_task_id = Some(*id);
+            state.active_tasks.insert(
+                *id,
+                crate::tui::progress::Progress {
+                    name: name.clone(),
+                    status: crate::tui::progress::ProgressStatus::Starting,
+                },
+            );
+        }
+        CoreEvent::TaskProgress { id, percent } => {
+            if let Some(task) = state.active_tasks.get_mut(id) {
+                task.status = crate::tui::progress::ProgressStatus::Running(*percent);
+            }
+        }
+        CoreEvent::TaskCompleted { id, message } => {
+            state.active_tasks.remove(id);
+            state.status_line = message.clone();
+        }
+        CoreEvent::TaskFailed { id, error } => {
+            state.active_tasks.remove(id);
+            state.status_line = format!("Error: {}", error);
+        }
+        CoreEvent::ProfileCreated(id) => {
+            state.status_line = format!("Profile '{}' created", id.as_str());
+        }
+        CoreEvent::ProfileUpdated(id) => {
+            state.status_line = format!("Profile '{}' updated", id.as_str());
+        }
+        CoreEvent::ProfileDeleted(id) => {
+            state.status_line = format!("Profile '{}' deleted", id.as_str());
+        }
+        CoreEvent::ProfileValidated { id, valid, message } => {
+            state.status_line = format!(
+                "Profile '{}' validation: {} ({})",
+                id.as_str(),
+                if *valid { "pass" } else { "fail" },
+                message
+            );
+        }
+        CoreEvent::ProfileLaunchPlan { id, .. } => {
+            state.status_line = format!("Launch plan ready for '{}'", id.as_str());
+        }
+        CoreEvent::ProfileSessionStarted { id, .. } => {
+            state.status_line = format!("Session started for '{}'", id.as_str());
+        }
+        CoreEvent::ProfileSessionFinished { id, .. } => {
+            state.status_line = format!("Session finished for '{}'", id.as_str());
+        }
+        CoreEvent::VaultAttached(id) => {
+            state.status_line = format!("Vault '{}' attached", id);
+        }
+        CoreEvent::VaultDetached(id) => {
+            state.status_line = format!("Vault '{}' detached", id);
+        }
+        CoreEvent::VaultRefreshed(id) => {
+            state.status_line = format!("Vault '{}' refreshed", id);
+        }
+        CoreEvent::ProviderActivated(id) => {
+            state.status_line = format!("Provider '{}' activated", id);
+        }
+        CoreEvent::ProviderDeactivated(id) => {
+            state.status_line = format!("Provider '{}' deactivated", id);
+        }
+        CoreEvent::McpRegistered(name) => {
+            state.status_line = format!("MCP '{}' registered", name);
+            state.mcp_state.refresh();
+        }
+        CoreEvent::McpEnabled { name, provider_id } => {
+            state.status_line = format!("MCP '{}' enabled for {}", name, provider_id);
+            state.mcp_state.refresh();
+        }
+        CoreEvent::McpDisabled { name, provider_id } => {
+            state.status_line = format!("MCP '{}' disabled for {}", name, provider_id);
+            state.mcp_state.refresh();
+        }
+        CoreEvent::McpListed(servers) => {
+            state.mcp_state.registry.servers = servers
+                .iter()
+                .map(|s| (s.name.clone(), s.clone()))
+                .collect();
+            state.status_line = format!("{} MCP servers listed", servers.len());
+        }
+        CoreEvent::McpTested {
+            name,
+            healthy,
+            message,
+        } => {
+            state.status_line = format!(
+                "MCP '{}' test: {} ({})",
+                name,
+                message,
+                if *healthy { "healthy" } else { "unhealthy" }
+            );
+        }
+        CoreEvent::AssetInstalled { identity, .. } => {
+            state.status_line = format!("Asset '{}' installed", identity);
+        }
+        CoreEvent::AssetRemoved { identity } => {
+            state.status_line = format!("Asset '{}' removed", identity);
+        }
+        CoreEvent::AssetUpdated { identity } => {
+            state.status_line = format!("Asset '{}' updated", identity);
+        }
+        CoreEvent::SyncComplete {
+            updated,
+            skipped,
+            errors,
+        } => {
+            state.status_line = format!(
+                "Sync: {} updated, {} skipped, {} errors",
+                updated.len(),
+                skipped.len(),
+                errors.len()
+            );
+        }
+        CoreEvent::RemoteVaultSearchResults { vault_id, packages } => {
+            state.remote_packages = packages.clone();
+            state.status_line = format!("Found {} packages in {}", packages.len(), vault_id);
+        }
+        CoreEvent::ValidationReport { passed, message } => {
+            state.status_line = format!(
+                "Validation {}: {}",
+                if *passed { "passed" } else { "failed" },
+                message
+            );
+        }
+        CoreEvent::TelemetryEnabled => {
+            state.analytics_config.settings.enabled = true;
+            state.status_line = "Telemetry enabled".to_string();
+        }
+        CoreEvent::TelemetryDisabled => {
+            state.analytics_config.settings.enabled = false;
+            state.status_line = "Telemetry disabled".to_string();
+        }
+        CoreEvent::TelemetryStatusReport(status) => {
+            state.analytics_config.settings.enabled = status.enabled;
+            state.status_line = format!(
+                "Telemetry: {} | Skills: {} | Last scan: {}",
+                if status.enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                status.skills_tracked,
+                status.last_scan.as_deref().unwrap_or("never")
+            );
+        }
+        CoreEvent::TelemetryExported { output_path, .. } => {
+            state.status_line = match output_path {
+                Some(p) => format!("Telemetry exported to {}", p),
+                None => "Telemetry exported to stdout".to_string(),
+            };
+        }
+        CoreEvent::Info(msg) => {
+            state.status_line = msg.clone();
+        }
+        CoreEvent::Error(msg) => {
+            state.status_line = format!("Error: {}", msg);
+        }
+        CoreEvent::WorkspaceLoaded(_) => {
+            state.status_line = "Workspace loaded".to_string();
+        }
+    }
+}

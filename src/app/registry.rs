@@ -35,6 +35,50 @@ impl Registry {
         }
         anyhow::bail!("Provider {} not found", id)
     }
+
+    /// Find a package by its full identity string (e.g. "vault/name:version" or "name").
+    pub fn find_package_by_identity(
+        &self,
+        identity_str: &str,
+    ) -> anyhow::Result<Option<crate::domain::asset::ScannedPackage>> {
+        let parts: Vec<&str> = identity_str.split('/').collect();
+        let (vault_hint, name_part) = if parts.len() == 2 {
+            (Some(parts[0]), parts[1])
+        } else {
+            (None, identity_str)
+        };
+
+        let name = name_part.split(':').next().unwrap_or(name_part);
+
+        for vault in &self.vaults {
+            if let Some(hint) = vault_hint {
+                if vault.id() != hint {
+                    continue;
+                }
+            }
+            for feature in &self.feature_sets {
+                let pkgs = vault.list_packages(feature.as_ref())?;
+                for pkg in pkgs {
+                    if pkg.identity.name == name {
+                        return Ok(Some(pkg));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Return all active providers that are listed in the given config.
+    pub fn active_providers_from_config(
+        &self,
+        config: &crate::domain::config::ConfigFile,
+    ) -> Vec<&dyn ProviderPort> {
+        self.providers
+            .iter()
+            .filter(|p| config.providers.contains(&p.id().to_string()))
+            .map(|p| p.as_ref())
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -62,7 +62,7 @@ pub fn install_provider(
 mod tests {
     use super::*;
     use crate::domain::asset::{AssetKind, ScannedPackage};
-    use crate::domain::config::{ConfigFile, Profile, VaultSection};
+    use crate::domain::config::ConfigFile;
     use crate::domain::identity::AssetIdentity;
     use std::collections::HashMap;
     use std::sync::Mutex;

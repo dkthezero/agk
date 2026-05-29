@@ -1,5 +1,6 @@
-use crate::tui::app::{AppState, ListMode};
-use crate::tui::event::{ControlFlow, EventContext};
+use crate::tui::app::AppState;
+use crate::tui::event::{AppEvent, ControlFlow, EventContext};
+use crate::tui::list_mode::ListMode;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
@@ -73,12 +74,9 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
     match code {
         KeyCode::F(5) => crate::tui::features::assets::controller::handle_f5_update_all(state, ctx),
         KeyCode::F(4) => {
-            let tx = ctx.tx.clone();
-            let registry = ctx.registry.clone();
-            tokio::spawn(async move {
-                let _ = crate::tui::features::common::actions::refresh_all_vaults(registry, tx, "")
-                    .await;
-            });
+            let _ = ctx.tx.send(AppEvent::ExecuteCommand(
+                crate::app::command::CoreCommand::RefreshAllVaults,
+            ));
             Ok(())
         }
         KeyCode::F(2) => {

@@ -1,5 +1,6 @@
 use crate::app::ports::WizardStep;
-use crate::tui::app::{AppState, ListMode};
+use crate::tui::app::AppState;
+use crate::tui::list_mode::ListMode;
 use crate::tui::widgets::modal;
 use ratatui::Frame;
 

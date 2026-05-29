@@ -2,49 +2,9 @@ use crate::app::tab_kind::TabKind;
 use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::config::{AssetKey, ConfigFile};
 use crate::domain::scope::Scope;
+use crate::tui::list_mode::ListMode;
+use crate::tui::progress::{Progress, ProgressStatus};
 use std::collections::{HashMap, HashSet};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ListMode {
-    Normal,
-    Searching,
-    AttachVault,
-    AttachVaultBranch,
-    AttachVaultPath,
-    AttachVaultName,
-    ConfirmDetachVault,
-    ConfirmClawHubInstall,
-    ConfirmDeactivateLastProvider,
-    /// MCP server registration modal sub-steps
-    RegisterMcpStepName,
-    RegisterMcpStepCommand,
-    RegisterMcpStepArgs,
-    RegisterMcpStepTransport,
-    RegisterMcpStepDescription,
-    ConfirmMcpTest,
-    SelectProviderRoot {
-        provider_id: String,
-        options: Vec<(String, String)>,
-        selected: usize,
-    },
-    /// Profile creation wizard (provider-specific step stack)
-    ProfileWizard,
-    ConfirmDeleteProfile,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ProgressStatus {
-    Starting,
-    Running(u8),
-}
-
-#[derive(Clone, Debug)]
-pub struct Progress {
-    pub name: String,
-    pub status: ProgressStatus,
-}
-
-pub static NEXT_TASK_ID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
 pub struct AppState {
     pub active_tab: usize,

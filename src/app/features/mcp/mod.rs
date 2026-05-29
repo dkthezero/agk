@@ -4,6 +4,7 @@ pub mod enable;
 pub mod list;
 pub mod register;
 pub mod test;
+pub mod toggle;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -24,20 +25,29 @@ pub fn dispatch(
             ref name,
             ref provider_id,
             scope,
-        } => {
-            Some(enable::run(name, provider_id, *scope, core.mcp_registry.as_ref(), sink))
-        }
+        } => Some(enable::run(
+            name,
+            provider_id,
+            *scope,
+            core.mcp_registry.as_ref(),
+            sink,
+        )),
         CoreCommand::DisableMcp {
             ref name,
             ref provider_id,
             scope,
-        } => {
-            Some(disable::run(name, provider_id, *scope, core.mcp_registry.as_ref(), sink))
-        }
+        } => Some(disable::run(
+            name,
+            provider_id,
+            *scope,
+            core.mcp_registry.as_ref(),
+            sink,
+        )),
         CoreCommand::ListMcp => Some(list::run(core.mcp_registry.as_ref(), sink)),
         CoreCommand::TestMcp { ref name } => {
             Some(test::run(name, core.mcp_registry.as_ref(), sink))
         }
+        CoreCommand::ToggleMcp { ref name, scope } => Some(toggle::run(name, *scope, core, sink)),
         _ => None,
     }
 }

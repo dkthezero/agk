@@ -1,3 +1,6 @@
+use crate::app::command::CoreCommand;
+use crate::app::core::AgkCore;
+use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::domain::config::ConfigFile;
 
 /// Remove empty vault sections / asset buckets so the TOML stays clean.
@@ -16,6 +19,40 @@ pub fn prune_empty_vault_defs(config: &mut ConfigFile) {
             .unwrap_or(false);
         has_vault || has_skills || has_instructions
     });
+}
+
+/// Dispatch common/workspace-related [`CoreCommand`] variants.
+/// Returns `Some(result)` if the command was handled, `None` otherwise.
+pub fn dispatch(
+    cmd: &CoreCommand,
+    core: &AgkCore,
+    sink: &mut dyn CoreEventSink,
+) -> Option<CoreResult> {
+    match cmd {
+        CoreCommand::CleanWorkspace { global } => {
+            let dir = if *global {
+                crate::domain::paths::global_config_root()
+            } else {
+                core.workspace_root.join(".agk")
+            };
+            if dir.exists() {
+                if let Err(e) = std::fs::remove_dir_all(&dir) {
+                    return Some(Err(e.into()));
+                }
+                sink.on_event(crate::app::event::CoreEvent::Info(format!(
+                    "Cleaned up {}",
+                    dir.display()
+                )));
+            } else {
+                sink.on_event(crate::app::event::CoreEvent::Info(format!(
+                    "Nothing to clean at {}",
+                    dir.display()
+                )));
+            }
+            Some(Ok(CoreOutcome::Ok))
+        }
+        _ => None,
+    }
 }
 
 #[cfg(test)]

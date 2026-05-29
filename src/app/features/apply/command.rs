@@ -26,11 +26,7 @@ impl ApplyConfigInput {
         }
     }
 
-    pub fn with_vault(
-        mut self,
-        id: impl Into<String>,
-        config: VaultConfig,
-    ) -> Self {
+    pub fn with_vault(mut self, id: impl Into<String>, config: VaultConfig) -> Self {
         self.vaults.push(ApplyVault {
             id: id.into(),
             config,

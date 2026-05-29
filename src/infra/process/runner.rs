@@ -24,7 +24,9 @@ impl ProcessRunnerPort for OsProcessRunner {
                 cmd.env(k, v);
             }
         }
-        let output = cmd.output().with_context(|| format!("Failed to spawn {}", command))?;
+        let output = cmd
+            .output()
+            .with_context(|| format!("Failed to spawn {}", command))?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             anyhow::bail!(

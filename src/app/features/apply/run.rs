@@ -1,5 +1,5 @@
-use crate::app::features::apply::command::ApplyConfigInput;
 use crate::app::event::CoreEvent;
+use crate::app::features::apply::command::ApplyConfigInput;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{ConfigStorePort, ContextStorePort};
 use crate::domain::context::{ContextConfig, ContextId};
@@ -83,9 +83,11 @@ pub fn run(
     for vault in &input.vaults {
         if scope == Scope::Global {
             if !dry_run {
-                if let Err(e) =
-                    crate::app::features::asset::sync::attach_vault(vault.id.clone(), vault.config.clone(), store)
-                {
+                if let Err(e) = crate::app::features::asset::sync::attach_vault(
+                    vault.id.clone(),
+                    vault.config.clone(),
+                    store,
+                ) {
                     sink.on_error(format!("Failed to attach vault '{}': {}", vault.id, e));
                     continue;
                 }

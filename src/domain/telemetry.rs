@@ -1,6 +1,21 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Target format for telemetry data export.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TelemetryExportFormat {
+    Json,
+    Csv,
+}
+
+/// Snapshot of telemetry scanner state suitable for event emission.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TelemetryStatus {
+    pub enabled: bool,
+    pub skills_tracked: usize,
+    pub last_scan: Option<String>,
+}
+
 /// Telemetry configuration and data stored in ~/.config/agk/analytics.toml
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AnalyticsConfig {

@@ -62,9 +62,14 @@ pub enum CoreCommand {
         vault_id: String,
         scope: crate::domain::scope::Scope,
     },
+    AttachBareVault {
+        vault_id: String,
+        scope: crate::domain::scope::Scope,
+    },
     RefreshVault {
         vault_id: String,
     },
+    RefreshAllVaults,
 
     // -----------------------------------------------------------------------
     // Provider commands
@@ -95,7 +100,13 @@ pub enum CoreCommand {
         scope: crate::domain::scope::Scope,
     },
     ListMcp,
-    TestMcp { name: String },
+    TestMcp {
+        name: String,
+    },
+    ToggleMcp {
+        name: String,
+        scope: crate::domain::scope::Scope,
+    },
 
     // -----------------------------------------------------------------------
     // Asset commands
@@ -120,6 +131,15 @@ pub enum CoreCommand {
     SyncAssets {
         scope: crate::domain::scope::Scope,
         dry_run: bool,
+    },
+    ValidateAssets {
+        scope: crate::domain::scope::Scope,
+    },
+    PackAsset {
+        identity: String,
+        target: crate::domain::asset::PackTarget,
+        stdout: bool,
+        scope: crate::domain::scope::Scope,
     },
     SearchRemoteVault {
         vault_id: String,
@@ -147,8 +167,22 @@ pub enum CoreCommand {
     },
 
     // -----------------------------------------------------------------------
+    // Telemetry commands
+    // -----------------------------------------------------------------------
+    EnableTelemetry,
+    DisableTelemetry,
+    TelemetryStatus,
+    ExportTelemetry {
+        format: crate::domain::telemetry::TelemetryExportFormat,
+        output_path: Option<String>,
+    },
+
+    // -----------------------------------------------------------------------
     // Workspace commands
     // -----------------------------------------------------------------------
+    CleanWorkspace {
+        global: bool,
+    },
     LoadWorkspaceSnapshot {
         scope: crate::domain::scope::Scope,
     },

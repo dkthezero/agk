@@ -19,65 +19,59 @@ pub fn dispatch(
     sink: &mut dyn CoreEventSink,
 ) -> Option<CoreResult> {
     match cmd {
-        CoreCommand::CreateProfile { ref input } => {
-            Some(create::run(
-                input,
-                core.store.as_ref(),
-                core.process_runner.as_ref(),
-                core.registry.as_ref(),
-                &core.workspace_root,
-                sink,
-            ))
-        }
-        CoreCommand::StartProfile { id, scope, dry_run } => {
-            Some(start::run(
-                id,
-                *scope,
-                *dry_run,
-                core.store.as_ref(),
-                &core.runtime_ports,
-                sink,
-            ))
-        }
+        CoreCommand::CreateProfile { ref input } => Some(create::run(
+            input,
+            core.store.as_ref(),
+            core.process_runner.as_ref(),
+            core.registry.as_ref(),
+            &core.workspace_root,
+            sink,
+        )),
+        CoreCommand::StartProfile { id, scope, dry_run } => Some(start::run(
+            id,
+            *scope,
+            *dry_run,
+            core.store.as_ref(),
+            &core.runtime_ports,
+            sink,
+        )),
         CoreCommand::DeleteProfile { id, scope } => {
             Some(delete::run(id, *scope, core.store.as_ref(), sink))
         }
-        CoreCommand::AttachSkillToProfile { profile_id, skill_id } => {
-            Some(attach_skill::run(
-                profile_id,
-                skill_id,
-                crate::domain::scope::Scope::Workspace,
-                core.store.as_ref(),
-                sink,
-            ))
-        }
-        CoreCommand::DetachSkillFromProfile { profile_id, skill_id } => {
-            Some(detach_skill::run(
-                profile_id,
-                skill_id,
-                crate::domain::scope::Scope::Workspace,
-                core.store.as_ref(),
-                sink,
-            ))
-        }
-        CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => {
-            Some(attach_mcp::run(
-                profile_id,
-                mcp_id,
-                crate::domain::scope::Scope::Workspace,
-                core.store.as_ref(),
-                sink,
-            ))
-        }
-        CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => {
-            Some(detach_mcp::run(
-                profile_id,
-                mcp_id,
-                crate::domain::scope::Scope::Workspace,
-                core.store.as_ref(),
-                sink,
-            ))
-        }
+        CoreCommand::AttachSkillToProfile {
+            profile_id,
+            skill_id,
+        } => Some(attach_skill::run(
+            profile_id,
+            skill_id,
+            crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            sink,
+        )),
+        CoreCommand::DetachSkillFromProfile {
+            profile_id,
+            skill_id,
+        } => Some(detach_skill::run(
+            profile_id,
+            skill_id,
+            crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            sink,
+        )),
+        CoreCommand::AttachMcpToProfile { profile_id, mcp_id } => Some(attach_mcp::run(
+            profile_id,
+            mcp_id,
+            crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            sink,
+        )),
+        CoreCommand::DetachMcpFromProfile { profile_id, mcp_id } => Some(detach_mcp::run(
+            profile_id,
+            mcp_id,
+            crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            sink,
+        )),
         _ => None,
     }
 }

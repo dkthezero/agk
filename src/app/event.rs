@@ -116,6 +116,17 @@ pub enum CoreEvent {
     },
 
     // -----------------------------------------------------------------------
+    // Telemetry
+    // -----------------------------------------------------------------------
+    TelemetryEnabled,
+    TelemetryDisabled,
+    TelemetryStatusReport(crate::domain::telemetry::TelemetryStatus),
+    TelemetryExported {
+        content: String,
+        output_path: Option<String>,
+    },
+
+    // -----------------------------------------------------------------------
     // General info
     // -----------------------------------------------------------------------
     Info(String),

@@ -69,8 +69,8 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::features::mcp::command::RegisterMcpInput;
     use crate::app::event::CoreEvent;
+    use crate::app::features::mcp::command::RegisterMcpInput;
     use crate::app::outcome::CoreEventSink;
     use crate::domain::mcp::McpTransport;
     use crate::domain::scope::Scope;

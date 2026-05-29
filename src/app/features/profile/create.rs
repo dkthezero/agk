@@ -91,12 +91,7 @@ pub fn run(
             args.push(&desc_arg);
         }
 
-        let _output = process_runner.run(
-            "opencode",
-            &args,
-            Some(workspace),
-            None,
-        )?;
+        let _output = process_runner.run("opencode", &args, Some(workspace), None)?;
 
         // If process_runner returns stdout on success, we continue.
         // The generated markdown may be in .opencode/agents/<name>.md

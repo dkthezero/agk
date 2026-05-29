@@ -39,7 +39,7 @@ pub fn remove_asset(
 mod tests {
     use super::*;
     use crate::domain::asset::{AssetKind, ScannedPackage};
-    use crate::domain::config::{AssetBucket, ConfigFile, Profile, VaultSection};
+    use crate::domain::config::{AssetBucket, ConfigFile, VaultSection};
     use crate::domain::identity::AssetIdentity;
     use std::collections::HashMap;
     use std::sync::Mutex;

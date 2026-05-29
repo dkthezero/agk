@@ -18,18 +18,19 @@ use std::sync::Arc;
 /// - It emits facts back via [`CoreEventSink`] so adapters can render outcomes.
 #[derive(Clone)]
 pub struct AgkCore {
-    pub(crate) store: Arc<dyn ConfigStorePort>,
-    pub(crate) context_store: Arc<dyn ContextStorePort>,
-    pub(crate) mcp_registry: Arc<dyn McpRegistryPort>,
-    pub(crate) vault_search: Arc<dyn VaultSearchPort>,
-    pub(crate) registry: Arc<Registry>,
+    pub store: Arc<dyn ConfigStorePort>,
+    pub context_store: Arc<dyn ContextStorePort>,
+    pub mcp_registry: Arc<dyn McpRegistryPort>,
+    pub vault_search: Arc<dyn VaultSearchPort>,
+    pub registry: Arc<Registry>,
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
-    pub(crate) runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
-    pub(crate) process_runner: Arc<dyn ProcessRunnerPort>,
-    pub(crate) workspace_root: std::path::PathBuf,
+    pub runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
+    pub process_runner: Arc<dyn ProcessRunnerPort>,
+    pub workspace_root: std::path::PathBuf,
 }
 
 impl AgkCore {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         store: Arc<dyn ConfigStorePort>,
         context_store: Arc<dyn ContextStorePort>,
@@ -79,11 +80,22 @@ impl AgkCore {
         if let Some(r) = crate::app::features::asset::dispatch(&command, self, sink) {
             return r;
         }
+        if let Some(r) = crate::app::features::common::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::telemetry::dispatch(&command, self, sink) {
+            return r;
+        }
 
         sink.on_error(format!("Command {:?} not yet implemented", command));
         Ok(CoreOutcome::Ok)
     }
 }
+
+#[cfg(test)]
+pub use tests::test_core;
+#[cfg(test)]
+pub use tests::test_core_with;
 
 #[cfg(test)]
 mod tests {
@@ -201,6 +213,27 @@ mod tests {
         fn on_error(&mut self, _error: String) {}
     }
 
+    struct RecordingSink {
+        events: Vec<crate::app::event::CoreEvent>,
+        errors: Vec<String>,
+    }
+    impl RecordingSink {
+        fn new() -> Self {
+            Self {
+                events: Vec::new(),
+                errors: Vec::new(),
+            }
+        }
+    }
+    impl CoreEventSink for RecordingSink {
+        fn on_event(&mut self, event: crate::app::event::CoreEvent) {
+            self.events.push(event);
+        }
+        fn on_error(&mut self, error: String) {
+            self.errors.push(error);
+        }
+    }
+
     struct FakeProcessRunner;
     impl ProcessRunnerPort for FakeProcessRunner {
         fn run(
@@ -245,7 +278,7 @@ mod tests {
         }
     }
 
-    fn test_core() -> AgkCore {
+    pub fn test_core() -> AgkCore {
         let mut registry = crate::app::registry::Registry::new();
         registry.register_provider(Box::new(FakeProvider));
         AgkCore::new(
@@ -258,6 +291,28 @@ mod tests {
             Arc::new(FakeProcessRunner),
             std::path::PathBuf::from("."),
         )
+    }
+
+    pub fn test_core_with(
+        store: Arc<dyn crate::app::ports::ConfigStorePort>,
+        registry: Arc<crate::app::registry::Registry>,
+    ) -> AgkCore {
+        AgkCore::new(
+            store,
+            Arc::new(FakeCtxStore::new()),
+            Arc::new(FakeMcp),
+            Arc::new(FakeVaultSearch),
+            registry,
+            HashMap::new(),
+            Arc::new(FakeProcessRunner),
+            std::path::PathBuf::from("."),
+        )
+    }
+
+    #[test]
+    fn agk_core_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<AgkCore>();
     }
 
     #[test]
@@ -292,5 +347,42 @@ mod tests {
         };
         let result = core.execute(cmd, &mut sink);
         assert!(result.is_ok());
+    }
+
+    /// Contract parity: the same [`CoreCommand`] must produce the same
+    /// [`CoreEvent`] sequence regardless of which adapter (CLI or TUI) drives
+    /// the core.  This is the central invariant of ADR-001.
+    #[test]
+    fn tui_cli_equivalence_profile_create() {
+        let cli_core = test_core();
+        let tui_core = test_core();
+
+        let cmd = CoreCommand::CreateProfile {
+            input: crate::app::features::profile::command::CreateProfileInput::new(
+                "parity-test",
+                "opencode",
+                crate::domain::scope::Scope::Workspace,
+            ),
+        };
+
+        let mut cli_sink = RecordingSink::new();
+        let mut tui_sink = RecordingSink::new();
+
+        let cli_result = cli_core.execute(cmd.clone(), &mut cli_sink);
+        let tui_result = tui_core.execute(cmd, &mut tui_sink);
+
+        assert_eq!(
+            cli_result.is_ok(),
+            tui_result.is_ok(),
+            "CLI and TUI must agree on success/failure"
+        );
+        assert_eq!(
+            cli_sink.events, tui_sink.events,
+            "CLI and TUI must observe identical CoreEvent sequence"
+        );
+        assert_eq!(
+            cli_sink.errors, tui_sink.errors,
+            "CLI and TUI must observe identical error sequence"
+        );
     }
 }

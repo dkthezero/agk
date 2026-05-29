@@ -19,19 +19,21 @@ pub fn dispatch(
             environment,
             context,
             dry_run,
-        } => {
-            Some(run::run(
-                input.clone(),
-                *scope,
-                *environment,
-                context.clone(),
-                *dry_run,
-                core.store.as_ref(),
-                core.context_store.as_ref(),
-                core.registry.providers.iter().map(|p| p.id().to_string()).collect(),
-                sink,
-            ))
-        }
+        } => Some(run::run(
+            input.clone(),
+            *scope,
+            *environment,
+            context.clone(),
+            *dry_run,
+            core.store.as_ref(),
+            core.context_store.as_ref(),
+            core.registry
+                .providers
+                .iter()
+                .map(|p| p.id().to_string())
+                .collect(),
+            sink,
+        )),
         _ => None,
     }
 }

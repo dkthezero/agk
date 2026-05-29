@@ -1,25 +1,19 @@
-use crate::tui::app::{AppState, ListMode};
+use crate::app::command::CoreCommand;
+use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, ControlFlow, EventContext};
 use crate::tui::features::common::actions::parse_github_url;
+use crate::tui::list_mode::ListMode;
 use anyhow::Result;
 use crossterm::event::KeyCode;
 
 pub fn dispatch_clawhub_search(state: &mut AppState, ctx: &EventContext) {
     let query = state.search_query.clone();
-    let tx = ctx.tx.clone();
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    state.clawhub_search_task_id = Some(id);
-    let _ = ctx.tx.send(AppEvent::TaskStarted {
-        id,
-        name: format!("Searching ClawHub '{}'", query),
-    });
-    tokio::task::spawn_blocking(move || {
-        let packages = crate::infra::vault::clawhub::cli_search(&query).unwrap_or_default();
-        let _ = tx.send(AppEvent::ClawHubSearchResults {
-            packages,
-            task_id: id,
-        });
-    });
+    let _ = ctx
+        .tx
+        .send(AppEvent::ExecuteCommand(CoreCommand::SearchRemoteVault {
+            vault_id: "clawhub".to_string(),
+            query,
+        }));
 }
 
 pub fn handle_attach_vault_input(
@@ -39,7 +33,7 @@ pub fn handle_attach_vault_input(
                 let input = std::mem::take(&mut state.prompt_buffer);
                 if input.is_empty() {
                     state.list_mode = ListMode::Normal;
-                    state.status_line = "Cancelled \u{2014} empty path".to_string();
+                    state.status_line = "Cancelled — empty path".to_string();
                 } else if let Some((id, repo)) = parse_github_url(&input) {
                     state.pending_vault_id = id;
                     state.pending_vault_repo = repo;
@@ -116,31 +110,12 @@ pub fn handle_attach_vault_input(
 
 pub fn handle_detach_confirm(state: &mut AppState, ctx: &EventContext) -> Result<ControlFlow> {
     if let Some(vault_id) = state.pending_detach_vault.take() {
-        let store = ctx.store.clone();
-        let tx = ctx.tx.clone();
-        let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        tokio::task::spawn_blocking(move || {
-            let _ = tx.send(AppEvent::TaskStarted {
-                id,
-                name: format!("Detaching vault '{}'", vault_id),
-            });
-            match crate::app::features::vault::detach::detach_vault(&vault_id, store.as_ref()) {
-                Ok(()) => {
-                    let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                    let _ = tx.send(AppEvent::TriggerReload);
-                    let _ = tx.send(AppEvent::TaskCompleted {
-                        id,
-                        message: format!("Detached vault '{}'", vault_id),
-                    });
-                }
-                Err(e) => {
-                    let _ = tx.send(AppEvent::TaskFailed {
-                        id,
-                        error: format!("Detach failed: {}", e),
-                    });
-                }
-            }
-        });
+        let _ = ctx
+            .tx
+            .send(AppEvent::ExecuteCommand(CoreCommand::DetachVault {
+                vault_id,
+                scope: crate::domain::scope::Scope::Global,
+            }));
     }
     state.list_mode = ListMode::Normal;
     state.status_line.clear();
@@ -158,66 +133,30 @@ pub fn handle_space_vault(state: &mut AppState, ctx: &EventContext) -> Result<()
     if let Some(vault) = state.vault_entries.get(state.selected_index) {
         let vault_id = vault.id.clone();
 
-        let is_attached = if let Ok(config) = ctx.store.load(crate::domain::scope::Scope::Global) {
-            config.vaults.contains(&vault_id)
-        } else {
-            false
-        };
+        let is_attached =
+            if let Ok(config) = ctx.core.store.load(crate::domain::scope::Scope::Global) {
+                config.vaults.contains(&vault_id)
+            } else {
+                false
+            };
 
         if is_attached {
             state.list_mode = ListMode::ConfirmDetachVault;
             state.pending_detach_vault = Some(vault_id.clone());
             state.status_line.clear();
         } else if vault.kind == "clawhub" {
-            if crate::infra::vault::clawhub::is_cli_available() {
-                let store = ctx.store.clone();
-                let tx = ctx.tx.clone();
-                let id =
-                    crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                tokio::task::spawn_blocking(move || {
-                    let _ = tx.send(AppEvent::TaskStarted {
-                        id,
-                        name: format!("Attaching vault '{}'", vault_id),
-                    });
-                    if let Ok(mut config) = store.load(crate::domain::scope::Scope::Global) {
-                        config.vaults.push(vault_id.clone());
-                        let _ = store.save(crate::domain::scope::Scope::Global, &config);
-                    }
-                    let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                    let _ = tx.send(AppEvent::TriggerReload);
-                    let _ = tx.send(AppEvent::TaskCompleted {
-                        id,
-                        message: format!("Attached vault '{}'", vault_id),
-                    });
-                });
-            } else if crate::infra::vault::clawhub::is_homebrew_available() {
-                state.list_mode = ListMode::ConfirmClawHubInstall;
-                state.status_line.clear();
-            } else {
-                state.status_line =
-                    "ClawHub CLI not found. Install manually from https://clawhub.ai".to_string();
-            }
+            // ClawHub attachment is handled by AgkCore, which auto-installs the CLI if needed.
+            let vault_config = crate::domain::config::VaultConfig::Clawhub(
+                crate::domain::config::ClawHubVaultSource {},
+            );
+            execute_attach_vault(ctx, vault_id, vault_config);
         } else {
-            let store = ctx.store.clone();
-            let tx = ctx.tx.clone();
-            let id =
-                crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            tokio::task::spawn_blocking(move || {
-                let _ = tx.send(AppEvent::TaskStarted {
-                    id,
-                    name: format!("Attaching vault '{}'", vault_id),
-                });
-                if let Ok(mut config) = store.load(crate::domain::scope::Scope::Global) {
-                    config.vaults.push(vault_id.clone());
-                    let _ = store.save(crate::domain::scope::Scope::Global, &config);
-                }
-                let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                let _ = tx.send(AppEvent::TriggerReload);
-                let _ = tx.send(AppEvent::TaskCompleted {
-                    id,
-                    message: format!("Attached vault '{}'", vault_id),
-                });
-            });
+            let _ = ctx
+                .tx
+                .send(AppEvent::ExecuteCommand(CoreCommand::AttachBareVault {
+                    vault_id,
+                    scope: crate::domain::scope::Scope::Global,
+                }));
         }
     }
     Ok(())
@@ -228,77 +167,24 @@ pub fn execute_attach_vault(
     vault_id: String,
     vault_config: crate::domain::config::VaultConfig,
 ) {
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    let _ = ctx.tx.send(AppEvent::TaskStarted {
-        id,
-        name: format!("Attaching vault '{}'", vault_id),
-    });
-
-    let store = ctx.store.clone();
-    let tx = ctx.tx.clone();
-
-    tokio::task::spawn_blocking(move || {
-        let vault_config_clone = vault_config.clone();
-        match crate::app::features::asset::sync::attach_vault(vault_id.clone(), vault_config, store.as_ref()) {
-            Ok(()) => {
-                let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                let _ = tx.send(AppEvent::TriggerReload);
-                let _ = tx.send(AppEvent::TaskCompleted {
-                    id,
-                    message: format!("Attached vault '{}'", vault_id),
-                });
-                let _ = tx.send(AppEvent::VaultRefreshRequired {
-                    id: vault_id,
-                    config: vault_config_clone,
-                });
-            }
-            Err(e) => {
-                let _ = tx.send(AppEvent::TaskFailed {
-                    id,
-                    error: format!("Failed to attach: {}", e),
-                });
-            }
-        }
-    });
+    let input = crate::app::features::vault::command::AttachVaultInput {
+        vault_id,
+        config: vault_config,
+        scope: crate::domain::scope::Scope::Global,
+    };
+    let _ = ctx
+        .tx
+        .send(AppEvent::ExecuteCommand(CoreCommand::AttachVault { input }));
 }
 
 pub fn handle_clawhub_install_confirm(
     state: &mut AppState,
-    ctx: &EventContext,
+    _ctx: &EventContext,
 ) -> Result<ControlFlow> {
+    // The ClawHub auto-install is now handled inside AgkCore::AttachVault.
+    // This confirm handler simply cancels the modal since the user already
+    // triggered attachment via the vault list.
     state.list_mode = ListMode::Normal;
-    state.status_line = "Installing ClawHub CLI via Homebrew...".to_string();
-
-    let store = ctx.store.clone();
-    let tx = ctx.tx.clone();
-    let id = crate::tui::app::NEXT_TASK_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-    tokio::task::spawn_blocking(move || {
-        let _ = tx.send(AppEvent::TaskStarted {
-            id,
-            name: "Installing ClawHub CLI via Homebrew".into(),
-        });
-        match crate::infra::vault::clawhub::install_cli_via_homebrew() {
-            Ok(()) => {
-                if let Ok(mut config) = store.load(crate::domain::scope::Scope::Global) {
-                    config.vaults.push("clawhub".to_string());
-                    let _ = store.save(crate::domain::scope::Scope::Global, &config);
-                }
-                let _ = tx.send(AppEvent::TaskProgress { id, percent: 100 });
-                let _ = tx.send(AppEvent::TriggerReload);
-                let _ = tx.send(AppEvent::TaskCompleted {
-                    id,
-                    message: "Installed ClawHub CLI and activated vault".into(),
-                });
-            }
-            Err(e) => {
-                let _ = tx.send(AppEvent::TaskFailed {
-                    id,
-                    error: format!("Failed to install ClawHub CLI: {}", e),
-                });
-            }
-        }
-    });
-
+    state.status_line = "ClawHub attachment handled by AgkCore.".to_string();
     Ok(ControlFlow::Continue)
 }

@@ -13,34 +13,33 @@ pub fn dispatch(
     sink: &mut dyn CoreEventSink,
 ) -> Option<CoreResult> {
     match cmd {
-        CoreCommand::ActivateProvider { id, scope } => {
-            match core.registry.get_provider(id) {
-                Ok(_provider) => {
-                    Some(activate::run(id.clone(), *scope, core.store.as_ref(), sink))
-                }
-                Err(e) => {
-                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+        CoreCommand::ActivateProvider { id, scope } => match core.registry.get_provider(id) {
+            Ok(provider) => Some(activate::run(
+                id.clone(),
+                *scope,
+                core.store.as_ref(),
+                provider,
+                core.registry.as_ref(),
+                sink,
+            )),
+            Err(e) => {
+                sink.on_error(format!("Provider '{}' not found: {}", id, e));
+                Some(Ok(CoreOutcome::Ok))
             }
-        }
-        CoreCommand::DeactivateProvider { id, scope } => {
-            match core.registry.get_provider(id) {
-                Ok(provider) => {
-                    Some(deactivate::run(
-                        id.clone(),
-                        *scope,
-                        core.store.as_ref(),
-                        provider,
-                        sink,
-                    ))
-                }
-                Err(e) => {
-                    sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+        },
+        CoreCommand::DeactivateProvider { id, scope } => match core.registry.get_provider(id) {
+            Ok(provider) => Some(deactivate::run(
+                id.clone(),
+                *scope,
+                core.store.as_ref(),
+                provider,
+                sink,
+            )),
+            Err(e) => {
+                sink.on_error(format!("Provider '{}' not found: {}", id, e));
+                Some(Ok(CoreOutcome::Ok))
             }
-        }
+        },
         _ => None,
     }
 }

@@ -184,6 +184,8 @@ fn matching_non_test_lines(text: &str, needle: &str) -> Vec<String> {
 }
 
 /// Return true if any non-test `.rs` file under `src/` exceeds `limit` lines.
+/// Strips `#[cfg(test)] mod tests { ... }` blocks before counting so test
+/// code does not inflate the business-logic line count.
 fn files_exceeding_line_limit(dir: &str, limit: usize) -> Vec<(PathBuf, usize)> {
     let mut offenders = Vec::new();
     let root = Path::new(dir);
@@ -212,29 +214,13 @@ fn files_exceeding_line_limit(dir: &str, limit: usize) -> Vec<(PathBuf, usize)> 
             continue;
         }
         let text = read_file(path);
-        let lines = text.lines().count();
+        let stripped = strip_cfg_test_modules(&text);
+        let lines = stripped.lines().count();
         if lines > limit {
             offenders.push((path.to_path_buf(), lines));
         }
     }
     offenders
-}
-
-// ---------------------------------------------------------------------------
-// Phase A — Temporary allowlist
-// Phase C will remove all `crate::infra` references from `tui/event.rs` by
-// decomposing it into feature controllers that communicate via ports only.
-// Tracking: docs/proposals/architectural-convergence-plan.md Phase C.
-// Phase I: File decomposition will split tui/event.rs into features.
-// Tracking: docs/proposals/file-decomposition-plan.md Phase I.
-fn is_tui_infra_allowlisted(path: &Path) -> bool {
-    let relative = path.strip_prefix("src/").unwrap_or(path).to_string_lossy();
-    let file_name = path.file_name().and_then(|f| f.to_str());
-    // Phase C decomposition: these files will become pure event matchers that
-    // delegate to feature controllers.  Controllers inside tui/features/ are
-    // the migration target for this infra code.
-    matches!(file_name, Some("event.rs") | Some("runtime_loop.rs"))
-        || relative.starts_with("tui/features/")
 }
 
 /// Scan all `.rs` files under `src/<dir>/` and assert none contain any of the
@@ -323,12 +309,6 @@ fn tui_must_not_import_infra() {
     let files = collect_rust_files("tui");
     let mut all_violations = Vec::new();
     for path in &files {
-        // Phase C allowlist: tui/event.rs is the large imperative hub that
-        // Phase C will decompose.  Skip it so the rest of the TUI code is
-        // still protected from new infra leakage.
-        if is_tui_infra_allowlisted(path) {
-            continue;
-        }
         let text = read_file(path);
         let refs = contains_infra_refs(&text);
         if !refs.is_empty() {
@@ -362,14 +342,9 @@ fn cli_must_not_import_tui() {
 fn is_process_spawn_allowlisted(path: &Path) -> bool {
     let relative = path.strip_prefix("src/").unwrap_or(path);
     let s = relative.to_string_lossy();
-    // Phase B: main.rs currently spawns interactive process directly.
-    if s == "main.rs" {
-        return true;
-    }
-    // Phase B/D: cli/commands.rs (or its split modules) shells out to opencode create.
-    if s == "cli/commands.rs" || s == "cli/commands/profiles.rs" {
-        return true;
-    }
+    // Phase B/D: cli/commands.rs was deleted after all commands wired through AgkCore.
+    // Kept as documentation that the allowlist must be pruned when phases complete.
+    // if s == "cli/commands.rs" { return true; }
     // Phase C: tui/runtime_loop.rs handles interactive child process launching.
     if s == "tui/runtime_loop.rs" {
         return true;
@@ -499,20 +474,26 @@ fn domain_must_not_use_fs() {
 #[test]
 #[ignore]
 fn file_size_lint() {
-    const LIMIT: usize = 550; // generous threshold for remaining transition files
+    const LIMIT: usize = 300;
 
     let offenders = files_exceeding_line_limit("src", LIMIT);
     let mut violations = Vec::new();
 
-    // Phase E: infra/provider/opencode.rs has been split into sub-modules.
-    // Phase C: tui/event.rs is the well-known 2,400-line hub.
-    // Phase B/D: cli/commands.rs will shrink as command logic moves to core_dispatcher
-    // and app/usecases/.
-    let allowlisted: std::collections::HashSet<&str> =
-        ["tui/event.rs", "cli/commands.rs", "cli/commands/assets.rs"]
-            .iter()
-            .cloned()
-            .collect();
+    // Out-of-scope for ADR-001: widgets, CLI presenter, and legacy asset mod
+    // are scheduled for decomposition in follow-up work.
+    let allowlisted: std::collections::HashSet<&str> = [
+        "tui/widgets/modal.rs",
+        "tui/widgets/detail.rs",
+        "tui/widgets/list.rs",
+        "app/features/asset/mod.rs",
+        "cli/presenter.rs",
+        "cli/entry.rs",
+        "infra/provider/opencode/session.rs",
+        "infra/telemetry/parser.rs",
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     for (path, lines) in offenders {
         let relative = path
@@ -538,7 +519,7 @@ fn file_size_lint() {
 
     assert!(
         real_violations.is_empty(),
-        "File-size lint: the following source files exceed {} lines:\n{}\n\
+        "File-size lint: the following source files exceed {} non-test lines:\n{}\n\
          Split into smaller modules per AGENTS.md guidelines.",
         LIMIT,
         real_violations.join("\n")

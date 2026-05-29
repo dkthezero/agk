@@ -18,15 +18,15 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
         let result = core.execute(cmd, &mut presenter);
         presenter.finalize();
         match result {
-            Ok(_) => Ok(crate::cli::commands::EXIT_SUCCESS),
+            Ok(_) => Ok(crate::cli::EXIT_SUCCESS),
             Err(e) => {
                 presenter.on_error(format!("{}", e));
-                Ok(crate::cli::commands::EXIT_GENERAL_FAILURE)
+                Ok(crate::cli::EXIT_GENERAL_FAILURE)
             }
         }
     } else {
         // No subcommand — fall through to TUI in main.rs
-        Ok(crate::cli::commands::EXIT_SUCCESS)
+        Ok(crate::cli::EXIT_SUCCESS)
     }
 }
 
@@ -58,8 +58,14 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                     input: crate::app::features::profile::command::CreateProfileInput {
                         id: crate::domain::profile::ProfileId::new(name.clone()),
                         provider_id: crate::domain::profile::ProviderId::new(provider.clone()),
-                        skill_refs: skills.iter().map(|s| crate::domain::profile::SkillId::new(s)).collect(),
-                        mcp_refs: mcps.iter().map(|m| crate::domain::profile::McpServerId::new(m)).collect(),
+                        skill_refs: skills
+                            .iter()
+                            .map(crate::domain::profile::SkillId::new)
+                            .collect(),
+                        mcp_refs: mcps
+                            .iter()
+                            .map(crate::domain::profile::McpServerId::new)
+                            .collect(),
                         instruction_refs: vec![],
                         description: desc,
                         scope: scope.into_domain_scope(),
@@ -130,9 +136,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                     .unwrap_or(Scope::Workspace),
             }),
             McpCommands::List { provider: _ } => Ok(CoreCommand::ListMcp),
-            McpCommands::Test { name } => Ok(CoreCommand::TestMcp {
-                name: name.clone(),
-            }),
+            McpCommands::Test { name } => Ok(CoreCommand::TestMcp { name: name.clone() }),
         },
         Commands::Sync { global, dry_run } => Ok(CoreCommand::SyncAssets {
             scope: if *global {
@@ -196,28 +200,45 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 .map(crate::domain::context::ContextId::new),
             dry_run: *dry_run,
         }),
-        Commands::Clean { .. } => Err(anyhow::anyhow!(
-            "Clean command not yet implemented in AgkCore"
-        )),
-        Commands::Validate { .. } => Err(anyhow::anyhow!(
-            "Validate command not yet implemented in AgkCore"
-        )),
-        Commands::Pack { .. } => Err(anyhow::anyhow!(
-            "Pack command not yet implemented in AgkCore"
-        )),
+        Commands::Clean { global } => Ok(CoreCommand::CleanWorkspace { global: *global }),
+        Commands::Validate { scope } => Ok(CoreCommand::ValidateAssets {
+            scope: scope
+                .map(|s| s.into_domain_scope())
+                .unwrap_or(crate::domain::scope::Scope::Workspace),
+        }),
+        Commands::Pack {
+            identity,
+            target,
+            stdout,
+        } => Ok(CoreCommand::PackAsset {
+            identity: identity.clone(),
+            target: match target {
+                crate::cli::entry::PackTarget::ClaudeDesktop => {
+                    crate::domain::asset::PackTarget::ClaudeDesktop
+                }
+                crate::cli::entry::PackTarget::Firebender => {
+                    crate::domain::asset::PackTarget::Firebender
+                }
+                crate::cli::entry::PackTarget::Tarball => crate::domain::asset::PackTarget::Tarball,
+            },
+            stdout: *stdout,
+            scope: crate::domain::scope::Scope::Workspace,
+        }),
         Commands::Telemetry { command } => match command {
-            TelemetryCommands::Enable => Err(anyhow::anyhow!(
-                "Telemetry enable not yet implemented in AgkCore"
-            )),
-            TelemetryCommands::Disable => Err(anyhow::anyhow!(
-                "Telemetry disable not yet implemented in AgkCore"
-            )),
-            TelemetryCommands::Status => Err(anyhow::anyhow!(
-                "Telemetry status not yet implemented in AgkCore"
-            )),
-            TelemetryCommands::Export { .. } => Err(anyhow::anyhow!(
-                "Telemetry export not yet implemented in AgkCore"
-            )),
+            TelemetryCommands::Enable => Ok(CoreCommand::EnableTelemetry),
+            TelemetryCommands::Disable => Ok(CoreCommand::DisableTelemetry),
+            TelemetryCommands::Status => Ok(CoreCommand::TelemetryStatus),
+            TelemetryCommands::Export { format, output } => Ok(CoreCommand::ExportTelemetry {
+                format: match format {
+                    crate::cli::entry::ExportFormat::Json => {
+                        crate::domain::telemetry::TelemetryExportFormat::Json
+                    }
+                    crate::cli::entry::ExportFormat::Csv => {
+                        crate::domain::telemetry::TelemetryExportFormat::Csv
+                    }
+                },
+                output_path: output.clone(),
+            }),
         },
     }
 }

@@ -13,18 +13,14 @@ pub fn dispatch(
     sink: &mut dyn CoreEventSink,
 ) -> Option<CoreResult> {
     match cmd {
-        CoreCommand::SwitchContext { id, dry_run } => {
-            Some(switch::run(
-                id,
-                *dry_run,
-                core.context_store.as_ref(),
-                sink,
-                core.store.as_ref(),
-            ))
-        }
-        CoreCommand::ListContexts => {
-            Some(list::run(core.context_store.as_ref(), sink))
-        }
+        CoreCommand::SwitchContext { id, dry_run } => Some(switch::run(
+            id,
+            *dry_run,
+            core.context_store.as_ref(),
+            sink,
+            core.store.as_ref(),
+        )),
+        CoreCommand::ListContexts => Some(list::run(core.context_store.as_ref(), sink)),
         _ => None,
     }
 }
