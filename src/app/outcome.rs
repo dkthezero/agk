@@ -17,6 +17,8 @@ pub enum CoreOutcome {
     WorkspaceSnapshot(crate::app::event::WorkspaceSnapshot),
     /// A validation report.
     ValidationReport { passed: bool, message: String },
+    /// Debug task list returned by `DebugListTasks` / `DebugDetectHangs`.
+    DebugTaskList(Vec<crate::app::ports::TrackedTask>),
 }
 
 impl From<crate::app::event::LaunchPlan> for CoreOutcome {
@@ -51,17 +53,6 @@ impl CoreEventSink for NullSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct StubSink {
-        events: Vec<crate::app::event::CoreEvent>,
-    }
-
-    impl CoreEventSink for StubSink {
-        fn on_event(&mut self, event: crate::app::event::CoreEvent) {
-            self.events.push(event);
-        }
-        fn on_error(&mut self, _error: String) {}
-    }
 
     #[test]
     fn null_sink_does_nothing() {

@@ -236,7 +236,7 @@ pub fn disable(
     Ok(())
 }
 
-pub(crate) mod adapter;
+pub mod adapter;
 
 pub fn build_mcp_providers(workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>> {
     vec![

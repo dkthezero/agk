@@ -175,3 +175,15 @@ pub enum ContextCommands {
         display_name: Option<String>,
     },
 }
+
+#[derive(Subcommand, Debug)]
+pub enum DebugCommands {
+    /// List active and recent tracked tasks
+    Tasks,
+
+    /// Detect hung tasks (running longer than 30 seconds)
+    Hangs,
+
+    /// Dump current trace span tree (requires observability feature)
+    Trace,
+}

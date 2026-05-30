@@ -6,6 +6,12 @@ pub struct Registry {
     pub providers: Vec<Box<dyn ProviderPort>>,
 }
 
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Registry {
     pub fn new() -> Self {
         Self {

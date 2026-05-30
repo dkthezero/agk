@@ -1,8 +1,9 @@
-pub(crate) mod config;
-pub(crate) mod context;
-pub(crate) mod feature;
-pub(crate) mod mcp;
-pub(crate) mod process;
-pub(crate) mod provider;
-pub(crate) mod telemetry;
-pub(crate) mod vault;
+pub mod config;
+pub mod context;
+pub mod feature;
+pub mod mcp;
+pub mod process;
+pub mod provider;
+pub mod task_tracker;
+pub mod telemetry;
+pub mod vault;

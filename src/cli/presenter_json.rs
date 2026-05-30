@@ -163,6 +163,20 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::Error(msg) => {
             serde_json::json!({ "type": "Error", "message": msg })
         }
+        CoreEvent::TaskPhaseChanged {
+            id,
+            phase,
+            elapsed_ms,
+        } => {
+            serde_json::json!({ "type": "TaskPhaseChanged", "id": id, "phase": phase, "elapsed_ms": elapsed_ms })
+        }
+        CoreEvent::TaskHungWarning {
+            id,
+            name,
+            elapsed_sec,
+        } => {
+            serde_json::json!({ "type": "TaskHungWarning", "id": id, "name": name, "elapsed_sec": elapsed_sec })
+        }
         CoreEvent::WorkspaceLoaded(_) => {
             serde_json::json!({ "type": "WorkspaceLoaded" })
         }

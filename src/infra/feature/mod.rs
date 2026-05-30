@@ -1,6 +1,6 @@
-pub(crate) mod instruction;
-pub(crate) mod skill;
-pub(crate) mod stub;
+pub mod instruction;
+pub mod skill;
+pub mod stub;
 
 /// Parsed YAML frontmatter from SKILL.md or AGENTS.md.
 #[derive(Debug, Clone, Default, PartialEq)]

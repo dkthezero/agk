@@ -48,7 +48,7 @@ mod tests {
     use crate::app::event::CoreEvent;
     use crate::app::ports::{
         ConfigStorePort, ContextStorePort, McpProvider, McpRegistryPort, ProcessRunnerPort,
-        VaultSearchPort,
+        TaskPhase, TaskTrackerPort, TrackedTask, VaultSearchPort,
     };
     use crate::app::registry::Registry;
     use crate::domain::context::{ContextConfig, ContextFile, ContextId};
@@ -171,6 +171,28 @@ mod tests {
         }
     }
 
+    struct StubTaskTracker;
+    impl TaskTrackerPort for StubTaskTracker {
+        fn register(&self, _name: &str) -> String {
+            "task-0000000001".to_string()
+        }
+        fn transition(&self, _id: &str, _phase: TaskPhase) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn complete(&self, _id: &str) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn list_active(&self) -> Vec<TrackedTask> {
+            vec![]
+        }
+        fn list_recent(&self) -> Vec<TrackedTask> {
+            vec![]
+        }
+        fn detect_hung(&self, _threshold: std::time::Duration) -> Vec<TrackedTask> {
+            vec![]
+        }
+    }
+
     fn core_with_one_context() -> AgkCore {
         let mut contexts = HashMap::new();
         contexts.insert(
@@ -196,6 +218,7 @@ mod tests {
             Arc::new(Registry::new()),
             HashMap::new(),
             Arc::new(StubProcessRunner),
+            Arc::new(StubTaskTracker),
             std::path::PathBuf::from("."),
         )
     }

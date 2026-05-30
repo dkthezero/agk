@@ -128,6 +128,13 @@ pub enum Commands {
         #[command(subcommand)]
         command: ProfileCommands,
     },
+
+    /// Debug / observability commands (hidden in help)
+    #[command(hide = true)]
+    Debug {
+        #[command(subcommand)]
+        command: DebugCommands,
+    },
 }
 
 // Subcommand enums (ProfileCommands, McpCommands, TelemetryCommands,
@@ -135,7 +142,7 @@ pub enum Commands {
 // file-size compliance and are re-exported here so caller paths
 // (`crate::cli::entry::ProfileCommands`, …) continue to resolve.
 pub use crate::cli::entry_subcommands::{
-    ContextCommands, McpCommands, ProfileCommands, TelemetryCommands,
+    ContextCommands, DebugCommands, McpCommands, ProfileCommands, TelemetryCommands,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

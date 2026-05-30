@@ -42,6 +42,7 @@ pub struct AppState {
     pub scroll_tick: u8,
     pub analytics_config: crate::domain::telemetry::AnalyticsConfig,
     pub mcp_state: crate::tui::widgets::mcp::McpState,
+    pub hung_warnings_shown: HashSet<usize>,
     // MCP registration pending fields (for modal)
     pub pending_mcp_name: String,
     pub pending_mcp_command: String,
@@ -100,6 +101,7 @@ impl AppState {
             pending_mcp_transport: String::new(),
             pending_mcp_description: String::new(),
             wizard_state: None,
+            hung_warnings_shown: HashSet::new(),
         }
     }
 

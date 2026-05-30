@@ -10,9 +10,17 @@ keywords = ["cli", "vault", "tui", "mcp", "skills"]
 categories = ["command-line-utilities"]
 readme = "README.md"
 
+[lib]
+name = "agk"
+path = "src/lib.rs"
+
 [[bin]]
 name = "agk"
 path = "src/main.rs"
+
+[[test]]
+name = "full_flow_tui"
+path = "tests/full_flow_tui/mod.rs"
 
 [features]
 default = ["tui", "vault-clawhub", "pack", "provider-opencode", "provider-claude", "provider-github", "provider-gemini", "provider-amp", "provider-firebender", "provider-letta", "provider-snowflake"]
@@ -29,9 +37,12 @@ provider-amp = []
 provider-firebender = []
 provider-letta = []
 provider-snowflake = []
+observability = ["dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
 ratatui = { version = "0.30", optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter", "fmt", "json"] }
 crossterm = { version = "0.28", features = ["event-stream"], optional = true }
 clap = { version = "4", features = ["derive"] }
 sha2 = "0.10"

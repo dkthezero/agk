@@ -240,6 +240,11 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 output_path: output.clone(),
             }),
         },
+        Commands::Debug { command } => match command {
+            crate::cli::entry::DebugCommands::Tasks => Ok(CoreCommand::DebugListTasks),
+            crate::cli::entry::DebugCommands::Hangs => Ok(CoreCommand::DebugDetectHangs),
+            crate::cli::entry::DebugCommands::Trace => Ok(CoreCommand::DebugDumpTrace),
+        },
     }
 }
 
