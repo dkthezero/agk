@@ -17,6 +17,14 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                     status: crate::tui::progress::ProgressStatus::Starting,
                 },
             );
+            // Track asset operations so the list can show a spinner.
+            if *id == 0 {
+                if let Some(rest) = name.strip_prefix("Installing '") {
+                    if let Some(identity) = rest.strip_suffix("'") {
+                        state.installing_names.insert(identity.to_string());
+                    }
+                }
+            }
         }
         CoreEvent::TaskProgress { id, percent } => {
             if let Some(task) = state.active_tasks.get_mut(id) {
@@ -29,6 +37,9 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         }
         CoreEvent::TaskFailed { id, error } => {
             state.active_tasks.remove(id);
+            if *id == 0 {
+                state.installing_names.clear();
+            }
             state.status_line = format!("Error: {}", error);
         }
         CoreEvent::ProfileCreated(id) => {
@@ -104,12 +115,17 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
             );
         }
         CoreEvent::AssetInstalled { identity, .. } => {
+            state.active_tasks.remove(&0);
+            // Keep the spinner in installing_names until ReloadComplete
+            // so the UI never shows [ ] between install success and config refresh.
             state.status_line = format!("Asset '{}' installed", identity);
         }
         CoreEvent::AssetRemoved { identity } => {
+            state.active_tasks.remove(&0);
             state.status_line = format!("Asset '{}' removed", identity);
         }
         CoreEvent::AssetUpdated { identity } => {
+            state.active_tasks.remove(&0);
             state.status_line = format!("Asset '{}' updated", identity);
         }
         CoreEvent::SyncComplete {
@@ -117,6 +133,7 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
             skipped,
             errors,
         } => {
+            state.active_tasks.remove(&0);
             state.status_line = format!(
                 "Sync: {} updated, {} skipped, {} errors",
                 updated.len(),
@@ -125,8 +142,11 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
             );
         }
         CoreEvent::RemoteVaultSearchResults { vault_id, packages } => {
-            state.remote_packages = packages.clone();
-            state.status_line = format!("Found {} packages in {}", packages.len(), vault_id);
+            // Ignore stale results that arrive after the user pressed ESC.
+            if !state.search_query.is_empty() {
+                state.remote_packages = packages.clone();
+                state.status_line = format!("Found {} packages in {}", packages.len(), vault_id);
+            }
         }
         CoreEvent::ValidationReport { passed, message } => {
             state.status_line = format!(

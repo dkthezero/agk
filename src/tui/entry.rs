@@ -1,14 +1,17 @@
-use crate::app::ports::ConfigStorePort;
 use crate::domain::scope::Scope;
 use std::collections::HashMap;
 
 /// Pure composition: build the TUI state from config + registry + scan.
 /// No side effects — the caller (main.rs bootstrap) handles the terminal.
+///
+/// `global_config` and `workspace_config` are passed in rather than loaded
+/// here so `bootstrap::build` and `build_state` do not duplicate disk reads.
 pub fn build_state(
     registry: &crate::app::registry::Registry,
-    store: &dyn ConfigStorePort,
     scan: crate::app::bootstrap::ScanResult,
     workspace_root: &std::path::Path,
+    global_config: crate::domain::config::ConfigFile,
+    workspace_config: crate::domain::config::ConfigFile,
 ) -> crate::tui::app::AppState {
     let tab_names: Vec<String> = registry
         .feature_sets
@@ -17,8 +20,6 @@ pub fn build_state(
         .collect();
     let tab_live: Vec<bool> = registry.feature_sets.iter().map(|f| !f.is_stub()).collect();
 
-    let global_config = store.load(Scope::Global).unwrap_or_default();
-    let workspace_config = store.load(Scope::Workspace).unwrap_or_default();
     let active_config_for_entries = workspace_config.clone();
 
     let vault_entries = crate::app::bootstrap::build_vault_entries(

@@ -47,46 +47,34 @@ impl OpenCodeProvider {
         let (mut config, _original_bytes) = self.read_workspace_config()?;
         let original_config = config.clone();
 
-        // 3. Patch `agent`
+        // 3. Patch agent entry (per-agent overrides for skills and MCPs)
         if config.get("agent").is_none() {
             config["agent"] = serde_json::json!({});
         }
         if let Some(agent_obj) = config["agent"].as_object_mut() {
-            agent_obj.insert(
-                agent_name.clone(),
-                serde_json::json!({
-                    "mode": "primary",
-                    "description": format!("Session agent for {} profile", profile.name),
-                }),
-            );
-        }
+            let mut agent_entry = serde_json::json!({
+                "mode": "primary",
+                "description": format!("Session agent for {} profile", profile.name),
+            });
 
-        // 4. Patch `permission -> skill`
-        if config.get("permission").is_none() {
-            config["permission"] = serde_json::json!({});
-        }
-        if config["permission"].get("skill").is_none() {
-            config["permission"]["skill"] = serde_json::json!({});
-        }
-        if let Some(skill_perm) = config["permission"]["skill"].as_object_mut() {
+            // Per-agent skill permissions
+            let mut skill_perm = serde_json::json!({});
             for skill in &profile.skills {
-                skill_perm.insert(skill.clone(), serde_json::json!("allow"));
+                skill_perm[skill.clone()] = serde_json::json!("allow");
             }
-            skill_perm.insert("*".to_string(), serde_json::json!("deny"));
-        }
+            skill_perm["*"] = serde_json::json!("deny");
+            agent_entry["permission"] = serde_json::json!({ "skill": skill_perm });
 
-        // 5. Patch `mcp` entries
-        for mcp_name in &profile.mcps {
-            if config.get("mcp").is_none() {
-                config["mcp"] = serde_json::json!({});
+            // Per-agent MCP enablement
+            let mut mcp_obj = serde_json::json!({});
+            for mcp_name in &profile.mcps {
+                mcp_obj[mcp_name.clone()] = serde_json::json!({ "enabled": true });
             }
-            if let Some(mcp_obj) = config["mcp"].as_object_mut() {
-                if let Some(entry) = mcp_obj.get_mut(mcp_name) {
-                    if let Some(e) = entry.as_object_mut() {
-                        e.insert("enabled".to_string(), serde_json::json!(true));
-                    }
-                }
+            if mcp_obj.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
+                agent_entry["mcp"] = mcp_obj;
             }
+
+            agent_obj.insert(agent_name.clone(), agent_entry);
         }
 
         self.write_workspace_config(&config)?;

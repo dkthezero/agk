@@ -93,32 +93,19 @@ pub fn run(
 
         let _output = process_runner.run("opencode", &args, Some(workspace), None)?;
 
-        // If process_runner returns stdout on success, we continue.
-        // The generated markdown may be in .opencode/agents/<name>.md
-        let agents_dir = workspace.join(".opencode").join("agents");
-        let source = agents_dir.join(format!("{}.md", id_str));
-        if !source.exists() {
-            let newest = std::fs::read_dir(&agents_dir).ok().and_then(|mut entries| {
-                let mut latest: Option<(std::fs::DirEntry, std::time::SystemTime)> = None;
-                while let Some(Ok(e)) = entries.next() {
-                    let meta = e.metadata().ok()?;
-                    if meta.is_file() {
-                        let modified = meta.modified().ok()?;
-                        if latest.as_ref().is_none_or(|(_, t)| modified > *t) {
-                            latest = Some((e, modified));
-                        }
-                    }
-                }
-                latest.map(|(e, _)| e.path())
-            });
-            if let Some(path) = newest {
-                std::fs::copy(&path, &source)?;
-            }
-        }
+        // OpenCode `agent create --path <profile_dir>` writes the agent
+        // markdown into <profile_dir>/agents/<agent_name>.md.
+        let agents_dir = profile_dir.join("agents");
+        let source = std::fs::read_dir(&agents_dir).ok().and_then(|entries| {
+            entries
+                .flatten()
+                .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
+                .map(|e| e.path())
+        });
 
         let target = profile_dir.join("agent.md");
-        if source.exists() {
-            std::fs::copy(&source, &target)?;
+        if let Some(ref src) = source {
+            std::fs::copy(src, &target)?;
             sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
             sink.on_event(CoreEvent::Info(format!(
                 "Profile '{}' created. Agent markdown saved to {}",
@@ -128,10 +115,10 @@ pub fn run(
         } else {
             sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
             sink.on_event(CoreEvent::Info(format!(
-                "Profile '{}' created. Agent markdown not found at expected path ({}). \
+                "Profile '{}' created. Agent markdown not found in {}. \
                  You may need to run `opencode agent create` manually.",
                 id_str,
-                source.display()
+                agents_dir.display()
             )));
         }
     } else {

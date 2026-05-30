@@ -197,9 +197,10 @@ This exact string becomes `--description` for `opencode agent create`.
    - Update frontmatter `name` to `<name>_<key>`.
    - Ensure `mode: primary`.
 3. Read/create workspace `opencode.json`:
-   - Under `"agent"`, insert `{"<name>_<key>": {"mode": "primary", ...}}`.
-   - Under `"permission" -> "skill"`, set `"*": "deny"` and each selected skill to `"allow"`.
-   - Under `"mcp"`, set each selected MCP to `"enabled": true`.
+   - Under `"agent"`, insert a per-agent entry keyed by `<name>_<key>` containing:
+     - `"mode": "primary"`
+     - `"permission" -> "skill"` — `"*": "deny"` plus each selected skill set to `"allow"`.
+     - `"mcp"` — each selected MCP server set to `"enabled": true`.
    - Remember original state for rollback.
 
 ### Launch
@@ -210,9 +211,7 @@ Spawn `opencode` in the workspace root (it auto-discovers the new primary agent)
 
 1. Delete `.opencode/agents/<name>_<key>.md`.
 2. Revert `opencode.json`:
-   - Remove the agent entry.
-   - Remove skill permission entries we added (if none remain, drop `"permission" -> "skill"`).
-   - Remove MCP entries we added (if `"mcp"` becomes empty, drop the key).
+   - Remove the agent entry (which atomically drops the nested `permission` and `mcp` overrides).
 3. If `opencode.json` is now `{}`, delete it.
 4. If `.opencode/` is empty, remove it.
 

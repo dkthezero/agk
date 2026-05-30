@@ -22,12 +22,24 @@ pub fn validate_profile_name(name: &str) -> Result<()> {
 
 impl OpenCodeProvider {
     /// Build the workspace path to the profile's base agent markdown.
+    /// OpenCode `agent create --path <dir>` writes into `<dir>/agents/*.md`,
+    /// so we scan that subdirectory and fall back to the legacy `agent.md`.
     pub fn profile_agent_path(&self, profile_name: &str) -> PathBuf {
-        self.workspace_root
+        let profile_dir = self
+            .workspace_root
             .join(".agk")
             .join("profiles")
-            .join(profile_name)
-            .join("agent.md")
+            .join(profile_name);
+        let agents_dir = profile_dir.join("agents");
+        if let Ok(entries) = std::fs::read_dir(&agents_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("md") {
+                    return path;
+                }
+            }
+        }
+        profile_dir.join("agent.md")
     }
 
     /// Returns the workspace `opencode.json` path.

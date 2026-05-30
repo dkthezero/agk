@@ -33,7 +33,14 @@ pub fn run(
         }
     };
 
-    sink.on_event(CoreEvent::RemoteVaultSearchResults { vault_id, packages });
+    sink.on_event(CoreEvent::RemoteVaultSearchResults {
+        vault_id: vault_id.clone(),
+        packages: packages.clone(),
+    });
+    sink.on_event(CoreEvent::TaskCompleted {
+        id: 0,
+        message: format!("Found {} packages in {}", packages.len(), vault_id),
+    });
     Ok(CoreOutcome::Ok)
 }
 
