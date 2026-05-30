@@ -10,3 +10,4 @@ opencode.json
 agents/
 .codegraph/
 .junie/
+.claude/worktrees

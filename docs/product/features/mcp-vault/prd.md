@@ -1,143 +1,166 @@
-# PRD: MCP Vault Management
+# PRD: MCP Vault Management (v0.3)
 
-> **Product Mindset:** `agk` is the agent kit for teams to share the way they work with AI agents together. MCP (Model Context Protocol) is becoming the USB-C for AI tool integration. agk should act as the team MCP registry — centrally storing server definitions and then pushing the correct provider-specific config when enabled.
+**Status:** Draft — v0.3 update  
+**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/mcp-vault/prd.md)  
+**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 
 ---
 
 ## Overview
 
-MCP servers are runtime tools that AI agents invoke via the Model Context Protocol. This PRD introduces MCP servers as a new `AssetKind` in `agk`, managed through a dedicated TUI tab and headless CLI. The installation is two-phase:
-1. **Registration:** Add an MCP server to agk's global registry, test it, and save its metadata.
-2. **Activation:** Toggle the MCP server on/off for active providers in the current scope (Global or Workspace), which writes the provider-specific MCP configuration.
+MCP servers are runtime tools that AI agents invoke via the Model Context Protocol. In v0.2, AGK introduced a global MCP registry (`~/.config/agk/mcp.toml`) with manual registration, testing, and per-provider activation. **v0.3 extends this to make MCP servers vault-discoverable assets** — teams can distribute MCP definitions through their vaults alongside skills and instructions.
 
-This PRD introduces a **TUI restructure**: Vaults is right-aligned as Tab `[0]`; MCP Servers becomes Tab `[2]`, between Skills `[1]` and Instructions `[3]`.
+Additionally, v0.3 **expands MCP provider coverage from 2 to 5 providers** by adding GitHub Copilot CLI, Gemini CLI, and AMP adapters.
+
+---
+
+## User-Facing Behavior
+
+### TUI Tab [2] MCP Servers
+
+- **Tab position:** `[2]` (between Skills `[1]` and Instructions `[3]`).
+- **Content:** Two sources displayed together:
+  1. **Globally registered MCPs** from `~/.config/agk/mcp.toml` (existing behavior).
+  2. **Vault-discovered MCPs** from attached vaults (`mcps/*/MCP.md`) (new in v0.3).
+
+#### Visual Indicators
+
+| State | Badge | Meaning |
+|-------|-------|---------|
+| `[⊘]` | Not registered | Vault-discovered but not yet copied to global registry |
+| `[ ]` | Registered, disabled | In global registry but not enabled for any provider |
+| `[x]` | Registered, enabled | In global registry and enabled for active providers in current scope |
+| `[✓]` | Tested | Registry entry has passed the MCP `initialize` handshake |
+
+#### Actions
+
+- **On a vault-discovered MCP (`[⊘]`):**
+  - `Space` — Registers it into `~/.config/agk/mcp.toml` (copies definition from vault) and runs the test handshake. Now shows `[ ]` or `[✓]`.
+- **On a registered MCP (`[ ]` / `[x]`):**
+  - `Space` — Toggles enable/disable for all active MCP-capable providers in the current scope (existing behavior).
+- **F2** — Opens the registration modal for a *new* manually-defined MCP (existing behavior).
+- **Enter** — Opens detail view showing command, args, transport, description, and vault source (if vault-sourced).
+
+### Vault-Discovered MCP Lifecycle
+
+1. **Scan:** When a vault is attached or refreshed, AGK scans `mcps/` for directories containing `MCP.md`.
+2. **Display:** Vault-discovered MCPs appear in the MCP tab with `[⊘]` badge.
+3. **Register:** User presses `Space` (or `agk install vault/mcp-name --kind mcp`). AGK:
+   - Copies the `MCP.md` definition into `~/.config/agk/mcp.toml`.
+   - Runs the JSON-RPC `initialize` handshake test.
+   - On success, marks `[✓]`.
+4. **Enable:** Once registered, the MCP behaves identically to manually-registered MCPs. `Space` toggles per-provider.
+5. **Update:** If the vault `MCP.md` changes SHA, `agk sync` or TUI refresh shows `[Update Available]`. Pressing `Enter` updates the global registry entry.
+
+---
+
+### CLI Commands (updated for v0.3)
+
+```bash
+# Register a vault-discovered MCP
+agk install clawhub/filesystem --kind mcp
+
+# Register with explicit vault (same as above)
+agk mcp add --name filesystem --from-vault clawhub
+
+# Enable/disable (unchanged from v0.2)
+agk mcp enable filesystem --provider claude-code --scope workspace
+agk mcp disable filesystem --provider opencode --scope global
+
+# List (now includes vault-discovered MCPs)
+agk mcp list --json
+# Output includes: name, command, tested, enabled_providers, vault_source
+```
 
 ---
 
 ## Functional Requirements
 
-### 1. MCP as a New AssetKind
-- `AssetKind::McpServer` is added to the domain model.
-- MCP servers are **not** sourced from external vaults (GitHub, ClawHub). They are registered directly into agk's global configuration, which acts as the **agk MCP Registry/Marketplace** (`~/.config/agk/mcp.toml`).
+### v0.3 New Requirements
 
-### 2. Tab Restructure
-- **Tab `[1]` — Skills:** Unchanged.
-- **Tab `[2]` — MCP Servers:** New. Lists all registered MCP servers. Shows checkbox `[x]`/`[ ]` for enabled status in current scope, plus Tested column.
-- **Tab `[3]` — Instructions:** Unchanged.
-- **Tab `[4]` — Providers:** Unchanged.
-- **Tab `[5]` — Telemetry:** Unchanged.
-- **Tab `[0]` — Vaults:** Right-aligned. Sources of skills/instructions.
+1. **Vault-discoverable MCPs:** `mcps/` directories in attached vaults shall be scanned for `MCP.md` files. Discovered MCPs shall appear in the TUI MCP tab and CLI list output.
+2. **MCP registration from vault:** Pressing `Space` on a vault-discovered MCP shall copy its definition to the global registry and run the test handshake.
+3. **SHA-based change detection:** Vault-discovered MCPs shall participate in the same SHA10 change-detection pipeline as skills and instructions. Stale MCPs show `[Update Available]`.
+4. **MCP provider expansion:** GitHub Copilot CLI, Gemini CLI, and AMP shall gain `McpProvider` implementations, raising coverage from 2 to 5 providers.
+5. **Provider exclusion:** Letta, Snowflake Cortex, and Firebender shall explicitly return `supports_mcp: false` and be excluded from MCP operations without errors.
+6. **Config preservation:** All new provider `McpProvider` implementations shall preserve existing JSON config content (non-destructive merge).
+7. **Scope behavior:** Copilot CLI, Gemini CLI, and AMP support Global scope only for MCP (no documented workspace-level config). If a user attempts workspace-scoped enable, emit a clear warning and fall back to global.
 
-### 3. Phase 1 — Registration
-#### TUI Flow
-1. User presses `F2` in Tab `[2]`.
-2. A multi-step modal collects:
-   - **Name** (required, unique in registry)
-   - **Command** (required, e.g., `npx`, `python`, `docker`)
-   - **Arguments** (optional, e.g., `@modelcontextprotocol/server-filesystem /path/to/dir`)
-   - **Transport** (required: `stdio` or `sse`)
-   - **Description** (optional)
-3. Final step shows a **security warning**: `WARNING: This will execute '{command} {args}' on your machine. Register? [y/N]`. User must confirm.
-4. `agk` registers the server, auto-runs the test handshake, and saves.
-5. **If test succeeds:** Server appears in Tab `[2]` with `[✓]` in Tested column.
-6. **If test fails:** Task fails with error in status bar.
+### Retained v0.2 Requirements
 
-#### Headless CLI Flow
-```bash
-agk mcp add --name fs --command npx \
-  --args "@modelcontextprotocol/server-filesystem /Users/alice/docs" \
-  --transport stdio
-```
-- `--test` flag (default: true) immediately runs the test after saving.
-- `--no-test` skips the test (useful for CI where the runtime isn't available).
-
-### 4. Phase 2 — Activation
-#### TUI Flow
-1. In Tab `[2]`, user navigates to a tested MCP server.
-2. Presses `Space`.
-3. If **any active provider** already has this server enabled in the **current scope**, it disables for all active providers.
-4. If **none** are enabled, it enables for all active MCP-capable providers (e.g., Claude Code, OpenCode).
-5. Checkbox `[x]`/`[ ]` updates to reflect scope-specific status.
-
-#### Headless CLI Flow
-```bash
-agk mcp enable fs --provider claude-code --scope workspace
-agk mcp disable fs --provider opencode --scope global
-```
-
-### 5. Provider-Specific MCP Config
-Each provider uses a different schema. agk normalizes to the correct format:
-- **Claude Code:** `.claude/mcp.json` (or `~/.claude/mcp.json`) with nested `mcpServers`.
-- **OpenCode:** Flat `mcp.<name>` in `opencode.json` with `type` ("local"/"remote") and `enabled` fields.
-- **GitHub Copilot:** TBD (if/when Copilot supports MCP).
-
-### 6. Scope Behavior
-- **Registration is always global.** The agk MCP registry is a global concept (stored in `~/.config/agk/mcp.toml`).
-- **Activation is scoped.** Enabling an MCP server for a provider in Workspace scope writes to the workspace provider config. In Global scope, it writes to the global provider config.
+- `AssetKind::McpServer` exists in the domain model.
+- Registration collects name, command, args, transport, description.
+- Test phase performs an MCP `initialize` handshake automatically after registration.
+- Registry is stored in `~/.config/agk/mcp.toml`.
+- `Space` in Tab `[2]` toggles activation for active MCP-capable providers in current scope.
+- Security warning shown before executing unknown MCP commands.
+- `--json` support for `agk mcp list`.
 
 ---
 
-## User Personas & Expected UX
+## MCP.md Format (Vault Asset)
 
-### 👤 Human User
+```markdown
+---
+name: filesystem
+version: 1.0.0
+command: npx
+args:
+  - "-y"
+  - "@modelcontextprotocol/server-filesystem"
+  - "."
+transport: stdio
+description: File system access via MCP
+---
 
-| Scenario | Expected UX |
-|----------|-------------|
-| Register a new MCP server | Tab `[2]` → `F2` → fill form → confirm warning → server appears with Tested `[✓]`. |
-| Enable an MCP server for Claude | Tab `[2]` → select `fs` → `Space`. Claude Code is active in Workspace scope → `.claude/mcp.json` updated. Checkbox shows `[x]`. |
-| Disable an MCP server | Tab `[2]` → select `fs` → `Space` again. MCP entry is removed from provider configs. Checkbox shows `[ ]`. |
-| View all registered servers | Tab `[2]` lists all servers. Untested are dimmed. Tested but not enabled show `[ ]`. Enabled show `[x]`. |
+# Filesystem MCP Server
 
-### 🤖 AI Agent User
+Provides read/write access to the local filesystem through the Model Context Protocol.
+```
 
-| Scenario | Expected UX |
-|----------|-------------|
-| Agent registers a tool | `agk mcp add --name browser --command docker --args "run mcp-browser" --transport stdio --json` returns the saved registry entry. |
-| Agent enables a tool | `agk mcp enable browser --provider claude-code --scope workspace --json` returns `{"enabled": true, "provider": "claude-code", "config_written": ".claude/mcp.json"}` |
-| Agent lists available tools | `agk mcp list --json` returns all registered servers with test/enable status. |
+---
 
-### 🏭 CI/CD User
+## Provider-Specific MCP Config
 
-| Scenario | Expected UX |
-|----------|-------------|
-| Standardize team MCP tools | `agk mcp add --name fs ... --no-test` in a team setup script (skip test if runtime missing in CI). |
-| Activate in project | `agk mcp enable fs --provider claude-code --scope workspace --quiet` in a repo's setup script. |
-| Verify configuration | `agk mcp list --json` is parsed by the pipeline to ensure required MCP servers are registered. |
+| Provider | Config Path | Schema | v0.3 Status |
+|----------|-------------|--------|-------------|
+| Claude Code | `.claude/mcp.json` | `mcpServers: { name: { command, args, env } }` | ✅ Existing |
+| OpenCode | `~/.config/opencode/opencode.json` | Flat `mcp.<name>: { type, enabled, command, args }` | ✅ Existing |
+| **GitHub Copilot CLI** | `~/.copilot/mcp-config.json` | `mcpServers: { name: { type, command, args, env, tools } }` | 🆕 NEW |
+| **Gemini CLI** | `~/.gemini/settings.json` | `mcpServers: { name: { command, args, env, trust, includeTools } }` | 🆕 NEW |
+| **AMP** | `.amp/settings.json` or `~/.config/amp/settings.json` | `amp.mcpServers` nested under settings | 🆕 NEW |
+| Letta | N/A | Proprietary `.skills/` directory | ❌ Unsupported |
+| Snowflake Cortex | N/A | `CREATE MCP SERVER ...` via SQL | ❌ Unsupported |
+| Firebender | N/A | No discoverable documentation | ❌ Unsupported |
 
 ---
 
 ## Non-Goals
-- Hosting an MCP server. agk registers and configures them, but the provider process owns execution.
-- MCP server discovery from remote registries. agk's registry is local and user-curated.
-- Real-time MCP server health monitoring after activation. agk tests at registration time; ongoing health is the provider's responsibility.
-- Cross-machine MCP registry sync. (Fast-follow: export/import registry as JSON.)
 
----
+- Hosting an MCP server. AGK registers and configures them; the provider process owns execution.
+- Real-time MCP health monitoring after activation. AGK tests at registration time; ongoing health is the provider's responsibility.
+- Cross-machine MCP registry sync. (Fast-follow: export/import.)
+- Workspace-level MCP config for Copilot, Gemini, or AMP (not documented by providers).
 
 ## Security Considerations
-- [x] **Arbitrary code execution warning:** The TUI shows a warning before registering: `WARNING: This will execute '{command} {args}' on your machine. Register? [y/N]`. User must explicitly confirm.
-- [ ] **File permissions:** `~/.config/agk/mcp.toml` should be created with `0600` permissions (not yet enforced).
-- [x] **No sandboxing:** agk does not sandbox MCP processes. The test phase runs the command as the current user. Warning covers this.
 
----
+- [x] Arbitrary code execution warning before registering.
+- [x] Vault-sourced MCPs execute the same command as manually-registered ones; same security model applies.
+- [ ] `~/.config/agk/mcp.toml` file permissions `0600` (pending hardening).
 
 ## Acceptance Criteria
+
 - [x] `AssetKind::McpServer` exists in the domain model.
-- [x] TUI tab: Tab `[2]` = MCP Servers (between Skills and Instructions).
-- [x] `F2` in Tab `[2]` opens the registration modal with security confirmation.
-- [x] Registration collects name, command, args, transport, description.
-- [x] Test phase performs an MCP `initialize` handshake automatically after registration.
-- [x] Registry is stored in `~/.config/agk/mcp.toml`.
-- [x] `Space` in Tab `[2]` toggles activation for active MCP-capable providers in current scope.
-- [x] Provider-specific MCP config is written correctly:
-  - Claude Code: nested `mcpServers` in `.claude/mcp.json`
-  - OpenCode: flat `mcp.<name>` in `opencode.json` with `type` + `enabled`
-- [x] Headless CLI: `agk mcp add`, `agk mcp enable`, `agk mcp disable`, `agk mcp list`, `agk mcp test`.
-- [x] `--json` support for `agk mcp list`.
-- [x] Security warning shown before executing unknown MCP commands.
-- [ ] `mcp.toml` file permissions `0600` (pending hardening).
-- [ ] TUI edit existing MCP server (Enter to modify) — workaround: disable + re-register.
+- [x] TUI tab `[2]` lists globally registered + vault-discovered MCPs with correct badges.
+- [x] Vault-discovered MCP can be registered into global registry with `Space`.
+- [x] `agk sync` detects SHA10 changes to vault MCPs and shows `[Update Available]`.
+- [x] Copilot CLI, Gemini CLI, and AMP support `agk mcp add` / `enable` / `disable`.
+- [x] Non-MCP-capable providers (Letta, Snowflake, Firebender) excluded without errors.
+- [x] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
+- [x] All new provider configs preserve existing JSON content.
+- [x] No regression: manually-registered MCPs continue to work exactly as before.
+- [x] Architecture tests pass with zero allowlists.
 
 ---
 
-*End of PRD.*
+*PRD v0.3 — updated 2026-05-30*
