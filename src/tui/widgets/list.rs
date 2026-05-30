@@ -33,6 +33,7 @@ fn scroll_name(name: &str, max_width: usize, offset: usize) -> String {
     padded[start..end].to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     frame: &mut Frame,
     area: Rect,
@@ -41,6 +42,7 @@ pub fn render(
     is_stub: bool,
     config: &ConfigFile,
     scroll_offset: usize,
+    installing_names: &std::collections::HashSet<String>,
 ) {
     let block = Block::default().borders(Borders::ALL).title("Packages");
 
@@ -84,6 +86,7 @@ pub fn render(
                 &pkg.identity.name,
                 &pkg.kind,
                 &pkg.identity.sha10,
+                installing_names,
             );
             let is_selected = idx == selected;
 
@@ -194,7 +197,12 @@ fn install_status(
     name: &str,
     kind: &AssetKind,
     current_hash: &str,
+    installing_names: &std::collections::HashSet<String>,
 ) -> &'static str {
+    // Show spinner while an install task is in flight for this identity.
+    if installing_names.contains(name) {
+        return "[⧗]";
+    }
     match kind {
         AssetKind::Skill => {
             if let Some(installed_hash) = config.installed_skill_hash(vault_id, name) {

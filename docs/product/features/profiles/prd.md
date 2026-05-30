@@ -50,11 +50,12 @@ agk p <profile_name>
    - OpenCode provider:
      - Copy `.agk/profiles/<name>/agent.md` → `.opencode/agents/<name>_<suffix>.md`
      - Set `mode: primary` and name in frontmatter.
-     - Merge `permission.skill` into workspace `opencode.json` (allow listed skills, deny `*`).
-     - Enable selected MCP servers in workspace `opencode.json`.
+     - Under `agent.<name>_<suffix>` in workspace `opencode.json`, set:
+       - `permission.skill` — allow listed skills, deny `*`.
+       - `mcp` — enable selected MCP servers (`enabled: true`).
 4. **Start agent CLI** — `opencode` (or provider-specific command).
 5. **Block until exit**.
-6. **Cleanup** — Remove session agent file, revert `opencode.json` changes, delete `opencode.json` if empty, prune `.opencode/` if empty.
+6. **Cleanup** — Remove session agent file, remove the `agent.<name>_<suffix>` entry from `opencode.json`, delete `opencode.json` if empty, prune `.opencode/` if empty.
 
 #### Create a profile headlessly
 

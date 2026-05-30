@@ -23,6 +23,7 @@ pub fn draw_content(frame: &mut Frame, state: &AppState, list_area: Rect, detail
                 !is_live,
                 state.active_config(),
                 state.scroll_offset,
+                &state.installing_names,
             );
             detail::render(
                 frame,

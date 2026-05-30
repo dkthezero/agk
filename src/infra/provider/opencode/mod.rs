@@ -442,12 +442,46 @@ mod tests {
         let plan = provider.build_launch_plan(&profile, None).unwrap();
         assert_eq!(plan.profile_id.as_str(), "dev");
         assert!(plan.patched_provider_config.is_some());
+        assert!(plan.session_agent_name.is_some());
 
         let config = plan.patched_provider_config.unwrap();
-        let permission = config.get("permission").unwrap();
+        let agent_name = plan.session_agent_name.unwrap();
+        let agent = config.get("agent").unwrap();
+        let dev_agent = agent.get(&agent_name).unwrap();
+        let permission = dev_agent.get("permission").unwrap();
         let skill_perm = permission.get("skill").unwrap();
         assert_eq!(skill_perm.get("rust").unwrap(), "allow");
         assert_eq!(skill_perm.get("*").unwrap(), "deny");
+    }
+
+    #[test]
+    fn profile_runtime_builds_launch_plan_with_mcps() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = OpenCodeProvider::new(dir.path().to_path_buf());
+
+        let profile_name = "dev";
+        let agent_dir = dir.path().join(".agk").join("profiles").join(profile_name);
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        std::fs::write(agent_dir.join("agent.md"), "Test agent").unwrap();
+
+        let profile = crate::domain::profile::Profile {
+            id: crate::domain::profile::ProfileId::new(profile_name),
+            scope: Scope::Workspace,
+            provider_id: crate::domain::profile::ProviderId::new("opencode"),
+            skill_refs: vec![],
+            mcp_refs: vec![crate::domain::profile::McpServerId::new("fs")],
+            instruction_refs: vec![],
+            prompt_overlay_path: None,
+            launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+        };
+
+        let plan = provider.build_launch_plan(&profile, None).unwrap();
+        let config = plan.patched_provider_config.unwrap();
+        let agent_name = plan.session_agent_name.unwrap();
+        let agent = config.get("agent").unwrap();
+        let dev_agent = agent.get(&agent_name).unwrap();
+        let mcp = dev_agent.get("mcp").unwrap();
+        assert_eq!(mcp.get("fs").unwrap().get("enabled").unwrap(), true);
     }
 
     #[test]

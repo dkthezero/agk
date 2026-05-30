@@ -8,6 +8,8 @@ pub fn build_with_store(
     Registry,
     super::ScanResult,
     crate::infra::config::toml_store::TomlConfigStore,
+    crate::domain::config::ConfigFile,
+    crate::domain::config::ConfigFile,
 )> {
     let mut registry = Registry::new();
 
@@ -82,10 +84,23 @@ pub fn build_with_store(
     for vault in active_vaults {
         registry.register_vault(vault);
     }
-    let mut scan_result = super::scan(&registry, &registry.vaults)?;
-    super::filter_scan(&mut scan_result, &global_config, Some(&workspace_config));
 
-    Ok((registry, scan_result, store))
+    // Scan is deferred to the first async TriggerReload so the TUI renders
+    // instantly instead of blocking on filesystem I/O before entering alternate
+    // screen.  The empty ScanResult is populated later via ReloadComplete.
+    let scan_result = super::ScanResult {
+        packages_by_tab: std::iter::repeat_with(Vec::new)
+            .take(registry.feature_sets.len())
+            .collect(),
+    };
+
+    Ok((
+        registry,
+        scan_result,
+        store,
+        global_config,
+        workspace_config,
+    ))
 }
 
 pub fn build(
@@ -94,6 +109,8 @@ pub fn build(
     Registry,
     super::ScanResult,
     crate::infra::config::toml_store::TomlConfigStore,
+    crate::domain::config::ConfigFile,
+    crate::domain::config::ConfigFile,
 )> {
     let store = crate::infra::config::toml_store::TomlConfigStore::standard(&workspace_root);
     build_with_store(workspace_root, store)

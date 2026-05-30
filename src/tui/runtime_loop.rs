@@ -57,6 +57,17 @@ where
                 state.status_line = format!("Error: {}", error);
             }
             AppEvent::TriggerReload => {
+                let id = crate::tui::progress::NEXT_TASK_ID
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                state.latest_task_id = Some(id);
+                state.active_tasks.insert(
+                    id,
+                    crate::tui::progress::Progress {
+                        name: "Scanning vaults...".to_string(),
+                        status: crate::tui::progress::ProgressStatus::Starting,
+                    },
+                );
+
                 let tx = ctx.tx.clone();
                 let active_scope = state.active_scope;
                 let ctx2 = EventContext {
@@ -69,6 +80,10 @@ where
                 tokio::task::spawn_blocking(move || {
                     let snapshot = compute_reload_snapshot(active_scope, &ctx2, &mut existing_mcp);
                     let _ = tx.send(AppEvent::ReloadComplete(snapshot));
+                    let _ = tx.send(AppEvent::TaskCompleted {
+                        id,
+                        message: "Scanning vaults... Done".to_string(),
+                    });
                 });
             }
             AppEvent::ClawHubSearchResults { packages, task_id } => {
@@ -102,6 +117,9 @@ where
             }
             AppEvent::ReloadComplete(snapshot) => {
                 apply_reload_snapshot(state, snapshot);
+                // Config is now fresh; let the list transition from spinner
+                // to [✓] / [ ] without flashing an intermediate empty state.
+                state.installing_names.clear();
             }
             AppEvent::ExecuteCommand(cmd) => {
                 let core = ctx.core.clone();
@@ -115,6 +133,17 @@ where
             }
             AppEvent::CoreEvent(evt) => {
                 apply_core_event(state, &evt);
+                // Asset mutations update the on-disk config; reload so the
+                // UI reflects installed / removed / updated state.
+                if matches!(
+                    &evt,
+                    crate::app::event::CoreEvent::AssetInstalled { .. }
+                        | crate::app::event::CoreEvent::AssetRemoved { .. }
+                        | crate::app::event::CoreEvent::AssetUpdated { .. }
+                        | crate::app::event::CoreEvent::SyncComplete { .. }
+                ) {
+                    let _ = ctx.tx.send(AppEvent::TriggerReload);
+                }
             }
         }
         terminal.draw(|frame| crate::tui::render::draw(frame, state))?;
@@ -177,109 +206,33 @@ where
         Ok(s) if s.success() => {
             state.status_line = format!("Finished: {} {}", command, args.join(" "));
 
-            // After opencode agent create succeeds, move the generated agent file into
-            // .agk/profiles/<name>/agent.md
+            // After opencode agent create succeeds, verify the generated agent
+            // file exists.  opencode writes into <--path>/agents/<name>.md.
             if command == "opencode" && args.iter().any(|a| a == "create") {
                 if let Some(name) = profile_name {
-                    let target_dir: std::path::PathBuf =
-                        current_dir.join(".agk").join("profiles").join(&name);
-                    let agents_dir = current_dir.join(".opencode").join("agents");
-                    let agents_subdir = agents_dir.join("agents");
-
-                    let mut moved = false;
-                    // Try .opencode/agents/<name>.md first (direct mode)
-                    let direct = agents_dir.join(format!("{}.md", name));
-                    if direct.exists() {
-                        if let Err(e) = std::fs::create_dir_all(&target_dir) {
-                            state.status_line = format!("Failed to create profile dir: {}", e);
-                        } else {
-                            let dest = target_dir.join("agent.md");
-                            if let Err(e) = std::fs::rename(&direct, &dest) {
-                                state.status_line = format!("Failed to move agent file: {}", e);
-                            } else {
-                                state.status_line =
-                                    format!("Profile '{}' created successfully", name);
-                                moved = true;
-                            }
+                    let profile_dir = current_dir.join(".agk").join("profiles").join(&name);
+                    let agents_dir = profile_dir.join("agents");
+                    let found = std::fs::read_dir(&agents_dir).ok().and_then(|entries| {
+                        entries
+                            .flatten()
+                            .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
+                            .map(|e| e.path())
+                    });
+                    match found {
+                        Some(path) => {
+                            // Also copy to the legacy agent.md path so older code
+                            // and the profile_agent_path fallback both resolve.
+                            let dest = profile_dir.join("agent.md");
+                            let _ = std::fs::copy(&path, &dest);
+                            state.status_line = format!("Profile '{}' created successfully", name);
                         }
-                    }
-
-                    // Fallback: look in .opencode/agents/agents/<name>.md
-                    if !moved {
-                        let nested = agents_subdir.join(format!("{}.md", name));
-                        if nested.exists() {
-                            if let Err(e) = std::fs::create_dir_all(&target_dir) {
-                                state.status_line = format!("Failed to create profile dir: {}", e);
-                            } else {
-                                let dest = target_dir.join("agent.md");
-                                if let Err(e) = std::fs::rename(&nested, &dest) {
-                                    state.status_line = format!("Failed to move agent file: {}", e);
-                                } else {
-                                    state.status_line =
-                                        format!("Profile '{}' created successfully", name);
-                                    moved = true;
-                                }
-                            }
+                        None => {
+                            state.status_line = format!(
+                                "Profile '{}' created, but no agent .md found in {}",
+                                name,
+                                agents_dir.display()
+                            );
                         }
-                    }
-
-                    // Last resort: scan for newest .md in agents dir
-                    if !moved {
-                        if let Ok(mut entries) = std::fs::read_dir(&agents_dir) {
-                            let now = std::time::SystemTime::now();
-                            let five_secs = std::time::Duration::from_secs(5);
-                            let mut newest: Option<(std::path::PathBuf, std::fs::Metadata)> = None;
-
-                            while let Some(Ok(entry)) = entries.next() {
-                                let path = entry.path();
-                                if let Some("md") = path.extension().and_then(|s| s.to_str()) {
-                                    if let Ok(meta) = entry.metadata() {
-                                        if let Ok(modified) = meta.modified() {
-                                            if now.duration_since(modified).unwrap_or(five_secs)
-                                                <= five_secs
-                                            {
-                                                let newer = match &newest {
-                                                    None => true,
-                                                    Some((_, prev_meta)) => {
-                                                        match prev_meta.modified() {
-                                                            Ok(prev) => modified > prev,
-                                                            Err(_) => true,
-                                                        }
-                                                    }
-                                                };
-                                                if newer {
-                                                    newest = Some((path, meta));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            if let Some((agent_md, _)) = newest {
-                                if let Err(e) = std::fs::create_dir_all(&target_dir) {
-                                    state.status_line =
-                                        format!("Failed to create profile dir: {}", e);
-                                } else {
-                                    let dest = target_dir.join("agent.md");
-                                    if let Err(e) = std::fs::rename(&agent_md, &dest) {
-                                        state.status_line =
-                                            format!("Failed to move agent file: {}", e);
-                                    } else {
-                                        state.status_line =
-                                            format!("Profile '{}' created successfully", name);
-                                        moved = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if !moved {
-                        state.status_line = format!(
-                            "Profile '{}' created, but no agent.md found in agents/",
-                            name
-                        );
                     }
                 }
             }

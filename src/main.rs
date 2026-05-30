@@ -51,21 +51,24 @@ async fn try_main() -> Result<()> {
 ///
 /// All commands are now routed through `AgkCore` via `cli::core_dispatcher`.
 fn run_headless(cli: cli::entry::Cli, workspace: &std::path::Path) -> Result<i32> {
-    let (registry, _scan, store) = app::bootstrap::build(workspace.to_path_buf())?;
+    let (registry, _scan, store, _global, _workspace) =
+        app::bootstrap::build(workspace.to_path_buf())?;
     let core = build_core(workspace, registry, store)?;
     cli::core_dispatcher::dispatch(&cli, workspace, &core)
 }
 
 /// Run the interactive TUI.
 async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
-    let (registry, scan, store) = app::bootstrap::build(workspace.clone())?;
+    let (registry, scan, store, global_config, workspace_config) =
+        app::bootstrap::build(workspace.clone())?;
     let core = build_core(&workspace, registry, store)?;
 
     let mut state = tui::entry::build_state(
         core.registry.as_ref(),
-        core.store.as_ref(),
         scan,
         &workspace,
+        global_config,
+        workspace_config,
     );
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
@@ -93,11 +96,7 @@ async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
 
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();
-    crossterm::execute!(
-        stdout,
-        crossterm::terminal::EnterAlternateScreen,
-        crossterm::event::EnableMouseCapture
-    )?;
+    crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen)?;
     let backend = ratatui::backend::CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
 
@@ -113,17 +112,26 @@ async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
         }
     });
 
+    // Kick off the initial vault scan in the background so the TUI renders
+    // immediately.  The footer progress bar will show "Scanning vaults..." while
+    // packages populate via the existing ReloadComplete pipeline.
+    let _ = tx.send(tui::event::AppEvent::TriggerReload);
+
     let result = tui::runtime_loop::run_loop(&mut terminal, &mut state, &ctx, &mut rx).await;
 
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(
         terminal.backend_mut(),
-        crossterm::terminal::LeaveAlternateScreen,
-        crossterm::event::DisableMouseCapture
+        crossterm::terminal::LeaveAlternateScreen
     )?;
     terminal.show_cursor()?;
 
-    result
+    result?;
+
+    // ESC x2 (or Ctrl+C) lands here.  Terminate immediately so the
+    // process does not hang waiting for spawned blocking tasks (e.g. an
+    // in-flight asset install) or the ticker / keyboard reader.
+    std::process::exit(EXIT_SUCCESS);
 }
 
 // ---------------------------------------------------------------------------

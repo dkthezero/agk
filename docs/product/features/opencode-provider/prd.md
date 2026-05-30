@@ -80,7 +80,7 @@ Add [OpenCode](https://github.com/anomalyco/opencode) as a first-class deploymen
 | Scenario | Expected UX |
 |----------|-------------|
 | Enable OpenCode as a target | Tab 3 (Providers) → navigate to "OpenCode" → press `Space`. A checkmark appears. |
-| Install a skill to OpenCode | Tab 1 (Skills) → select skill → press `Space`. Skill is copied to `.opencode/skills/<name>/SKILL.md` (workspace) or `~/.config/opencode/skills/<name>/SKILL.md` (global). `opencode.json` is updated with the skill reference. |
+| Install a skill to OpenCode | Tab 1 (Skills) → select skill → press `Space`. Skill is copied to `.opencode/skills/<name>/SKILL.md` (workspace) or `~/.config/opencode/skills/<name>/SKILL.md` (global). OpenCode auto-discovers the skill from the directory; `opencode.json` is not modified for regular skill installs. |
 | Enable MCP for OpenCode | Tab 2 (MCP) → select server → `Space`. OpenCode writes flat `mcp.<name>` entry to `opencode.json`. |
 | Verify install | OpenCode CLI can now use the skill natively because it scans the same directories. |
 
@@ -88,7 +88,7 @@ Add [OpenCode](https://github.com/anomalyco/opencode) as a first-class deploymen
 
 | Scenario | Expected UX |
 |----------|-------------|
-| Agent targets OpenCode explicitly | `agk install clawhub/react-builder --provider opencode --json` returns `{"installed": true, "path": ".opencode/skills/react-builder/SKILL.md", "config_updated": "opencode.json"}` |
+| Agent targets OpenCode explicitly | `agk install clawhub/react-builder --provider opencode --json` returns `{"installed": true, "path": ".opencode/skills/react-builder/SKILL.md"}`. `opencode.json` is not modified because OpenCode auto-discovers skills from the filesystem. |
 | Agent enables MCP for OpenCode | `agk mcp enable fs --provider opencode --scope workspace` writes flat `mcp.fs = { "type": "local", ... }` to `opencode.json`. |
 | Agent checks provider status | `agk sync --dry-run --json` shows OpenCode as an active target and lists which skills would be installed there. |
 

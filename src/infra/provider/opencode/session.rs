@@ -30,46 +30,37 @@ impl ProfileRuntimePort for OpenCodeProvider {
         let (current_config, original_bytes) = self.read_workspace_config()?;
         let mut plan_config = current_config.clone();
 
-        // Patch agent entry
+        // Generate one deterministic agent name for the session.
+        let agent_name = format!("{}{}", name, random_6_digits());
+
+        // Patch agent entry (per-agent overrides for skills and MCPs)
         if plan_config.get("agent").is_none() {
             plan_config["agent"] = serde_json::json!({});
         }
         if let Some(agent_obj) = plan_config["agent"].as_object_mut() {
-            agent_obj.insert(
-                format!("{}{}", name, random_6_digits()),
-                serde_json::json!({
-                    "mode": "primary",
-                    "description": format!("Session agent for {} profile", name),
-                }),
-            );
-        }
+            let mut agent_entry = serde_json::json!({
+                "mode": "primary",
+                "description": format!("Session agent for {} profile", name),
+            });
 
-        // Patch permission -> skill
-        if plan_config.get("permission").is_none() {
-            plan_config["permission"] = serde_json::json!({});
-        }
-        if plan_config["permission"].get("skill").is_none() {
-            plan_config["permission"]["skill"] = serde_json::json!({});
-        }
-        if let Some(skill_perm) = plan_config["permission"]["skill"].as_object_mut() {
+            // Per-agent skill permissions
+            let mut skill_perm = serde_json::json!({});
             for skill in &profile.skill_refs {
-                skill_perm.insert(skill.0.clone(), serde_json::json!("allow"));
+                skill_perm[skill.0.clone()] = serde_json::json!("allow");
             }
-            skill_perm.insert("*".to_string(), serde_json::json!("deny"));
-        }
+            skill_perm["*"] = serde_json::json!("deny");
+            agent_entry["permission"] = serde_json::json!({ "skill": skill_perm });
 
-        // Patch mcp entries
-        for mcp in &profile.mcp_refs {
-            if plan_config.get("mcp").is_none() {
-                plan_config["mcp"] = serde_json::json!({});
+            // Per-agent MCP enablement
+            let mut mcp_obj = serde_json::json!({});
+            for mcp in &profile.mcp_refs {
+                mcp_obj[mcp.0.clone()] = serde_json::json!({ "enabled": true });
             }
-            if let Some(mcp_obj) = plan_config["mcp"].as_object_mut() {
-                if let Some(entry) = mcp_obj.get_mut(&mcp.0) {
-                    if let Some(e) = entry.as_object_mut() {
-                        e.insert("enabled".to_string(), serde_json::json!(true));
-                    }
-                }
+            if mcp_obj.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
+                agent_entry["mcp"] = mcp_obj;
             }
+
+            agent_obj.insert(agent_name.clone(), agent_entry);
         }
 
         Ok(LaunchPlan {
@@ -78,12 +69,17 @@ impl ProfileRuntimePort for OpenCodeProvider {
             agent_markdown_source: base_agent_path,
             patched_provider_config: Some(plan_config),
             original_provider_config_bytes: original_bytes,
+            session_agent_name: Some(agent_name),
             ..LaunchPlan::default()
         })
     }
 
     fn run_plan(&self, plan: &LaunchPlan) -> Result<ProfileSession> {
-        let agent_name = format!("{}{}", plan.profile_id.as_str(), random_6_digits());
+        let agent_name = plan
+            .session_agent_name
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| format!("{}{}", plan.profile_id.as_str(), random_6_digits()));
         let agents_dir = self.workspace_root.join(".opencode").join("agents");
         let session_agent_path = agents_dir.join(format!("{}.md", agent_name));
 

@@ -56,6 +56,29 @@ fn remove_mcp_server(&self, name: &str, scope: Scope) -> Result<()>;
 - On remove: drops the server entry. If `mcp` becomes empty, drops the entire `mcp` key to avoid schema validation errors.
 - **Migration:** On write, drops any stale `mcp.servers` key (from earlier schema iteration).
 
+**Profile Session Overrides:**
+- When `agk p start <profile>` launches an OpenCode session, skill permissions and MCP enablement are written as **per-agent overrides** under `agent.<session_name>` rather than globally.
+- Example structure:
+  ```json
+  {
+    "agent": {
+      "dev_123456": {
+        "mode": "primary",
+        "permission": {
+          "skill": {
+            "rust": "allow",
+            "*": "deny"
+          }
+        },
+        "mcp": {
+          "fs": { "enabled": true }
+        }
+      }
+    }
+  }
+  ```
+- On session exit, the entire `agent.<session_name>` entry is removed, which atomically cleans up the overrides.
+
 ## Module Structure
 
 ```

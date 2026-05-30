@@ -157,6 +157,8 @@ pub struct LaunchPlan {
     pub patched_provider_config: Option<serde_json::Value>,
     /// Original provider configuration bytes for lossless restoration.
     pub original_provider_config_bytes: Option<Vec<u8>>,
+    /// Agent name that was patched into provider config (used by run_plan and cleanup).
+    pub session_agent_name: Option<String>,
 }
 
 /// Snapshot of the workspace configuration and scan results.
