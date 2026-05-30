@@ -1,4 +1,4 @@
-pub(crate) mod clawhub;
-pub(crate) mod github;
-pub(crate) mod local;
-pub(crate) mod search_adapters;
+pub mod clawhub;
+pub mod github;
+pub mod local;
+pub mod search_adapters;

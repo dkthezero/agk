@@ -209,6 +209,16 @@ impl CoreEventSink for CliPresenter {
             CoreEvent::Info(msg) => {
                 self.print(msg);
             }
+            CoreEvent::TaskHungWarning {
+                id,
+                name,
+                elapsed_sec,
+            } => {
+                self.eprint(&format!(
+                    "[HUNG] Task {} '{}' has been running for {}s",
+                    id, name, elapsed_sec
+                ));
+            }
             // Other events are silent in CLI mode
             _ => {}
         }

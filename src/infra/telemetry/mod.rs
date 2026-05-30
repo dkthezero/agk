@@ -2,5 +2,5 @@
 
 pub mod parser;
 pub mod parsers;
-pub(crate) mod scanner;
-pub(crate) mod store;
+pub mod scanner;
+pub mod store;

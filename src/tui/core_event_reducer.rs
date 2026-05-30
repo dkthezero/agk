@@ -188,6 +188,19 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::Error(msg) => {
             state.status_line = format!("Error: {}", msg);
         }
+        CoreEvent::TaskPhaseChanged { id, phase, .. } => {
+            if let Some(task) = state.active_tasks.get_mut(id) {
+                task.status = match phase.as_str() {
+                    "completed" => crate::tui::progress::ProgressStatus::Running(100),
+                    _ => crate::tui::progress::ProgressStatus::Running(0),
+                };
+            }
+        }
+        CoreEvent::TaskHungWarning {
+            name, elapsed_sec, ..
+        } => {
+            state.status_line = format!("Warning: task '{}' appears hung ({}s)", name, elapsed_sec);
+        }
         CoreEvent::WorkspaceLoaded(_) => {
             state.status_line = "Workspace loaded".to_string();
         }

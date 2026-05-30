@@ -96,6 +96,37 @@ where
                 if state.scroll_tick.is_multiple_of(2) {
                     state.scroll_offset = state.scroll_offset.wrapping_add(1);
                 }
+
+                // Underground hang detection — query TaskTrackerPort every tick.
+                let hung = ctx
+                    .core
+                    .task_tracker
+                    .detect_hung(std::time::Duration::from_secs(30));
+                let hung_ids: std::collections::HashSet<usize> = hung
+                    .iter()
+                    .filter_map(|t| t.id.strip_prefix("task-").and_then(|s| s.parse().ok()))
+                    .collect();
+
+                for task in &hung {
+                    if let Some(id) = task.id.strip_prefix("task-").and_then(|s| s.parse().ok()) {
+                        if !state.hung_warnings_shown.contains(&id) {
+                            let elapsed = task
+                                .started_at
+                                .map(|s| s.elapsed().as_secs())
+                                .unwrap_or_else(|| task.created_at.elapsed().as_secs());
+                            let _ = ctx.tx.send(AppEvent::CoreEvent(
+                                crate::app::event::CoreEvent::TaskHungWarning {
+                                    id,
+                                    name: task.name.clone(),
+                                    elapsed_sec: elapsed,
+                                },
+                            ));
+                            state.hung_warnings_shown.insert(id);
+                        }
+                    }
+                }
+                // Remove ids that are no longer hung so they can be re-warned if they hang again.
+                state.hung_warnings_shown.retain(|id| hung_ids.contains(id));
             }
             AppEvent::RunInteractiveProcess {
                 command,

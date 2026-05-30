@@ -13,6 +13,7 @@ pub mod mcp_registry;
 pub mod process_runner;
 pub mod profile_runtime;
 pub mod provider;
+pub mod task_tracker;
 pub mod telemetry_store;
 pub mod vault;
 
@@ -25,5 +26,6 @@ pub use mcp_registry::{McpProvider, McpRegistryPort};
 pub use process_runner::ProcessRunnerPort;
 pub use profile_runtime::{ProfileRuntimePort, ProfileSession};
 pub use provider::{ProviderPort, WizardState, WizardStep};
+pub use task_tracker::{TaskPhase, TaskTrackerPort, TrackedTask};
 pub use telemetry_store::TelemetryStorePort;
 pub use vault::{VaultPort, VaultSearchPort};

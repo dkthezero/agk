@@ -2,7 +2,7 @@ use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{
     ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort, ProfileRuntimePort,
-    VaultSearchPort,
+    TaskTrackerPort, VaultSearchPort,
 };
 use crate::app::registry::Registry;
 use std::collections::HashMap;
@@ -26,6 +26,7 @@ pub struct AgkCore {
     /// Provider runtime ports keyed by `provider_id` (e.g. "opencode").
     pub runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
     pub process_runner: Arc<dyn ProcessRunnerPort>,
+    pub task_tracker: Arc<dyn TaskTrackerPort>,
     pub workspace_root: std::path::PathBuf,
 }
 
@@ -39,6 +40,7 @@ impl AgkCore {
         registry: Arc<Registry>,
         runtime_ports: HashMap<String, Arc<dyn ProfileRuntimePort>>,
         process_runner: Arc<dyn ProcessRunnerPort>,
+        task_tracker: Arc<dyn TaskTrackerPort>,
         workspace_root: std::path::PathBuf,
     ) -> Self {
         Self {
@@ -49,6 +51,7 @@ impl AgkCore {
             registry,
             runtime_ports,
             process_runner,
+            task_tracker,
             workspace_root,
         }
     }
@@ -58,6 +61,10 @@ impl AgkCore {
     ///
     /// The TUI passes a presenter that updates `TuiState`; the CLI passes a
     /// presenter that writes JSON / text to stdout.
+    #[cfg_attr(
+        feature = "observability",
+        tracing::instrument(skip_all, fields(command = ?command))
+    )]
     pub fn execute(&self, command: CoreCommand, sink: &mut dyn CoreEventSink) -> CoreResult {
         if let Some(r) = crate::app::features::profile::dispatch(&command, self, sink) {
             return r;
@@ -84,6 +91,9 @@ impl AgkCore {
             return r;
         }
         if let Some(r) = crate::app::features::telemetry::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::debug::dispatch(&command, self, sink) {
             return r;
         }
 
@@ -289,6 +299,7 @@ mod tests {
             Arc::new(registry),
             HashMap::new(),
             Arc::new(FakeProcessRunner),
+            Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
         )
     }
@@ -305,6 +316,7 @@ mod tests {
             registry,
             HashMap::new(),
             Arc::new(FakeProcessRunner),
+            Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
         )
     }

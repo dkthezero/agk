@@ -1,10 +1,12 @@
-pub(crate) mod bootstrap;
-pub(crate) mod command;
-pub(crate) mod core;
-pub(crate) mod event;
-pub(crate) mod features;
-pub(crate) mod outcome;
-pub(crate) mod ports;
-pub(crate) mod registry;
-pub(crate) mod snapshot;
-pub(crate) mod tab_kind;
+pub mod bootstrap;
+pub mod command;
+pub mod core;
+pub mod event;
+pub mod features;
+pub mod outcome;
+pub mod ports;
+pub mod registry;
+pub mod snapshot;
+pub mod tab_kind;
+
+pub mod test_support;

@@ -110,6 +110,20 @@ pub enum CoreEvent {
         error: String,
     },
 
+    /// A background task transitioned to a new phase (for the TUI operation log).
+    TaskPhaseChanged {
+        id: usize,
+        phase: String,
+        elapsed_ms: u64,
+    },
+
+    /// A warning that a task appears hung (for developer/debug builds).
+    TaskHungWarning {
+        id: usize,
+        name: String,
+        elapsed_sec: u64,
+    },
+
     ValidationReport {
         passed: bool,
         message: String,

@@ -1,0 +1,15 @@
+//! End-to-End Full-Flow TUI Tests (P8 Layer 1 — Terminal Emulation).
+//!
+//! Each scenario constructs a headless [`TestBackend`], runs a [`CoreCommand`]
+//! through [`AgkCore`] with a sink that feeds events straight into
+//! [`AppState`], draws the resulting frame, and asserts on the rendered text.
+//!
+//! This reproduces the actual user experience without a real terminal or
+//! async event loop, giving us deterministic frame-level assertions.
+
+mod common;
+mod mcp_register;
+mod provider_toggle;
+mod skill_install;
+mod sync_update;
+mod vault_attach;

@@ -1,8 +1,8 @@
-pub(crate) mod core_dispatcher;
-pub(crate) mod entry;
-pub(crate) mod entry_subcommands;
-pub(crate) mod presenter;
-pub(crate) mod presenter_json;
+pub mod core_dispatcher;
+pub mod entry;
+pub mod entry_subcommands;
+pub mod presenter;
+pub mod presenter_json;
 
 // ---------------------------------------------------------------------------
 // CLI exit codes

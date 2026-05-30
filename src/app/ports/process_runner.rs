@@ -27,4 +27,19 @@ pub trait ProcessRunnerPort: Send + Sync {
         let _ = (command, args, cwd);
         anyhow::bail!("interactive process not supported by this runner")
     }
+
+    /// Run a command with a timeout. Returns Err if the child exceeds the timeout.
+    ///
+    /// Default delegates to [`run`](Self::run) and ignores the timeout —
+    /// adapters that genuinely support timeouts (e.g. `OsProcessRunner`) should override.
+    fn run_with_timeout(
+        &self,
+        command: &str,
+        args: &[&str],
+        cwd: Option<&Path>,
+        env: Option<&[(String, String)]>,
+        _timeout: std::time::Duration,
+    ) -> Result<String> {
+        self.run(command, args, cwd, env)
+    }
 }
