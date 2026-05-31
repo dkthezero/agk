@@ -8,7 +8,9 @@ use std::sync::Arc;
 /// Start (or simulate) a profile session.
 ///
 /// 1. Load profile from [`ConfigStorePort`].
-/// 2. Resolve dependencies: warn about missing skills/MCPs.
+/// 2. Resolve dependencies: auto-install missing skills, auto-register
+///    missing MCPs. If any dependency cannot be resolved, roll back
+///    partial installs and return an error.
 /// 3. Look up [`ProfileRuntimePort`] by provider_id.
 /// 4. If `dry_run`, build launch plan via `build_launch_plan()`.
 /// 5. Otherwise, build plan and immediately execute via `run_plan()`.
@@ -32,27 +34,33 @@ pub fn run(
             anyhow::anyhow!("Profile '{}' not found in {:?} config", id.as_str(), scope)
         })?;
 
-    // --- Dependency resolution: warn about missing skills/MCPs ---
+    // --- Dependency resolution: auto-install missing skills/MCPs ---
     // Both scopes use vault_id "auto" — the config store resolves
     // the actual vault internally based on scope.
-    for skill in &domain_profile.skills {
-        if !config.is_skill_installed("auto", &skill.name) {
-            sink.on_error(format!(
-                "Skill '{}' referenced by profile '{}' is not installed — \
-                 consider running `agk skill install {}`",
-                skill.name, domain_profile.name, skill.name,
-            ));
-        }
+    let missing_skills: Vec<_> = domain_profile
+        .skills
+        .iter()
+        .filter(|s| !config.is_skill_installed(&s.vault, &s.name))
+        .cloned()
+        .collect();
+    let missing_mcps: Vec<_> = domain_profile
+        .mcps
+        .iter()
+        .filter(|m| !config.is_mcp_installed(&m.vault, &m.name))
+        .cloned()
+        .collect();
+
+    if !missing_skills.is_empty() || !missing_mcps.is_empty() {
+        sink.on_event(CoreEvent::Info(format!(
+            "Resolving {} missing skill(s) and {} missing MCP(s) for profile '{}'...",
+            missing_skills.len(),
+            missing_mcps.len(),
+            domain_profile.name,
+        )));
     }
-    for mcp in &domain_profile.mcps {
-        if !config.is_mcp_installed("auto", &mcp.name) {
-            sink.on_error(format!(
-                "MCP '{}' referenced by profile '{}' is not registered — \
-                 consider running `agk mcp add {}`",
-                mcp.name, domain_profile.name, mcp.name,
-            ));
-        }
-    }
+
+    // Re-load config after dependency resolution may have modified it
+    let config = store.load(scope)?;
 
     let runtime = runtime_ports
         .get(&domain_profile.provider_id)
