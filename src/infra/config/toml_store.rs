@@ -125,6 +125,8 @@ mod tests {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Workspace, &config).unwrap();

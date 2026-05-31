@@ -29,6 +29,11 @@ pub fn remove_asset(
                 }
             }
             &AssetKind::McpServer => {}
+            &AssetKind::Profile => {
+                if let Some(bucket) = section.profiles.as_mut() {
+                    bucket.items.retain(|s| s != &identity_str);
+                }
+            }
         }
     }
     crate::app::features::common::prune_empty_vault_defs(&mut config);
@@ -120,6 +125,8 @@ mod tests {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Workspace, &config).unwrap();
@@ -160,6 +167,8 @@ mod tests {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Workspace, &config).unwrap();

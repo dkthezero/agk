@@ -49,6 +49,7 @@ impl GeminiProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 

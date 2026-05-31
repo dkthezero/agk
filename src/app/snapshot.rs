@@ -40,6 +40,6 @@ pub struct ProviderEntry {
 pub struct ProfileEntry {
     pub name: String,
     pub provider_id: String,
-    pub skills: Vec<String>,
-    pub mcps: Vec<String>,
+    pub skills: Vec<crate::domain::profile::ProfileAssetRef>,
+    pub mcps: Vec<crate::domain::profile::ProfileAssetRef>,
 }

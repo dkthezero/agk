@@ -246,6 +246,8 @@ mod tests {
                     items: vec!["[my-skill:--:hash]".into()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         state.configs.insert(Scope::Workspace, config.clone());

@@ -50,7 +50,12 @@ pub fn filter_scan(
                     crate::domain::asset::AssetKind::Instruction => {
                         global_config.is_instruction_installed(&pkg.vault_id, &pkg.identity.name)
                     }
-                    crate::domain::asset::AssetKind::McpServer => false,
+                    crate::domain::asset::AssetKind::McpServer => {
+                        global_config.is_mcp_installed(&pkg.vault_id, &pkg.identity.name)
+                    }
+                    crate::domain::asset::AssetKind::Profile => {
+                        global_config.is_profile_installed(&pkg.vault_id, &pkg.identity.name)
+                    }
                 };
                 let is_ws = if let Some(ws) = workspace_config {
                     match pkg.kind {
@@ -60,7 +65,12 @@ pub fn filter_scan(
                         crate::domain::asset::AssetKind::Instruction => {
                             ws.is_instruction_installed(&pkg.vault_id, &pkg.identity.name)
                         }
-                        crate::domain::asset::AssetKind::McpServer => false,
+                        crate::domain::asset::AssetKind::McpServer => {
+                            ws.is_mcp_installed(&pkg.vault_id, &pkg.identity.name)
+                        }
+                        crate::domain::asset::AssetKind::Profile => {
+                            ws.is_profile_installed(&pkg.vault_id, &pkg.identity.name)
+                        }
                     }
                 } else {
                     false

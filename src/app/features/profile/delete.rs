@@ -70,9 +70,14 @@ mod tests {
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
             skills: vec![],
             mcps: vec![],
-        });
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
+            });
         let store = FakeStore {
             data: Mutex::new(config),
         };

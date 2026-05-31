@@ -178,8 +178,19 @@ pub fn handle_profile_wizard_input(
                 new_config.profiles.push(crate::domain::config::Profile {
                     name: name.clone(),
                     provider_id,
-                    skills: skills.clone(),
-                    mcps: mcps.clone(),
+                    scope: state.active_scope.to_string().to_lowercase(),
+                    skills: skills
+                        .iter()
+                        .map(|s| crate::domain::profile::ProfileAssetRef::new(s.clone(), "auto"))
+                        .collect(),
+                    mcps: mcps
+                        .iter()
+                        .map(|m| crate::domain::profile::ProfileAssetRef::new(m.clone(), "auto"))
+                        .collect(),
+                    instructions: vec![],
+                    tool_refs: vec![],
+                    permission_mode: None,
+                    prompt_overlay_path: None,
                 });
 
                 let scope = state.active_scope;

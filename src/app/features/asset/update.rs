@@ -33,6 +33,15 @@ pub fn update_asset(
                 }
             }
             AssetKind::McpServer => {}
+            AssetKind::Profile => {
+                if let Some(bucket) = section.profiles.as_mut() {
+                    bucket.items.retain(|s| {
+                        crate::domain::config::parse_identity(s)
+                            .map(|id| id.name != *name)
+                            .unwrap_or(true)
+                    });
+                }
+            }
         }
     }
     store.save(scope, &config)?;
@@ -115,6 +124,8 @@ mod tests {
                     items: vec!["[my-skill:--:old_sha_old]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Workspace, &config).unwrap();

@@ -6,6 +6,7 @@ pub enum AssetKind {
     Skill,
     Instruction,
     McpServer,
+    Profile,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

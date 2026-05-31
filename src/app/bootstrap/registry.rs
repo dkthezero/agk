@@ -15,11 +15,7 @@ pub fn build_with_store(
 
     // Feature sets — order defines tab order
     registry.register_feature_set(Box::new(crate::infra::feature::skill::SkillFeatureSet));
-    registry.register_feature_set(Box::new(crate::infra::feature::stub::StubFeatureSet::new(
-        "mcp",
-        "MCP Servers",
-        "",
-    )));
+    registry.register_feature_set(Box::new(crate::infra::feature::mcp::McpFeatureSet));
     registry.register_feature_set(Box::new(
         crate::infra::feature::instruction::InstructionFeatureSet,
     ));
@@ -28,9 +24,9 @@ pub fn build_with_store(
         "Providers",
         "",
     )));
-    registry.register_feature_set(Box::new(crate::infra::feature::stub::StubFeatureSet::new(
-        "profile", "Profiles", "",
-    )));
+    registry.register_feature_set(Box::new(
+        crate::infra::feature::profile::ProfileFeatureSet,
+    ));
     registry.register_feature_set(Box::new(crate::infra::feature::stub::StubFeatureSet::new(
         "vault", "Vaults", "",
     )));
@@ -47,6 +43,8 @@ pub fn build_with_store(
                 )),
                 skills: None,
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         let _ = ConfigStorePort::save(&store, crate::domain::scope::Scope::Global, &global_config);

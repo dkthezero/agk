@@ -172,6 +172,7 @@ impl AppState {
             AssetKind::Skill => config.is_skill_installed(vault_id, name),
             AssetKind::Instruction => config.is_instruction_installed(vault_id, name),
             AssetKind::McpServer => false,
+            AssetKind::Profile => config.is_profile_installed(vault_id, name),
         }
     }
 

@@ -14,10 +14,10 @@ pub fn run(
 ) -> CoreResult {
     let mut config = store.load(scope)?;
     let profile_name = profile_id.as_str();
-    let skill_ref = skill_id.as_str().to_string();
+    let skill_ref = crate::domain::profile::ProfileAssetRef::new(skill_id.as_str(), "auto");
 
     if let Some(profile) = config.profiles.iter_mut().find(|p| p.name == profile_name) {
-        if !profile.skills.contains(&skill_ref) {
+        if !profile.skills.iter().any(|s| s.name == skill_ref.name) {
             profile.skills.push(skill_ref);
             store.save(scope, &config)?;
             sink.on_event(CoreEvent::ProfileUpdated(profile_id.clone()));
@@ -79,8 +79,13 @@ mod tests {
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
             skills: vec![],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let store = FakeStore {
             data: Mutex::new(config),
@@ -105,8 +110,13 @@ mod tests {
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
-            skills: vec!["rust".to_string()],
+            scope: "workspace".to_string(),
+            skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let store = FakeStore {
             data: Mutex::new(config),

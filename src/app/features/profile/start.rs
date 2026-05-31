@@ -45,18 +45,15 @@ pub fn run(
         id: crate::domain::profile::ProfileId::new(&domain_profile.name),
         scope,
         provider_id: crate::domain::profile::ProviderId::new(&domain_profile.provider_id),
-        skill_refs: domain_profile
-            .skills
-            .iter()
-            .map(crate::domain::profile::SkillId::new)
-            .collect(),
-        mcp_refs: domain_profile
-            .mcps
-            .iter()
-            .map(crate::domain::profile::McpServerId::new)
-            .collect(),
-        instruction_refs: vec![],
-        prompt_overlay_path: None,
+        skill_refs: domain_profile.skills.clone(),
+        mcp_refs: domain_profile.mcps.clone(),
+        instruction_refs: domain_profile.instructions.clone(),
+        tool_refs: domain_profile.tool_refs.clone(),
+        permission_mode: domain_profile.permission_mode.clone(),
+        prompt_overlay_path: domain_profile
+            .prompt_overlay_path
+            .as_ref()
+            .map(std::path::PathBuf::from),
         launch_policy: if dry_run {
             crate::domain::profile::LaunchPolicy::DryRun
         } else {
@@ -134,8 +131,13 @@ mod tests {
             config.profiles.push(crate::domain::config::Profile {
                 name: "dev".into(),
                 provider_id: "opencode".into(),
-                skills: vec!["rust".into()],
+                scope: "workspace".into(),
+                skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
                 mcps: vec![],
+                instructions: vec![],
+                tool_refs: vec![],
+                permission_mode: None,
+                prompt_overlay_path: None,
             });
             Ok(config)
         }

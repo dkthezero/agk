@@ -46,7 +46,7 @@ impl ProfileRuntimePort for OpenCodeProvider {
             // Per-agent skill permissions
             let mut skill_perm = serde_json::json!({});
             for skill in &profile.skill_refs {
-                skill_perm[skill.0.clone()] = serde_json::json!("allow");
+                skill_perm[skill.name.clone()] = serde_json::json!("allow");
             }
             skill_perm["*"] = serde_json::json!("deny");
             agent_entry["permission"] = serde_json::json!({ "skill": skill_perm });
@@ -54,7 +54,7 @@ impl ProfileRuntimePort for OpenCodeProvider {
             // Per-agent MCP enablement
             let mut mcp_obj = serde_json::json!({});
             for mcp in &profile.mcp_refs {
-                mcp_obj[mcp.0.clone()] = serde_json::json!({ "enabled": true });
+                mcp_obj[mcp.name.clone()] = serde_json::json!({ "enabled": true });
             }
             if mcp_obj.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
                 agent_entry["mcp"] = mcp_obj;

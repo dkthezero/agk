@@ -34,6 +34,7 @@ impl OpenCodeProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 }
@@ -432,9 +433,11 @@ mod tests {
             id: crate::domain::profile::ProfileId::new(profile_name),
             scope: Scope::Workspace,
             provider_id: crate::domain::profile::ProviderId::new("opencode"),
-            skill_refs: vec![crate::domain::profile::SkillId::new("rust")],
+            skill_refs: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
             mcp_refs: vec![],
             instruction_refs: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
         };
@@ -469,8 +472,10 @@ mod tests {
             scope: Scope::Workspace,
             provider_id: crate::domain::profile::ProviderId::new("opencode"),
             skill_refs: vec![],
-            mcp_refs: vec![crate::domain::profile::McpServerId::new("fs")],
+            mcp_refs: vec![crate::domain::profile::ProfileAssetRef::new("fs", "auto")],
             instruction_refs: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
         };
@@ -496,6 +501,8 @@ mod tests {
             skill_refs: vec![],
             mcp_refs: vec![],
             instruction_refs: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
         };

@@ -61,8 +61,13 @@ pub fn run(
     let profile = Profile {
         name: id_str.to_string(),
         provider_id: provider_id.to_string(),
-        skills: input.skill_refs.iter().map(|s| s.0.clone()).collect(),
-        mcps: input.mcp_refs.iter().map(|m| m.0.clone()).collect(),
+        scope: input.scope.to_string().to_lowercase(),
+        skills: input.skill_refs.clone(),
+        mcps: input.mcp_refs.clone(),
+        instructions: input.instruction_refs.clone(),
+        tool_refs: vec![],
+        permission_mode: None,
+        prompt_overlay_path: None,
     };
     config.profiles.push(profile);
     store.save(input.scope, &config)?;
@@ -131,8 +136,8 @@ pub fn run(
         profiles: vec![crate::app::snapshot::ProfileEntry {
             name: input.id.as_str().to_string(),
             provider_id: input.provider_id.as_str().to_string(),
-            skills: input.skill_refs.iter().map(|s| s.0.clone()).collect(),
-            mcps: input.mcp_refs.iter().map(|m| m.0.clone()).collect(),
+            skills: input.skill_refs.clone(),
+            mcps: input.mcp_refs.clone(),
         }],
         ..WorkspaceSnapshot::default()
     };
@@ -149,6 +154,8 @@ fn to_domain_profile(input: &CreateProfileInput) -> crate::domain::profile::Prof
         skill_refs: input.skill_refs.clone(),
         mcp_refs: input.mcp_refs.clone(),
         instruction_refs: input.instruction_refs.clone(),
+        tool_refs: vec![],
+        permission_mode: None,
         prompt_overlay_path: None,
         launch_policy: crate::domain::profile::LaunchPolicy::default(),
     }
