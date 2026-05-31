@@ -34,7 +34,12 @@ pub fn install_asset(
                 bucket.items.push(identity_str);
             }
         }
-        AssetKind::McpServer => {}
+        AssetKind::McpServer => {
+            let bucket = section.mcps.get_or_insert_with(AssetBucket::default);
+            if !bucket.items.contains(&identity_str) {
+                bucket.items.push(identity_str);
+            }
+        }
         AssetKind::Profile => {
             let bucket = section.profiles.get_or_insert_with(AssetBucket::default);
             if !bucket.items.contains(&identity_str) {

@@ -32,7 +32,15 @@ pub fn update_asset(
                     });
                 }
             }
-            AssetKind::McpServer => {}
+            AssetKind::McpServer => {
+                if let Some(bucket) = section.mcps.as_mut() {
+                    bucket.items.retain(|s| {
+                        crate::domain::config::parse_identity(s)
+                            .map(|id| id.name != *name)
+                            .unwrap_or(true)
+                    });
+                }
+            }
             AssetKind::Profile => {
                 if let Some(bucket) = section.profiles.as_mut() {
                     bucket.items.retain(|s| {

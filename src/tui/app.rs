@@ -171,7 +171,7 @@ impl AppState {
         match kind {
             AssetKind::Skill => config.is_skill_installed(vault_id, name),
             AssetKind::Instruction => config.is_instruction_installed(vault_id, name),
-            AssetKind::McpServer => false,
+            AssetKind::McpServer => config.is_mcp_installed(vault_id, name),
             AssetKind::Profile => config.is_profile_installed(vault_id, name),
         }
     }
