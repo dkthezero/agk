@@ -57,10 +57,16 @@ pub fn render_review_modal(
         estimate_wrapped_lines(&tools.join(", "), inner_width)
     };
 
+    // Estimate tokens for the badge
+    let token_count = crate::app::features::profile::token_estimate::estimate_tokens(description);
+    let token_color_name =
+        crate::app::features::profile::token_estimate::token_badge_color(token_count);
+
     // Content height: label + content + spacing for each section
     let content_height = 1 // Profile: name
         + 2                 // blank + Description label
         + desc_lines
+        + 2                 // blank + Token badge
         + 2                 // blank + Skills label
         + skills_lines
         + 2                 // blank + MCPs label
@@ -109,6 +115,21 @@ pub fn render_review_modal(
             )]));
         }
     }
+    lines.push(Line::from(""));
+
+    // Token estimate badge
+    let token_color = match token_color_name {
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        _ => Color::Red,
+    };
+    lines.push(Line::from(vec![
+        Span::styled("Tokens: ", Style::default().fg(Color::White)),
+        Span::styled(
+            format!("~{}", token_count),
+            Style::default().fg(token_color),
+        ),
+    ]));
     lines.push(Line::from(""));
 
     lines.push(Line::from(vec![Span::styled(

@@ -19,11 +19,29 @@ impl ProfileRuntimePort for OpenCodeProvider {
         let base_agent_path = self.profile_agent_path(name);
 
         // Auto-generate a minimal agent markdown if the file is missing.
+        // If a prompt_overlay_path is set, use that file's content instead
+        // of the default placeholder body.
         if !base_agent_path.exists() {
             if let Some(parent) = base_agent_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let content = format!("# {}\n\nProfile agent for {}.\n", name, name);
+            let content = if let Some(ref overlay_path) = profile.prompt_overlay_path {
+                match std::fs::read_to_string(overlay_path) {
+                    Ok(overlay_content) => overlay_content,
+                    Err(e) => {
+                        // Fall back to default with a warning
+                        let mut fallback = format!("# {}\n\nProfile agent for {}.\n", name, name);
+                        fallback.push_str(&format!(
+                            "\n\n<!-- WARNING: prompt_overlay_path not found ({}): {} -->",
+                            overlay_path.display(),
+                            e
+                        ));
+                        fallback
+                    }
+                }
+            } else {
+                format!("# {}\n\nProfile agent for {}.\n", name, name)
+            };
             std::fs::write(&base_agent_path, content)?;
         }
 

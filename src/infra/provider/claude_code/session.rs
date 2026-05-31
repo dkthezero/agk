@@ -119,21 +119,42 @@ pub fn compose_agent_markdown(profile: &Profile) -> String {
 
     frontmatter.push_str("---\n\n");
 
-    // Compose a natural-language body from structured answers.
-    // If a prompt_overlay_path is set, that file's content supersedes
-    // the composed body — but we still write the frontmatter above.
+    // If a prompt_overlay_path is set, read that file and use it as the
+    // body; otherwise compose from structured answers.
+    let body = if let Some(ref overlay_path) = profile.prompt_overlay_path {
+        match std::fs::read_to_string(overlay_path) {
+            Ok(content) => content,
+            Err(e) => {
+                // Fall back to composed description with a warning comment
+                let mut fallback = compose_description_from_profile(profile);
+                fallback.push_str(&format!(
+                    "\n\n<!-- WARNING: prompt_overlay_path not found ({}): {} -->",
+                    overlay_path.display(),
+                    e
+                ));
+                fallback
+            }
+        }
+    } else {
+        compose_description_from_profile(profile)
+    };
+    frontmatter.push_str(&body);
+
+    frontmatter
+}
+
+/// Compose a natural-language description from profile fields.
+fn compose_description_from_profile(profile: &Profile) -> String {
     let scope_label = match profile.scope {
         Scope::Global => "global",
         Scope::Workspace => "workspace",
     };
-    frontmatter.push_str(&format!(
+    format!(
         "# {}\n\nProfile agent for {} (scope: {}).\n",
         profile.id.as_str(),
         profile.id.as_str(),
         scope_label,
-    ));
-
-    frontmatter
+    )
 }
 
 /// Escape a string for safe inclusion in a YAML value.
