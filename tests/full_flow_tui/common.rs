@@ -75,6 +75,7 @@ pub fn test_core() -> AgkCore {
         Arc::new(agk::app::test_support::FakeProcessRunner::new()),
         Arc::new(agk::infra::task_tracker::InMemoryTaskTracker::new()),
         std::path::PathBuf::from("."),
+        Arc::new(agk::app::test_support::FakeClawHub::new()),
     )
 }
 

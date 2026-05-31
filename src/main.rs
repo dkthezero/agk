@@ -180,6 +180,7 @@ fn build_core(
         process_runner,
         task_tracker,
         workspace.to_path_buf(),
+        Arc::new(agk::infra::vault::clawhub::ClawHubAdapter),
     );
 
     Ok(core)

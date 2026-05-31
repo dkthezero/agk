@@ -19,6 +19,7 @@ pub fn dispatch(
                 input.vault_id.clone(),
                 input.config.clone(),
                 core.store.as_ref(),
+                core.clawhub.as_ref(),
                 sink,
             )
             .map(|_| CoreOutcome::Ok),

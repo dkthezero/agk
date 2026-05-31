@@ -1,5 +1,5 @@
 use crate::app::outcome::CoreEventSink;
-use crate::app::ports::ConfigStorePort;
+use crate::app::ports::{ClawHubPort, ConfigStorePort};
 use crate::domain::config::VaultConfig;
 use crate::domain::scope::Scope;
 use anyhow::Result;
@@ -8,23 +8,22 @@ use anyhow::Result;
 ///
 /// Phase 3: Uses [`ConfigStorePort`] only — no direct filesystem access.
 /// For ClawHub vaults, verifies the CLI is available and attempts
-/// Homebrew installation when missing.
+/// Homebrew installation when missing (via [`ClawHubPort`]).
 pub fn run(
     vault_id: String,
     vault_config: VaultConfig,
     store: &dyn ConfigStorePort,
+    clawhub: &dyn ClawHubPort,
     sink: &mut dyn CoreEventSink,
 ) -> Result<()> {
     // ClawHub auto-install: if the CLI is missing and Homebrew is present,
     // install automatically before attaching.
-    if matches!(vault_config, VaultConfig::Clawhub(_))
-        && !crate::infra::vault::clawhub::is_cli_available()
-    {
-        if crate::infra::vault::clawhub::is_homebrew_available() {
+    if matches!(vault_config, VaultConfig::Clawhub(_)) && !clawhub.is_cli_available() {
+        if clawhub.is_homebrew_available() {
             sink.on_event(crate::app::event::CoreEvent::Info(
                 "ClawHub CLI not found — installing via Homebrew...".to_string(),
             ));
-            if let Err(e) = crate::infra::vault::clawhub::install_cli_via_homebrew() {
+            if let Err(e) = clawhub.install_cli() {
                 anyhow::bail!(
                     "ClawHub CLI is required but installation failed: {}. \
                      Install manually from https://clawhub.ai",
@@ -100,10 +99,11 @@ mod tests {
     fn attach_vault_adds_to_config() {
         let store = FakeStore::new();
         let mut sink = NullSink;
+        let clawhub = crate::app::test_support::FakeClawHub::new();
         let vault_config = VaultConfig::Local(crate::domain::config::LocalVaultSource {
             path: "/tmp/vault".into(),
         });
-        run("my-vault".into(), vault_config, &store, &mut sink).unwrap();
+        run("my-vault".into(), vault_config, &store, &clawhub, &mut sink).unwrap();
 
         let config = store.load(Scope::Global).unwrap();
         assert!(config.vaults.contains(&"my-vault".to_string()));

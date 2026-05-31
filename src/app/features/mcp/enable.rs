@@ -86,6 +86,10 @@ mod tests {
         fn disable(&self, _name: &str, _provider_id: &str, _scope: Scope) -> anyhow::Result<()> {
             Ok(())
         }
+
+        fn unregister(&self, _name: &str) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 
     #[test]

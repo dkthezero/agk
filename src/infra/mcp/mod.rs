@@ -236,6 +236,20 @@ pub fn disable(
     Ok(())
 }
 
+/// Remove a registered MCP server from the registry.
+///
+/// Used for rollback when batch dependency installation fails partway.
+pub fn unregister(name: &str) -> Result<()> {
+    let path = crate::domain::paths::mcp_path();
+    let mut registry = McpRegistry::load(&path)?;
+
+    if registry.servers.remove(name).is_none() {
+        bail!("MCP server '{}' not found", name);
+    }
+    registry.save(&path)?;
+    Ok(())
+}
+
 pub mod adapter;
 
 pub fn build_mcp_providers(workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>> {

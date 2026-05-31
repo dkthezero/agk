@@ -4,6 +4,7 @@
 //! re-exported from this module so callers can continue to write
 //! `use crate::app::ports::FooPort` without caring how the file is split.
 
+pub mod clawhub;
 pub mod config_store;
 pub mod context_store;
 pub mod feature_set;
@@ -18,6 +19,7 @@ pub mod telemetry_store;
 pub mod vault;
 pub mod wizard_state;
 
+pub use clawhub::ClawHubPort;
 pub use config_store::ConfigStorePort;
 pub use context_store::ContextStorePort;
 pub use feature_set::FeatureSetPort;

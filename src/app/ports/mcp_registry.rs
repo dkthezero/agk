@@ -20,6 +20,9 @@ pub trait McpRegistryPort: Send + Sync {
     fn build_providers(&self, workspace_root: &std::path::Path) -> Vec<Box<dyn McpProvider>>;
     fn enable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
     fn disable(&self, name: &str, provider_id: &str, scope: Scope) -> Result<()>;
+    /// Remove a registered MCP server from the registry.
+    /// Used for rollback when batch dependency installation fails.
+    fn unregister(&self, name: &str) -> Result<()>;
 }
 
 /// Extension trait for providers that support MCP configuration.
