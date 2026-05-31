@@ -121,6 +121,10 @@ impl ProviderPort for AmpProvider {
         }
         Some(self.asset_dir(&scope, kind, &_identity.name, None))
     }
+
+    fn supports_mcp(&self) -> bool {
+        true
+    }
 }
 
 impl McpProvider for AmpProvider {

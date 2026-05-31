@@ -72,6 +72,11 @@ pub trait ProviderPort: Send + Sync {
     fn available_permission_modes(&self) -> Vec<(String, String)> {
         vec![]
     }
+
+    /// Return true if this provider supports MCP server configuration.
+    fn supports_mcp(&self) -> bool {
+        false
+    }
 }
 
 /// A single static description of a wizard step.  Mutable UI state lives in

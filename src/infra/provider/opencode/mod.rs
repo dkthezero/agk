@@ -115,6 +115,10 @@ impl ProviderPort for OpenCodeProvider {
         true
     }
 
+    fn supports_mcp(&self) -> bool {
+        true
+    }
+
     fn start_profile_session(
         &self,
         profile: &crate::domain::config::Profile,

@@ -33,6 +33,7 @@ pub struct ProviderEntry {
     pub id: String,
     pub name: String,
     pub active: bool,
+    pub supports_mcp: bool,
 }
 
 /// Display-only struct for the Profiles tab.

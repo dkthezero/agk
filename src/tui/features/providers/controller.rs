@@ -253,6 +253,7 @@ mod tests {
             id: "fake".to_string(),
             name: "Fake".to_string(),
             active: true,
+            supports_mcp: false,
         }];
 
         let mut config = ConfigFile {

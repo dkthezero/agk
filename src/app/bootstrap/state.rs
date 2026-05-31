@@ -105,6 +105,7 @@ pub fn build_provider_entries(config: &ConfigFile, registry: &Registry) -> Vec<P
                 id: id.clone(),
                 name,
                 active: config.providers.contains(&id),
+                supports_mcp: p.supports_mcp(),
             }
         })
         .collect()

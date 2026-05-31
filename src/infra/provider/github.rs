@@ -114,6 +114,10 @@ impl ProviderPort for GithubProvider {
         }
         None
     }
+
+    fn supports_mcp(&self) -> bool {
+        true
+    }
 }
 
 impl McpProvider for GithubProvider {

@@ -128,6 +128,10 @@ impl ProviderPort for GeminiProvider {
             (".ai".to_string(), "Legacy .ai folder".to_string()),
         ]
     }
+
+    fn supports_mcp(&self) -> bool {
+        true
+    }
 }
 
 impl McpProvider for GeminiProvider {

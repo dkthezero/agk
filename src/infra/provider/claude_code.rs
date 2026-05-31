@@ -244,6 +244,10 @@ impl ProviderPort for ClaudeCodeProvider {
             ("plan".into(), "Plan mode — suggest only".into()),
         ]
     }
+
+    fn supports_mcp(&self) -> bool {
+        true
+    }
 }
 
 impl McpProvider for ClaudeCodeProvider {
