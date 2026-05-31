@@ -260,6 +260,13 @@ impl ProviderPort for ClaudeCodeProvider {
         true
     }
 
+    /// Bridge from the TUI's `Profile` config type to `ProfileRuntimePort`.
+    ///
+    /// `session_key` and `workspace_root` are currently unused because
+    /// `ProfileRuntimePort::run_plan` already has access to `workspace_root`
+    /// via `self.workspace_root`. They are kept in the trait signature for
+    /// future use when providers may need an explicit session key or an
+    /// overridden workspace root.
     fn start_profile_session(
         &self,
         profile: &crate::domain::config::Profile,

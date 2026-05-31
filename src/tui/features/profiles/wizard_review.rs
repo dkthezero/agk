@@ -1,17 +1,37 @@
+use crate::domain::profile::validate_profile_id;
 use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, EventContext};
 use crate::tui::list_mode::ListMode;
 use crossterm::event::KeyCode;
+
+/// Map provider_id to the CLI command used to create a profile session.
+/// Only providers that support interactive profile creation are listed.
+fn provider_command(provider_id: &str) -> &'static str {
+    match provider_id {
+        "claude-code" => "claude",
+        _ => "opencode",
+    }
+}
 
 pub fn handle_review_step(
     state: &mut AppState,
     ctx: &EventContext,
     key: &crossterm::event::KeyEvent,
 ) {
-    let ws = state.wizard_state.as_mut().unwrap();
+    let ws = match state.wizard_state.as_mut() {
+        Some(s) => s,
+        None => return,
+    };
     match key.code {
         KeyCode::Enter => {
             let name = ws.name.clone();
+            // Validate profile name before using it in filesystem paths.
+            if let Err(e) = validate_profile_id(&crate::domain::profile::ProfileId::new(&name)) {
+                state.wizard_state = None;
+                state.list_mode = ListMode::Normal;
+                state.status_line = format!("Invalid profile name: {}", e);
+                return;
+            }
             let skills = ws.skills.clone();
             let mcps = ws.mcps.clone();
             let provider_id = ws.provider_id.clone();
@@ -47,6 +67,7 @@ pub fn handle_review_step(
             let id = crate::tui::progress::NEXT_TASK_ID
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let workspace_root = ctx.workspace_root.clone();
+            let provider_cmd = provider_command(&new_config.profiles.last().unwrap().provider_id);
             let profile_dir = workspace_root.join(".agk").join("profiles").join(&name);
             let _ = std::fs::create_dir_all(&profile_dir);
 
@@ -59,7 +80,7 @@ pub fn handle_review_step(
                     Ok(()) => {
                         let _ = tx.send(AppEvent::TriggerReload);
                         let _ = tx.send(AppEvent::RunInteractiveProcess {
-                            command: "opencode".into(),
+                            command: provider_cmd.into(),
                             args: vec![
                                 "agent".into(),
                                 "create".into(),

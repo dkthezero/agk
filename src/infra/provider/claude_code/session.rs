@@ -89,28 +89,31 @@ impl ProfileRuntimePort for ClaudeCodeProvider {
 pub fn compose_agent_markdown(profile: &Profile) -> String {
     let mut frontmatter = String::from("---\n");
 
-    // Core identity
-    frontmatter.push_str(&format!("name: {}\n", profile.id.as_str()));
-    frontmatter.push_str(&format!("provider: {}\n", profile.provider_id.as_str()));
+    // Core identity — values are YAML-escaped to handle special characters.
+    frontmatter.push_str(&format!("name: {}\n", yaml_escape(profile.id.as_str())));
+    frontmatter.push_str(&format!(
+        "provider: {}\n",
+        yaml_escape(profile.provider_id.as_str())
+    ));
     if !profile.tool_refs.is_empty() {
         frontmatter.push_str("tools:\n");
         for tool in &profile.tool_refs {
-            frontmatter.push_str(&format!("  - {}\n", tool));
+            frontmatter.push_str(&format!("  - {}\n", yaml_escape(tool)));
         }
     }
     if let Some(ref mode) = profile.permission_mode {
-        frontmatter.push_str(&format!("permission_mode: {}\n", mode));
+        frontmatter.push_str(&format!("permission_mode: {}\n", yaml_escape(mode)));
     }
     if !profile.skill_refs.is_empty() {
         frontmatter.push_str("skills:\n");
         for skill in &profile.skill_refs {
-            frontmatter.push_str(&format!("  - {}\n", skill.name));
+            frontmatter.push_str(&format!("  - {}\n", yaml_escape(&skill.name)));
         }
     }
     if !profile.mcp_refs.is_empty() {
         frontmatter.push_str("mcps:\n");
         for mcp in &profile.mcp_refs {
-            frontmatter.push_str(&format!("  - {}\n", mcp.name));
+            frontmatter.push_str(&format!("  - {}\n", yaml_escape(&mcp.name)));
         }
     }
 
@@ -131,6 +134,38 @@ pub fn compose_agent_markdown(profile: &Profile) -> String {
     ));
 
     frontmatter
+}
+
+/// Escape a string for safe inclusion in a YAML value.
+///
+/// Wraps the value in double quotes if it contains characters that would
+/// break YAML parsing (colons, hashes, quotes, newlines, brackets, etc.)
+/// and escapes any internal double quotes.
+fn yaml_escape(s: &str) -> String {
+    let needs_quoting = s.contains(':')
+        || s.contains('#')
+        || s.contains('"')
+        || s.contains('\'')
+        || s.contains('\n')
+        || s.contains('[')
+        || s.contains(']')
+        || s.contains('{')
+        || s.contains('}')
+        || s.contains(',')
+        || s.contains('&')
+        || s.contains('*')
+        || s.contains('!')
+        || s.contains('|')
+        || s.contains('>')
+        || s.contains('%')
+        || s.contains('@')
+        || s.contains('`')
+        || s.is_empty();
+    if needs_quoting {
+        format!("\"{}\"", s.replace('"', "\\\""))
+    } else {
+        s.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -197,5 +232,65 @@ mod tests {
             .expect("plan should succeed");
         assert!(plan.agent_markdown_source.exists());
         assert!(plan.tool_refs.contains(&"Read".to_string()));
+    }
+
+    #[test]
+    fn yaml_escape_plain_value() {
+        assert_eq!(yaml_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn yaml_escape_colon() {
+        assert_eq!(yaml_escape("foo:bar"), "\"foo:bar\"");
+    }
+
+    #[test]
+    fn yaml_escape_hash() {
+        assert_eq!(yaml_escape("foo#bar"), "\"foo#bar\"");
+    }
+
+    #[test]
+    fn yaml_escape_newline() {
+        // Newlines trigger quoting; the actual \n stays inside the quotes.
+        assert!(yaml_escape("line1\nline2").starts_with('"'));
+    }
+
+    #[test]
+    fn yaml_escape_quotes() {
+        // Single quotes trigger quoting but aren't escaped
+        assert_eq!(yaml_escape("it's"), "\"it's\"");
+        // Double quotes are escaped
+        assert_eq!(yaml_escape("say \"hi\""), "\"say \\\"hi\\\"\"");
+    }
+
+    #[test]
+    fn yaml_escape_empty() {
+        assert_eq!(yaml_escape(""), "\"\"");
+    }
+
+    #[test]
+    fn yaml_escape_brackets() {
+        assert_eq!(yaml_escape("[1,2]"), "\"[1,2]\"");
+    }
+
+    #[test]
+    fn yaml_escape_compose_with_special_chars() {
+        let profile = Profile {
+            id: ProfileId::new("my:agent"),
+            scope: Scope::Workspace,
+            provider_id: ProviderId::new("claude-code"),
+            skill_refs: vec![],
+            mcp_refs: vec![],
+            instruction_refs: vec![],
+            tool_refs: vec![],
+            permission_mode: Some("auto-accept".into()),
+            prompt_overlay_path: None,
+            launch_policy: LaunchPolicy::AutoRestore,
+        };
+        let md = compose_agent_markdown(&profile);
+        // Colon in id should be quoted
+        assert!(md.contains("name: \"my:agent\""));
+        // Hyphenated mode should not be quoted (no special chars)
+        assert!(md.contains("permission_mode: auto-accept"));
     }
 }

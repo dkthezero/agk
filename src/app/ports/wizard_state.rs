@@ -184,3 +184,98 @@ impl WizardState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn simple_steps() -> Vec<WizardStep> {
+        vec![
+            WizardStep::Checklist {
+                title: "Skills".into(),
+                options: vec!["rust".into(), "python".into()],
+            },
+            WizardStep::ToolSelect {
+                title: "Tools".into(),
+                tools: vec![
+                    ("Read".into(), "Read".into(), false),
+                    ("Grep".into(), "Grep".into(), false),
+                ],
+            },
+            WizardStep::PermissionSelect {
+                title: "Permissions".into(),
+                modes: vec![
+                    ("auto".into(), "Auto-approve".into()),
+                    ("plan".into(), "Plan only".into()),
+                ],
+            },
+        ]
+    }
+
+    #[test]
+    fn sync_checklist_state_resets_on_new_step() {
+        let mut ws = WizardState::new(simple_steps(), "opencode".into());
+        // Step 0: Checklist with 2 options
+        assert_eq!(ws.checked.len(), 2);
+        assert_eq!(ws.checked, vec![false, false]);
+
+        // Manually check an item, then advance to a different step type
+        ws.checked[0] = true;
+        ws.step_index = 1;
+        ws.sync_checklist_state();
+        // ToolSelect step has 2 tools — checked should reset to all false
+        assert_eq!(ws.checked.len(), 2);
+        assert_eq!(ws.checked, vec![false, false]);
+    }
+
+    #[test]
+    fn sync_checklist_state_pre_checks_tools() {
+        let mut ws = WizardState::new(simple_steps(), "opencode".into());
+        ws.selected_tools = vec!["Grep".into()];
+        ws.step_index = 1; // ToolSelect
+        ws.checked_step_index = None; // force re-sync
+        ws.sync_checklist_state();
+        assert_eq!(ws.checked, vec![false, true]); // Grep is pre-checked
+    }
+
+    #[test]
+    fn sync_checklist_state_pre_checks_permission_mode() {
+        let mut ws = WizardState::new(simple_steps(), "opencode".into());
+        ws.selected_permission_mode = Some("plan".into());
+        ws.step_index = 2; // PermissionSelect
+        ws.checked_step_index = None; // force re-sync
+        ws.sync_checklist_state();
+        assert_eq!(ws.checked, vec![false, true]); // "plan" is at index 1
+    }
+
+    #[test]
+    fn sync_checklist_state_noop_on_non_checklist_step() {
+        let ws = WizardState::new(
+            vec![WizardStep::TextInput {
+                title: "Name".into(),
+                placeholder: "foo".into(),
+            }],
+            "opencode".into(),
+        );
+        // TextInput is not a checklist step — checked should stay empty
+        assert!(ws.checked.is_empty());
+    }
+
+    #[test]
+    fn filtered_indices_matches_filter() {
+        let mut ws = WizardState::new(simple_steps(), "opencode".into());
+        ws.step_index = 1; // ToolSelect step
+        ws.filter_query = "grep".into(); // matches only "Grep"
+        let indices = ws.filtered_indices();
+        assert_eq!(indices, vec![1]); // Grep is at index 1
+    }
+
+    #[test]
+    fn composed_description_uses_structured_answers() {
+        let mut ws = WizardState::new(vec![], "opencode".into());
+        ws.structured_answers
+            .insert("role".into(), "Rust dev".into());
+        let desc = ws.composed_description();
+        assert!(desc.contains("Rust dev"));
+    }
+}

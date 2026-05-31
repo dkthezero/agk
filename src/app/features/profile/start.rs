@@ -33,12 +33,10 @@ pub fn run(
         })?;
 
     // --- Dependency resolution: warn about missing skills/MCPs ---
+    // Both scopes use vault_id "auto" — the config store resolves
+    // the actual vault internally based on scope.
     for skill in &domain_profile.skills {
-        let installed = match scope {
-            Scope::Workspace => config.is_skill_installed("auto", &skill.name),
-            Scope::Global => config.is_skill_installed("auto", &skill.name),
-        };
-        if !installed {
+        if !config.is_skill_installed("auto", &skill.name) {
             sink.on_error(format!(
                 "Skill '{}' referenced by profile '{}' is not installed — \
                  consider running `agk skill install {}`",
@@ -47,11 +45,7 @@ pub fn run(
         }
     }
     for mcp in &domain_profile.mcps {
-        let installed = match scope {
-            Scope::Workspace => config.is_mcp_installed("auto", &mcp.name),
-            Scope::Global => config.is_mcp_installed("auto", &mcp.name),
-        };
-        if !installed {
+        if !config.is_mcp_installed("auto", &mcp.name) {
             sink.on_error(format!(
                 "MCP '{}' referenced by profile '{}' is not registered — \
                  consider running `agk mcp add {}`",
