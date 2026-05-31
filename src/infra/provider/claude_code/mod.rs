@@ -1,15 +1,17 @@
-use crate::app::ports::{McpProvider, ProviderPort};
+use crate::app::ports::ProviderPort;
 use crate::domain::asset::{AssetKind, ScannedPackage};
 use crate::domain::identity::AssetIdentity;
-use crate::domain::mcp::McpServer;
 use crate::domain::scope::Scope;
 use crate::infra::provider::common;
 use crate::infra::provider::common::copy_dir;
 use anyhow::Result;
 use std::path::PathBuf;
 
+pub mod mcp;
+pub mod session;
+
 pub struct ClaudeCodeProvider {
-    workspace_root: PathBuf,
+    pub(crate) workspace_root: PathBuf,
 }
 
 impl ClaudeCodeProvider {
@@ -35,6 +37,14 @@ impl ClaudeCodeProvider {
                 self.workspace_root.join(folder)
             }
         }
+    }
+
+    pub(crate) fn profile_agent_path(&self, profile_name: &str) -> PathBuf {
+        // Claude Code stores agent markdown at .claude/agents/<name>.md
+        self.workspace_root
+            .join(".claude")
+            .join("agents")
+            .join(format!("{}.md", profile_name))
     }
 
     fn asset_dir(
@@ -200,7 +210,8 @@ impl ProviderPort for ClaudeCodeProvider {
             },
             WizardStep::ToolSelect {
                 title: "Select Tools".into(),
-                tools: self.available_profile_tools()
+                tools: self
+                    .available_profile_tools()
                     .into_iter()
                     .map(|t| (t.clone(), t, false))
                     .collect(),
@@ -248,52 +259,36 @@ impl ProviderPort for ClaudeCodeProvider {
     fn supports_mcp(&self) -> bool {
         true
     }
-}
 
-impl McpProvider for ClaudeCodeProvider {
-    fn provider_id(&self) -> &str {
-        "claude-code"
-    }
-
-    fn supports_mcp(&self) -> bool {
-        true
-    }
-
-    fn mcp_config_path(&self, scope: Scope) -> Option<PathBuf> {
-        Some(self.mcp_json_path(&scope))
-    }
-
-    fn write_mcp_server(&self, server: &McpServer, scope: Scope) -> Result<()> {
-        let mut config = self.load_mcp_config(&scope)?;
-        if !config.is_object() {
-            config = serde_json::json!({});
-        }
-        if config.get("mcpServers").is_none() {
-            config["mcpServers"] = serde_json::json!({});
-        }
-        let mcp_servers = config["mcpServers"]
-            .as_object_mut()
-            .ok_or_else(|| anyhow::anyhow!(".claude/mcp.json 'mcpServers' key is not an object"))?;
-
-        let entry = serde_json::json!({
-            "command": server.command,
-            "args": server.args,
-            "env": server.env,
-        });
-        mcp_servers.insert(server.name.clone(), entry);
-        self.save_mcp_config(&scope, &config)
-    }
-
-    fn remove_mcp_server(&self, name: &str, scope: Scope) -> Result<()> {
-        let mut config = self.load_mcp_config(&scope)?;
-        if let Some(servers) = config
-            .as_object_mut()
-            .and_then(|obj| obj.get_mut("mcpServers"))
-            .and_then(|v| v.as_object_mut())
-        {
-            servers.remove(name);
-        }
-        self.save_mcp_config(&scope, &config)
+    fn start_profile_session(
+        &self,
+        profile: &crate::domain::config::Profile,
+        session_key: &str,
+        workspace_root: &std::path::Path,
+    ) -> anyhow::Result<crate::app::ports::ProfileSession> {
+        use crate::app::ports::ProfileRuntimePort;
+        let domain_profile = crate::domain::profile::Profile {
+            id: crate::domain::profile::ProfileId::new(&profile.name),
+            scope: if profile.scope == "global" {
+                Scope::Global
+            } else {
+                Scope::Workspace
+            },
+            provider_id: crate::domain::profile::ProviderId::new(&profile.provider_id),
+            skill_refs: profile.skills.clone(),
+            mcp_refs: profile.mcps.clone(),
+            instruction_refs: profile.instructions.clone(),
+            tool_refs: profile.tool_refs.clone(),
+            permission_mode: profile.permission_mode.clone(),
+            prompt_overlay_path: profile
+                .prompt_overlay_path
+                .as_ref()
+                .map(std::path::PathBuf::from),
+            launch_policy: crate::domain::profile::LaunchPolicy::AutoRestore,
+        };
+        let plan = self.build_launch_plan(&domain_profile, None)?;
+        let _ = (session_key, workspace_root);
+        self.run_plan(&plan)
     }
 }
 

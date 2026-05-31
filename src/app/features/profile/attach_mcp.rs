@@ -18,10 +18,11 @@ pub fn run(
 
     if let Some(profile) = config.profiles.iter_mut().find(|p| p.name == profile_name) {
         if !profile.mcps.iter().any(|m| m.name == mcp_ref) {
-            profile.mcps.push(crate::domain::profile::ProfileAssetRef::new(
-                mcp_ref,
-                "auto",
-            ));
+            profile
+                .mcps
+                .push(crate::domain::profile::ProfileAssetRef::new(
+                    mcp_ref, "auto",
+                ));
             store.save(scope, &config)?;
             sink.on_event(CoreEvent::ProfileUpdated(profile_id.clone()));
         } else {
@@ -115,7 +116,9 @@ mod tests {
             provider_id: "opencode".to_string(),
             scope: "workspace".to_string(),
             skills: vec![],
-            mcps: vec![crate::domain::profile::ProfileAssetRef::new("github", "auto")],
+            mcps: vec![crate::domain::profile::ProfileAssetRef::new(
+                "github", "auto",
+            )],
             instructions: vec![],
             tool_refs: vec![],
             permission_mode: None,

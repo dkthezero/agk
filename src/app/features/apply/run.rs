@@ -346,7 +346,7 @@ mod tests {
             tool_refs: vec![],
             permission_mode: None,
             prompt_overlay_path: None,
-            };
+        };
         let input = ApplyConfigInput::from_url("https://example.com/team.yaml")
             .with_profile(profile.clone());
         let mut sink = CollectingSink::new();

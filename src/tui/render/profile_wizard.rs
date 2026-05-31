@@ -37,9 +37,8 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                         .collect();
                     let filtered_checked: Vec<bool> =
                         filtered_indices.iter().map(|&i| ws.checked[i]).collect();
-                    let selected_filtered = ws
-                        .selected
-                        .min(filtered_options.len().saturating_sub(1));
+                    let selected_filtered =
+                        ws.selected.min(filtered_options.len().saturating_sub(1));
                     modal::render_checklist_modal(
                         frame,
                         title,
@@ -80,7 +79,9 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                     ];
                     modal::render_select_modal(frame, title, &options, ws.selected);
                 }
-                WizardStep::Textarea { title, placeholder, .. } => {
+                WizardStep::Textarea {
+                    title, placeholder, ..
+                } => {
                     modal::render_input_modal(
                         frame,
                         title,
@@ -101,9 +102,8 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                         .collect();
                     let filtered_checked: Vec<bool> =
                         filtered_indices.iter().map(|&i| ws.checked[i]).collect();
-                    let selected_filtered = ws
-                        .selected
-                        .min(filtered_options.len().saturating_sub(1));
+                    let selected_filtered =
+                        ws.selected.min(filtered_options.len().saturating_sub(1));
                     modal::render_checklist_modal(
                         frame,
                         title,
@@ -125,9 +125,8 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                         .collect();
                     let filtered_checked: Vec<bool> =
                         filtered_indices.iter().map(|&i| ws.checked[i]).collect();
-                    let selected_filtered = ws
-                        .selected
-                        .min(filtered_options.len().saturating_sub(1));
+                    let selected_filtered =
+                        ws.selected.min(filtered_options.len().saturating_sub(1));
                     modal::render_checklist_modal(
                         frame,
                         title,

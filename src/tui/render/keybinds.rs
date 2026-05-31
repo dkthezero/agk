@@ -32,8 +32,7 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
                     "[Space] Toggle  [Enter] Confirm  [Esc] Back"
                 }
                 Some(WizardStep::Review { .. }) => "[Enter] Confirm Create  [Esc] Back",
-                Some(WizardStep::TemplateSelect { .. })
-                | Some(WizardStep::ScopeSelect { .. }) => {
+                Some(WizardStep::TemplateSelect { .. }) | Some(WizardStep::ScopeSelect { .. }) => {
                     "[↑/↓] Move  [Enter] Confirm  [Esc] Cancel"
                 }
                 _ => "[Enter] Confirm  [Esc] Cancel",

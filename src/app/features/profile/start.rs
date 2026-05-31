@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 /// Start (or simulate) a profile session.
 ///
-/// Phase 5 implementation:
 /// 1. Load profile from [`ConfigStorePort`].
-/// 2. Look up [`ProfileRuntimePort`] by provider_id.
-/// 3. If `dry_run`, build launch plan via `build_launch_plan()`.
-/// 4. Otherwise, build plan and immediately execute via `run_plan()`.
-/// 5. Emit appropriate [`CoreEvent`]s.
+/// 2. Resolve dependencies: warn about missing skills/MCPs.
+/// 3. Look up [`ProfileRuntimePort`] by provider_id.
+/// 4. If `dry_run`, build launch plan via `build_launch_plan()`.
+/// 5. Otherwise, build plan and immediately execute via `run_plan()`.
+/// 6. Emit appropriate [`CoreEvent`]s.
 pub fn run(
     id: &ProfileId,
     scope: Scope,
@@ -31,6 +31,34 @@ pub fn run(
         .ok_or_else(|| {
             anyhow::anyhow!("Profile '{}' not found in {:?} config", id.as_str(), scope)
         })?;
+
+    // --- Dependency resolution: warn about missing skills/MCPs ---
+    for skill in &domain_profile.skills {
+        let installed = match scope {
+            Scope::Workspace => config.is_skill_installed("auto", &skill.name),
+            Scope::Global => config.is_skill_installed("auto", &skill.name),
+        };
+        if !installed {
+            sink.on_error(format!(
+                "Skill '{}' referenced by profile '{}' is not installed — \
+                 consider running `agk skill install {}`",
+                skill.name, domain_profile.name, skill.name,
+            ));
+        }
+    }
+    for mcp in &domain_profile.mcps {
+        let installed = match scope {
+            Scope::Workspace => config.is_mcp_installed("auto", &mcp.name),
+            Scope::Global => config.is_mcp_installed("auto", &mcp.name),
+        };
+        if !installed {
+            sink.on_error(format!(
+                "MCP '{}' referenced by profile '{}' is not registered — \
+                 consider running `agk mcp add {}`",
+                mcp.name, domain_profile.name, mcp.name,
+            ));
+        }
+    }
 
     let runtime = runtime_ports
         .get(&domain_profile.provider_id)

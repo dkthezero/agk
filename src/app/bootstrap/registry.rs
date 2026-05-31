@@ -24,9 +24,7 @@ pub fn build_with_store(
         "Providers",
         "",
     )));
-    registry.register_feature_set(Box::new(
-        crate::infra::feature::profile::ProfileFeatureSet,
-    ));
+    registry.register_feature_set(Box::new(crate::infra::feature::profile::ProfileFeatureSet));
     registry.register_feature_set(Box::new(crate::infra::feature::stub::StubFeatureSet::new(
         "vault", "Vaults", "",
     )));

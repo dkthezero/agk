@@ -222,7 +222,11 @@ impl ConfigFile {
                 .map(|b| b.items.len())
                 .unwrap_or(0);
             let m_count = section.mcps.as_ref().map(|b| b.items.len()).unwrap_or(0);
-            let p_count = section.profiles.as_ref().map(|b| b.items.len()).unwrap_or(0);
+            let p_count = section
+                .profiles
+                .as_ref()
+                .map(|b| b.items.len())
+                .unwrap_or(0);
             s_count + i_count + m_count + p_count > 0
         } else {
             false
@@ -455,7 +459,7 @@ mcps = ["filesystem"]
             tool_refs: vec![],
             permission_mode: None,
             prompt_overlay_path: None,
-            });
+        });
         assert!(config.find_profile("test").is_some());
         assert!(config.find_profile("missing").is_none());
     }
@@ -473,7 +477,7 @@ mcps = ["filesystem"]
             tool_refs: vec![],
             permission_mode: None,
             prompt_overlay_path: None,
-            });
+        });
         assert!(config.remove_profile("a"));
         assert!(!config.remove_profile("a"));
         assert!(config.profiles.is_empty());

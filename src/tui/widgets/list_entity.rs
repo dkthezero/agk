@@ -68,10 +68,7 @@ pub fn render_providers(
         .map(|p| {
             let checkbox = if p.active { "[x]" } else { "[ ]" };
             let mcp_badge = if p.supports_mcp { " [MCP]" } else { "" };
-            ListItem::new(Line::from(format!(
-                "{} {}{}",
-                checkbox, p.name, mcp_badge
-            )))
+            ListItem::new(Line::from(format!("{} {}{}", checkbox, p.name, mcp_badge)))
         })
         .collect();
     let list = List::new(items)

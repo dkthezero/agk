@@ -80,10 +80,8 @@ pub fn handle_profile_wizard_input(
                             WizardStep::QuestionAnswer { question, .. } => {
                                 ws.description_parts.push((question, val));
                             }
-                            WizardStep::Textarea { key, .. } => {
-                                if !val.is_empty() {
-                                    ws.structured_answers.insert(key, val);
-                                }
+                            WizardStep::Textarea { key, .. } if !val.is_empty() => {
+                                ws.structured_answers.insert(key, val);
                             }
                             _ => {}
                         }
@@ -108,35 +106,33 @@ pub fn handle_profile_wizard_input(
                 _ => {}
             }
         }
-        WizardStep::TemplateSelect { ref templates, .. } => {
-            match code {
-                KeyCode::Up if ws.selected > 0 => {
-                    ws.selected -= 1;
-                }
-                KeyCode::Down if ws.selected + 1 < templates.len() => {
-                    ws.selected += 1;
-                }
-                KeyCode::Enter => {
-                    if let Some(tmpl) = templates.get(ws.selected) {
-                        ws.selected_template = Some(tmpl.id.clone());
-                        ws.structured_answers = tmpl.defaults.clone();
-                        ws.selected_tools = tmpl.default_tools.clone();
-                        ws.selected_permission_mode = tmpl.default_permission_mode.clone();
-                    }
-                    ws.step_index += 1;
-                    ws.selected = 0;
-                    ws.sync_checklist_state();
-                }
-                KeyCode::Esc => {
-                    state.wizard_state = None;
-                    state.list_mode = ListMode::Normal;
-                    state.status_line = "Cancelled profile creation".to_string();
-                }
-                _ => {}
+        WizardStep::TemplateSelect { ref templates, .. } => match code {
+            KeyCode::Up if ws.selected > 0 => {
+                ws.selected -= 1;
             }
-        }
+            KeyCode::Down if ws.selected + 1 < templates.len() => {
+                ws.selected += 1;
+            }
+            KeyCode::Enter => {
+                if let Some(tmpl) = templates.get(ws.selected) {
+                    ws.selected_template = Some(tmpl.id.clone());
+                    ws.structured_answers = tmpl.defaults.clone();
+                    ws.selected_tools = tmpl.default_tools.clone();
+                    ws.selected_permission_mode = tmpl.default_permission_mode.clone();
+                }
+                ws.step_index += 1;
+                ws.selected = 0;
+                ws.sync_checklist_state();
+            }
+            KeyCode::Esc => {
+                state.wizard_state = None;
+                state.list_mode = ListMode::Normal;
+                state.status_line = "Cancelled profile creation".to_string();
+            }
+            _ => {}
+        },
         WizardStep::ScopeSelect { .. } => {
-            let options = vec!["workspace", "global"];
+            let options = ["workspace", "global"];
             match code {
                 KeyCode::Up if ws.selected > 0 => {
                     ws.selected -= 1;

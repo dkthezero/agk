@@ -173,6 +173,12 @@ pub struct LaunchPlan {
     pub original_provider_config_bytes: Option<Vec<u8>>,
     /// Agent name that was patched into provider config (used by run_plan and cleanup).
     pub session_agent_name: Option<String>,
+
+    // --- Tool & permission config for profile sessions ---
+    /// Tool references the profile has selected (e.g. ["Read", "Glob", "Grep"]).
+    pub tool_refs: Vec<String>,
+    /// Permission mode for providers that support it (e.g. "default", "auto", "plan").
+    pub permission_mode: Option<String>,
 }
 
 /// Snapshot of the workspace configuration and scan results.

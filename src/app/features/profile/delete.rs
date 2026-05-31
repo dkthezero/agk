@@ -77,7 +77,7 @@ mod tests {
             tool_refs: vec![],
             permission_mode: None,
             prompt_overlay_path: None,
-            });
+        });
         let store = FakeStore {
             data: Mutex::new(config),
         };

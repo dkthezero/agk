@@ -27,7 +27,7 @@ pub use mcp_registry::{McpProvider, McpRegistryPort};
 pub use process_runner::ProcessRunnerPort;
 pub use profile_runtime::{ProfileRuntimePort, ProfileSession};
 pub use provider::{ArchetypeTemplate, ProviderPort, WizardStep};
-pub use wizard_state::WizardState;
 pub use task_tracker::{TaskPhase, TaskTrackerPort, TrackedTask};
 pub use telemetry_store::TelemetryStorePort;
 pub use vault::{VaultPort, VaultSearchPort};
+pub use wizard_state::WizardState;

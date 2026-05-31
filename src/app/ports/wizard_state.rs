@@ -122,9 +122,7 @@ impl WizardState {
     /// Pre-checks items that match `selected_tools` or `selected_permission_mode`.
     pub fn sync_checklist_state(&mut self) {
         let (options_len, pre_checked) = match self.steps.get(self.step_index) {
-            Some(WizardStep::Checklist { options, .. }) => {
-                (Some(options.len()), None)
-            }
+            Some(WizardStep::Checklist { options, .. }) => (Some(options.len()), None),
             Some(WizardStep::ToolSelect { tools, .. }) => {
                 let pre: Vec<usize> = tools
                     .iter()
@@ -181,7 +179,8 @@ impl WizardState {
             lines.join("\n")
         } else {
             crate::app::features::profile::wizard_description::compose_description(
-                &self.structured_answers)
+                &self.structured_answers,
+            )
         }
     }
 }

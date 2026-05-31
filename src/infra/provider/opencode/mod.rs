@@ -193,7 +193,8 @@ impl ProviderPort for OpenCodeProvider {
             },
             WizardStep::ToolSelect {
                 title: "Select Tools".into(),
-                tools: self.available_profile_tools()
+                tools: self
+                    .available_profile_tools()
                     .into_iter()
                     .map(|t| (t.clone(), t, false))
                     .collect(),

@@ -60,6 +60,35 @@ impl ProfileRuntimePort for OpenCodeProvider {
                 agent_entry["mcp"] = mcp_obj;
             }
 
+            // Per-agent tool allowlist
+            if !profile.tool_refs.is_empty() {
+                let mut tool_obj = serde_json::json!({});
+                for tool in &profile.tool_refs {
+                    tool_obj[tool.clone()] = serde_json::json!("allow");
+                }
+                tool_obj["*"] = serde_json::json!("deny");
+                if let Some(perm) = agent_entry
+                    .get_mut("permission")
+                    .and_then(|v| v.as_object_mut())
+                {
+                    perm.insert("tool".to_string(), tool_obj);
+                } else {
+                    agent_entry["permission"] = serde_json::json!({ "tool": tool_obj });
+                }
+            }
+
+            // Per-agent permission mode (e.g. "auto", "plan", "default")
+            if let Some(ref mode) = profile.permission_mode {
+                if let Some(perm) = agent_entry
+                    .get_mut("permission")
+                    .and_then(|v| v.as_object_mut())
+                {
+                    perm.insert("mode".to_string(), serde_json::json!(mode));
+                } else {
+                    agent_entry["permission"] = serde_json::json!({ "mode": mode });
+                }
+            }
+
             agent_obj.insert(agent_name.clone(), agent_entry);
         }
 
@@ -70,6 +99,8 @@ impl ProfileRuntimePort for OpenCodeProvider {
             patched_provider_config: Some(plan_config),
             original_provider_config_bytes: original_bytes,
             session_agent_name: Some(agent_name),
+            tool_refs: profile.tool_refs.clone(),
+            permission_mode: profile.permission_mode.clone(),
             ..LaunchPlan::default()
         })
     }

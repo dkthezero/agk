@@ -26,7 +26,10 @@ pub fn compose_description(answers: &HashMap<String, String>) -> String {
         lines.push(String::new());
     }
 
-    let responsibilities = answers.get("responsibilities").map(|s| s.as_str()).unwrap_or("");
+    let responsibilities = answers
+        .get("responsibilities")
+        .map(|s| s.as_str())
+        .unwrap_or("");
     if !responsibilities.is_empty() {
         lines.push("# Core Responsibilities".to_string());
         for (i, line) in responsibilities.lines().enumerate() {
@@ -86,7 +89,10 @@ mod tests {
         answers.insert("role".into(), "Senior Rust engineer".into());
         answers.insert("domain".into(), "async CLI tooling".into());
         answers.insert("audience".into(), "my team".into());
-        answers.insert("responsibilities".into(), "Review PRs\nSuggest idioms".into());
+        answers.insert(
+            "responsibilities".into(),
+            "Review PRs\nSuggest idioms".into(),
+        );
         answers.insert("style".into(), "Direct".into());
         answers.insert("format".into(), "Bullets".into());
         answers.insert("boundaries".into(), "No prod deploys".into());

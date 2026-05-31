@@ -60,11 +60,15 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                         provider_id: crate::domain::profile::ProviderId::new(provider.clone()),
                         skill_refs: skills
                             .iter()
-                            .map(|s| crate::domain::profile::ProfileAssetRef::new(s.clone(), "auto"))
+                            .map(|s| {
+                                crate::domain::profile::ProfileAssetRef::new(s.clone(), "auto")
+                            })
                             .collect(),
                         mcp_refs: mcps
                             .iter()
-                            .map(|m| crate::domain::profile::ProfileAssetRef::new(m.clone(), "auto"))
+                            .map(|m| {
+                                crate::domain::profile::ProfileAssetRef::new(m.clone(), "auto")
+                            })
                             .collect(),
                         instruction_refs: vec![],
                         description: desc,

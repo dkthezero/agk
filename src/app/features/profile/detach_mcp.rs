@@ -82,7 +82,9 @@ mod tests {
             provider_id: "opencode".to_string(),
             scope: "workspace".to_string(),
             skills: vec![],
-            mcps: vec![crate::domain::profile::ProfileAssetRef::new("github", "auto")],
+            mcps: vec![crate::domain::profile::ProfileAssetRef::new(
+                "github", "auto",
+            )],
             instructions: vec![],
             tool_refs: vec![],
             permission_mode: None,
