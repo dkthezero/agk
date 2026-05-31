@@ -9,21 +9,25 @@ Vaults serve as the canonical upstream source to index raw assets (Skills and In
   - Local Directories (filesystem paths)
   - GitHub Remote Repositories (handling sparse cloning patterns strictly over HTTPS defaults)
   - ClawHub Registry (clawhub.ai — community skill marketplace with CLI-delegated operations)
-- **Automatic Auditing:** Whenever a vault is "refreshed", `agk` should scan the vault contents immediately to parse metadata formats, and actively recompute deterministic `sha10` integrity arrays for all assets implicitly discovered. 
+- **Automatic Auditing:** Whenever a vault is "refreshed", `agk` should scan the vault contents immediately to parse metadata formats, and actively recompute deterministic `sha10` integrity arrays for all assets implicitly discovered.
+- **Parallel Scanning (v0.3.1):** When multiple asset directories exist within a vault (`skills/`, `instructions/`, `mcps/`, `profiles/`), AGK scans them concurrently to minimize `agk sync` latency.
 - **Persistence:** Configuration and vault caches are stored in:
     - **macOS/Linux**: `~/.config/agk/`
     - **Windows**: `%APPDATA%\agk\` (typically `C:\Users\<User>\AppData\Roaming\agk\`)
 - **Tab 4 UI Details:** The TUI's 4th Tab must visually present:
   - Active enabling/disabling states (whether the vault is configured into `config.toml`)
-  - Supported statistics / volume of cached metadata (e.g. `14 Skills / 3 Instructions`)
+  - Supported statistics / volume of cached metadata (e.g. `14 Skills / 3 Instructions / 2 MCPs / 1 Profile`)
+  - Refresh time indicator for multi-directory vaults (e.g., "Refreshed in 0.8s")
 - **Interactive UI Shortcuts:**
   - `F2` (Attach Flow): Open an interactive buffer explicitly pausing normal keyboard hooks to allow user path dictation or **GitHub URL** (e.g. `https://github.com/user/repo`). For GitHub URLs, the process follows a multi-step confirmation:
     1. **Primary URL**: Enter the GitHub repository address.
     2. **Branch Confirmation**: Confirm or replace the target branch (defaults to `main`).
     3. **Subfolder Path**: Confirm or replace the relative path to assets (defaults to `skills/`).
   - Subfolder isolation: GitHub vaults utilize `git sparse-checkout` to pull only the specified subfolder, improving performance and reducing disk usage.
+  - **GHES Support (v0.3.1):** GitHub Enterprise Server URLs are auto-detected and use the GHES API base URL. See [GHES Vault PRD](../ghes-vault/prd.md).
   - Interactive feedback: After confirmation, `agk` immediately triggers an async `git clone` or `pull`, updating the UI with real-time progress markers.
-  - `F4` (Refresh Focus): Triggers a global background task iterating uniformly through `registry.vaults` to synchronize external repositories, pushing byte-loaded progress messages through MPSC channels into the active visual buffer status bar.
+  - `F4` (Refresh Focus): Triggers a global background task iterating uniformly through `registry.vaults` to synchronize external repositories, pushing byte-loaded progress messages through MPSC channels into the active visual buffer status bar. Scanning is parallel across asset directories (`skills/`, `instructions/`, `mcps/`, `profiles/`).
+  - Refresh performance: Multi-directory vaults (≥ 4 asset types) refresh in under 2 seconds on SSD.
 
 ## ClawHub Vault Integration
 ClawHub (clawhub.ai) is a community skill marketplace providing a curated registry of agent skills. The integration follows a CLI-delegated architecture — all remote operations are performed by shelling out to the `clawhub` CLI binary.

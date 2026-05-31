@@ -31,6 +31,8 @@ pub fn render_review_modal(
     description: &str,
     skills: &[String],
     mcps: &[String],
+    tools: &[String],
+    permission_mode: Option<&str>,
     actions: &str,
     scroll_offset: usize,
 ) {
@@ -49,6 +51,11 @@ pub fn render_review_modal(
     } else {
         estimate_wrapped_lines(&mcps.join(", "), inner_width)
     };
+    let tools_lines = if tools.is_empty() {
+        1
+    } else {
+        estimate_wrapped_lines(&tools.join(", "), inner_width)
+    };
 
     // Content height: label + content + spacing for each section
     let content_height = 1 // Profile: name
@@ -58,6 +65,9 @@ pub fn render_review_modal(
         + skills_lines
         + 2                 // blank + MCPs label
         + mcps_lines
+        + 2                 // blank + Tools label
+        + tools_lines
+        + 2                 // blank + Permission label
         + 2; // blank + actions padding
 
     // Cap outer height at 90% of terminal (leave 5% margin top+bottom)
@@ -133,6 +143,33 @@ pub fn render_review_modal(
             Style::default().fg(Color::Cyan),
         )]));
     }
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(vec![Span::styled(
+        "Tools:",
+        Style::default().fg(Color::White),
+    )]));
+    if tools.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "(none)",
+            Style::default().fg(Color::DarkGray),
+        )]));
+    } else {
+        lines.push(Line::from(vec![Span::styled(
+            tools.join(", "),
+            Style::default().fg(Color::Cyan),
+        )]));
+    }
+    lines.push(Line::from(""));
+
+    lines.push(Line::from(vec![Span::styled(
+        "Permission Mode:",
+        Style::default().fg(Color::White),
+    )]));
+    lines.push(Line::from(vec![Span::styled(
+        permission_mode.unwrap_or("(default)"),
+        Style::default().fg(Color::Cyan),
+    )]));
     lines.push(Line::from(""));
 
     let action_spans = color_keys(actions);

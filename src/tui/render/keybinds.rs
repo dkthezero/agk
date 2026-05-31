@@ -26,8 +26,16 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
     } else if state.is_profile_wizard_mode() {
         if let Some(ref ws) = state.wizard_state {
             match ws.steps.get(ws.step_index) {
-                Some(WizardStep::Checklist { .. }) => "[Space] Toggle  [Enter] Confirm  [Esc] Back",
+                Some(WizardStep::Checklist { .. })
+                | Some(WizardStep::ToolSelect { .. })
+                | Some(WizardStep::PermissionSelect { .. }) => {
+                    "[Space] Toggle  [Enter] Confirm  [Esc] Back"
+                }
                 Some(WizardStep::Review { .. }) => "[Enter] Confirm Create  [Esc] Back",
+                Some(WizardStep::TemplateSelect { .. })
+                | Some(WizardStep::ScopeSelect { .. }) => {
+                    "[↑/↓] Move  [Enter] Confirm  [Esc] Cancel"
+                }
                 _ => "[Enter] Confirm  [Esc] Cancel",
             }
         } else {

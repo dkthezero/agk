@@ -148,6 +148,63 @@ Provides read/write access to the local filesystem through the Model Context Pro
 - [x] Vault-sourced MCPs execute the same command as manually-registered ones; same security model applies.
 - [ ] `~/.config/agk/mcp.toml` file permissions `0600` (pending hardening).
 
+---
+
+## v0.3.1: MCP Security Scorecard
+
+### Problem
+All MCP servers currently receive the same generic security warning: "This will execute '{command} {args}' on your machine." There is no differentiation between a read-only MCP and one that requests broad filesystem access or network egress.
+
+### Solution
+AGK analyzes the MCP command + args at registration time and assigns **security flags** based on heuristic patterns.
+
+#### Flag Definitions
+
+| Flag | Trigger Pattern | Severity | UI |
+|------|----------------|----------|-----|
+| `broad-filesystem` | Args contain `/`, `~`, or `.` (root or cwd access) | High | `[!]` badge |
+| `network-egress` | Command/args contain `http`, `curl`, `wget`, `fetch` | High | `[!]` badge |
+| `arbitrary-execution` | Command is `bash`, `sh`, `python` with unverified script | Critical | `[‼]` badge |
+| `env-exfiltration` | Args reference env vars (`$HOME`, `$SSH_KEY`, `$TOKEN`) | Medium | `[!]` badge |
+| `unspecified-args` | No args provided (command may default to dangerous behavior) | Low | `[i]` badge |
+
+### TUI Behavior
+- **MCP list:** High/Critical severity MCPs show `[!]` or `[‼]` next to their name.
+- **Detail view (`Enter`):** Security flags are listed in a dedicated "Security Assessment" section with explanations.
+- **Registration modal:** If security flags are detected, an additional warning line appears: "⚠️ This MCP requests broad filesystem access. Only enable if you trust the source."
+
+### CLI Behavior
+- `agk mcp list --json` includes `security_flags: ["broad-filesystem", "network-egress"]`.
+- `agk mcp add` warns about detected flags before the standard security confirmation.
+
+### Heuristic Implementation
+```rust
+fn assess_mcp_security(command: &str, args: &[Str]) -> Vec<SecurityFlag> {
+    let mut flags = Vec::new();
+    let full = format!("{} {}", command, args.join(" "));
+
+    if args.iter().any(|a| a == "/" || a == "~" || a == ".") {
+        flags.push(SecurityFlag::BroadFilesystem);
+    }
+    if full.contains("http") || full.contains("curl") || full.contains("wget") {
+        flags.push(SecurityFlag::NetworkEgress);
+    }
+    if (command == "bash" || command == "sh" || command == "python")
+        && args.iter().any(|a| a.ends_with(".sh") || a.ends_with(".py")) {
+        flags.push(SecurityFlag::ArbitraryExecution);
+    }
+    if full.contains("$") {
+        flags.push(SecurityFlag::EnvExfiltration);
+    }
+    if args.is_empty() {
+        flags.push(SecurityFlag::UnspecifiedArgs);
+    }
+    flags
+}
+```
+
+**Important:** Heuristics are **advisory only**. They never block installation. The user always has the final say.
+
 ## Acceptance Criteria
 
 - [x] `AssetKind::McpServer` exists in the domain model.
@@ -159,8 +216,11 @@ Provides read/write access to the local filesystem through the Model Context Pro
 - [x] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
 - [x] All new provider configs preserve existing JSON content.
 - [x] No regression: manually-registered MCPs continue to work exactly as before.
+- [x] v0.3.1: MCP security flags appear in `agk mcp list --json`.
+- [x] v0.3.1: TUI MCP tab shows `[!]` badge for high-risk MCPs.
 - [x] Architecture tests pass with zero allowlists.
 
 ---
 
 *PRD v0.3 — updated 2026-05-30*
+*Security Scorecard section added for v0.3.1 — 2026-05-30*

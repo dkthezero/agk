@@ -6,6 +6,9 @@ pub mod delete;
 pub mod detach_mcp;
 pub mod detach_skill;
 pub mod start;
+pub mod template;
+pub mod token_estimate;
+pub mod wizard_description;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;

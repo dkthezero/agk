@@ -131,6 +131,119 @@ impl ProviderPort for ClaudeCodeProvider {
             (".agents".to_string(), "Shared agents folder".to_string()),
         ]
     }
+
+    fn supports_profiles(&self) -> bool {
+        true
+    }
+
+    fn profile_wizard_steps(&self) -> Vec<crate::app::ports::WizardStep> {
+        use crate::app::ports::WizardStep;
+        vec![
+            WizardStep::TemplateSelect {
+                title: "Select Archetype".into(),
+                templates: crate::app::features::profile::template::TEMPLATES.to_vec(),
+            },
+            WizardStep::TextInput {
+                title: "Profile name".into(),
+                placeholder: "e.g. claude-dev".into(),
+            },
+            WizardStep::ScopeSelect {
+                title: "Select Scope".into(),
+            },
+            WizardStep::Textarea {
+                title: "Role".into(),
+                placeholder: "e.g. Senior Rust engineer".into(),
+                rows: 2,
+                key: "role".into(),
+            },
+            WizardStep::Textarea {
+                title: "Domain / Specialty".into(),
+                placeholder: "e.g. async CLI tooling".into(),
+                rows: 2,
+                key: "domain".into(),
+            },
+            WizardStep::Textarea {
+                title: "Collaboration Style".into(),
+                placeholder: "e.g. Direct and thorough".into(),
+                rows: 3,
+                key: "style".into(),
+            },
+            WizardStep::Textarea {
+                title: "Scope Boundaries".into(),
+                placeholder: "IN SCOPE:\n...\n\nOUT OF SCOPE:\n...".into(),
+                rows: 5,
+                key: "boundaries".into(),
+            },
+            WizardStep::Textarea {
+                title: "Activation Triggers".into(),
+                placeholder: "e.g. After code changes, on explicit request".into(),
+                rows: 3,
+                key: "triggers".into(),
+            },
+            WizardStep::Textarea {
+                title: "Constraints".into(),
+                placeholder: "e.g. Always run cargo fmt before finishing".into(),
+                rows: 3,
+                key: "constraints".into(),
+            },
+            WizardStep::Textarea {
+                title: "Output Format".into(),
+                placeholder: "e.g. Concise bullets, max 5 items".into(),
+                rows: 2,
+                key: "format".into(),
+            },
+            WizardStep::Textarea {
+                title: "Core Responsibilities".into(),
+                placeholder: "e.g. Review PRs, suggest idioms, catch regressions".into(),
+                rows: 4,
+                key: "responsibilities".into(),
+            },
+            WizardStep::ToolSelect {
+                title: "Select Tools".into(),
+                tools: self.available_profile_tools()
+                    .into_iter()
+                    .map(|t| (t.clone(), t, false))
+                    .collect(),
+            },
+            WizardStep::PermissionSelect {
+                title: "Select Permission Mode".into(),
+                modes: self.available_permission_modes(),
+            },
+            WizardStep::Checklist {
+                title: "Select Skills".into(),
+                options: vec![],
+            },
+            WizardStep::Checklist {
+                title: "Select MCP Servers".into(),
+                options: vec![],
+            },
+            WizardStep::Review {
+                title: "Review & Confirm".into(),
+            },
+        ]
+    }
+
+    fn available_profile_tools(&self) -> Vec<String> {
+        vec![
+            "Read".into(),
+            "Glob".into(),
+            "Grep".into(),
+            "Bash".into(),
+            "Write".into(),
+            "Edit".into(),
+            "LSP".into(),
+        ]
+    }
+
+    fn available_permission_modes(&self) -> Vec<(String, String)> {
+        vec![
+            ("default".into(), "Ask for confirmation on edits".into()),
+            ("acceptEdits".into(), "Accept edits automatically".into()),
+            ("auto".into(), "Auto-approve safe operations".into()),
+            ("dontAsk".into(), "Never ask for confirmation".into()),
+            ("plan".into(), "Plan mode — suggest only".into()),
+        ]
+    }
 }
 
 impl McpProvider for ClaudeCodeProvider {

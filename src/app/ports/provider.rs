@@ -61,10 +61,32 @@ pub trait ProviderPort: Send + Sync {
     fn profile_wizard_steps(&self) -> Vec<WizardStep> {
         vec![]
     }
+
+    /// Return available profile tools for providers that support tool selection.
+    fn available_profile_tools(&self) -> Vec<String> {
+        vec![]
+    }
+
+    /// Return available permission modes for providers that support it.
+    /// Each entry is (mode_id, description).
+    fn available_permission_modes(&self) -> Vec<(String, String)> {
+        vec![]
+    }
 }
 
 /// A single static description of a wizard step.  Mutable UI state lives in
 /// `WizardState`, not here, so the step list can be cloned/replaced freely.
+/// Archetype template for pre-filling wizard fields.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArchetypeTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub defaults: std::collections::HashMap<String, String>,
+    pub default_tools: Vec<String>,
+    pub default_permission_mode: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum WizardStep {
     TextInput {
@@ -82,6 +104,33 @@ pub enum WizardStep {
     Review {
         title: String,
     },
+    /// Select an archetype template to pre-fill structured fields.
+    TemplateSelect {
+        title: String,
+        templates: Vec<ArchetypeTemplate>,
+    },
+    /// Select scope (workspace / global).
+    ScopeSelect {
+        title: String,
+    },
+    /// Multi-line text input.
+    Textarea {
+        title: String,
+        placeholder: String,
+        rows: usize,
+        /// Key used to store the answer in `structured_answers`.
+        key: String,
+    },
+    /// Tool selection checklist (injected by provider if available).
+    ToolSelect {
+        title: String,
+        tools: Vec<(String, String, bool)>, // (id, description, default)
+    },
+    /// Permission mode selection (injected by provider if available).
+    PermissionSelect {
+        title: String,
+        modes: Vec<(String, String)>, // (id, description)
+    },
     /// Reserved for future providers that want to embed an external interactive
     /// command as a distinct wizard step.  Not currently used by OpenCode.
     Interactive {
@@ -89,115 +138,6 @@ pub enum WizardStep {
         command: String,
         args: Vec<String>,
     },
-}
-
-/// Accumulator + UI state for the active profile-creation wizard.
-#[derive(Clone, Debug, PartialEq)]
-pub struct WizardState {
-    pub steps: Vec<WizardStep>,
-    pub step_index: usize,
-    /// Profile name collected in step 0.
-    pub name: String,
-    /// (question, answer) pairs from Q&A steps.
-    pub description_parts: Vec<(String, String)>,
-    pub skills: Vec<String>,
-    pub mcps: Vec<String>,
-    pub skill_options: Vec<String>,
-    pub mcp_options: Vec<String>,
-    /// Shared text buffer for TextInput / QuestionAnswer steps.
-    pub prompt_buffer: String,
-    /// Shared checklist state for Checklist steps.
-    pub checked: Vec<bool>,
-    pub selected: usize,
-    /// Cursor position tracked in **character indices** (not bytes) so
-    /// multi-byte UTF-8 characters are handled correctly.
-    pub cursor_pos: usize,
-    /// Provider id that produced this wizard.
-    pub provider_id: String,
-    /// Tracks which step_index `checked` was last initialized for, so
-    /// entering a different checklist step always resets state even if
-    /// option counts happen to match.
-    pub checked_step_index: Option<usize>,
-    /// Vertical scroll offset for the Review step (wrapped lines).
-    pub scroll_offset: usize,
-    /// Search query for Checklist steps (filtered options).
-    pub filter_query: String,
-}
-
-impl WizardState {
-    /// Get the indices of options that match the current filter query.
-    pub fn filtered_indices(&self) -> Vec<usize> {
-        if let Some(WizardStep::Checklist { options, .. }) = self.steps.get(self.step_index) {
-            let q = self.filter_query.to_lowercase();
-            if q.is_empty() {
-                (0..options.len()).collect()
-            } else {
-                options
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, opt)| opt.to_lowercase().contains(&q))
-                    .map(|(i, _)| i)
-                    .collect()
-            }
-        } else {
-            vec![]
-        }
-    }
-
-    /// Get the currently selected option index (in the original options array),
-    /// accounting for filtered view.
-    pub fn selected_original_index(&self) -> Option<usize> {
-        let filtered = self.filtered_indices();
-        filtered.get(self.selected).copied()
-    }
-}
-
-impl WizardState {
-    pub fn new(steps: Vec<WizardStep>, provider_id: String) -> Self {
-        let mut ws = Self {
-            steps,
-            step_index: 0,
-            name: String::new(),
-            description_parts: Vec::new(),
-            skills: Vec::new(),
-            mcps: Vec::new(),
-            skill_options: Vec::new(),
-            mcp_options: Vec::new(),
-            prompt_buffer: String::new(),
-            checked: vec![],
-            selected: 0,
-            cursor_pos: 0,
-            provider_id,
-            checked_step_index: None,
-            scroll_offset: 0,
-            filter_query: String::new(),
-        };
-        ws.sync_checklist_state();
-        ws
-    }
-
-    /// Resize `checked` and reset `selected` when the current step is a Checklist.
-    /// Always resets when entering a new checklist step to prevent state leakage.
-    pub fn sync_checklist_state(&mut self) {
-        if let Some(WizardStep::Checklist { options, .. }) = self.steps.get(self.step_index) {
-            if self.checked_step_index != Some(self.step_index) {
-                self.checked = vec![false; options.len()];
-                self.selected = self.selected.min(options.len().saturating_sub(1));
-                self.checked_step_index = Some(self.step_index);
-            }
-        }
-    }
-
-    /// Compose the full description string from Q&A pairs.
-    pub fn composed_description(&self) -> String {
-        let mut lines: Vec<String> = Vec::new();
-        for (q, a) in &self.description_parts {
-            lines.push(format!("Q: {}", q));
-            lines.push(format!("A: {}", a));
-            lines.push(String::new());
-        }
-        lines.join("\n")
-    }
 }
 
 #[cfg(test)]
