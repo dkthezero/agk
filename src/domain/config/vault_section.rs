@@ -150,4 +150,44 @@ impl super::ConfigFile {
         self.profiles.retain(|p| p.name != name);
         self.profiles.len() < before
     }
+
+    /// Remove a skill by name from the specified vault section.
+    /// Returns `true` if a skill was actually removed.
+    pub fn remove_skill_installed(&mut self, vault_id: &str, name: &str) -> bool {
+        if let Some(section) = self.vault_defs.get_mut(vault_id) {
+            if let Some(ref mut bucket) = section.skills {
+                let before = bucket.items.len();
+                bucket.items.retain(|item| {
+                    super::parse_identity(item)
+                        .map(|id| id.name != name)
+                        .unwrap_or(true)
+                });
+                bucket.items.len() < before
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Remove an MCP by name from the specified vault section.
+    /// Returns `true` if an MCP was actually removed.
+    pub fn remove_mcp_installed(&mut self, vault_id: &str, name: &str) -> bool {
+        if let Some(section) = self.vault_defs.get_mut(vault_id) {
+            if let Some(ref mut bucket) = section.mcps {
+                let before = bucket.items.len();
+                bucket.items.retain(|item| {
+                    super::parse_identity(item)
+                        .map(|id| id.name != name)
+                        .unwrap_or(true)
+                });
+                bucket.items.len() < before
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }

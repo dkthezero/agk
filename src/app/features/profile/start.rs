@@ -1,6 +1,8 @@
 use crate::app::event::CoreEvent;
+use crate::app::features::profile::batch_install::resolve_and_install_deps;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
-use crate::app::ports::{ConfigStorePort, ProfileRuntimePort};
+use crate::app::ports::{ConfigStorePort, McpRegistryPort, ProfileRuntimePort};
+use crate::app::registry::Registry;
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
 use std::sync::Arc;
@@ -15,15 +17,18 @@ use std::sync::Arc;
 /// 4. If `dry_run`, build launch plan via `build_launch_plan()`.
 /// 5. Otherwise, build plan and immediately execute via `run_plan()`.
 /// 6. Emit appropriate [`CoreEvent`]s.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     id: &ProfileId,
     scope: Scope,
     dry_run: bool,
     store: &dyn ConfigStorePort,
     runtime_ports: &std::collections::HashMap<String, Arc<dyn ProfileRuntimePort>>,
+    registry: &Registry,
+    mcp_registry: &dyn McpRegistryPort,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
-    let config = store.load(scope)?;
+    let mut config = store.load(scope)?;
 
     let domain_profile = config
         .profiles
@@ -35,8 +40,6 @@ pub fn run(
         })?;
 
     // --- Dependency resolution: auto-install missing skills/MCPs ---
-    // Both scopes use vault_id "auto" — the config store resolves
-    // the actual vault internally based on scope.
     let missing_skills: Vec<_> = domain_profile
         .skills
         .iter()
@@ -57,10 +60,30 @@ pub fn run(
             missing_mcps.len(),
             domain_profile.name,
         )));
+        let providers = registry.active_providers_from_config(&config);
+        let result = resolve_and_install_deps(
+            &domain_profile.name,
+            &missing_skills,
+            &missing_mcps,
+            scope,
+            &config,
+            store,
+            registry,
+            mcp_registry,
+            &providers,
+            sink,
+        );
+        if !result.all_succeeded() {
+            for (dep, err) in &result.failed {
+                sink.on_error(format!("Failed to install dependency '{}': {}", dep, err));
+            }
+            for (dep, err) in &result.rollback_failed {
+                sink.on_error(format!("Rollback failed for '{}': {}", dep, err));
+            }
+        }
+        // Re-load config after dependency resolution may have modified it
+        config = store.load(scope)?;
     }
-
-    // Re-load config after dependency resolution may have modified it
-    let config = store.load(scope)?;
 
     let runtime = runtime_ports
         .get(&domain_profile.provider_id)
@@ -116,11 +139,17 @@ pub fn run(
 mod tests {
     use super::*;
     use crate::app::outcome::NullSink;
+    use crate::app::ports::McpRegistryPort;
+    use crate::app::registry::Registry;
+    use crate::domain::mcp::McpServer;
     use crate::domain::profile::ProfileId;
     use crate::domain::scope::Scope;
+    use anyhow::Result;
 
     #[test]
     fn start_profile_dry_run_returns_plan() {
+        let registry = Registry::new();
+        let mcp_registry = FakeMcpRegistry::new();
         let mut sink = NullSink;
         let result = run(
             &ProfileId::new("dev"),
@@ -128,6 +157,8 @@ mod tests {
             true,
             &FakeStore,
             &std::collections::HashMap::new(),
+            &registry,
+            &mcp_registry,
             &mut sink,
         );
         // No runtime port registered → should fail gracefully
@@ -136,6 +167,8 @@ mod tests {
 
     #[test]
     fn start_profile_live_returns_ok() {
+        let registry = Registry::new();
+        let mcp_registry = FakeMcpRegistry::new();
         let mut sink = NullSink;
         let result = run(
             &ProfileId::new("dev"),
@@ -143,6 +176,8 @@ mod tests {
             false,
             &FakeStore,
             &std::collections::HashMap::new(),
+            &registry,
+            &mcp_registry,
             &mut sink,
         );
         // No runtime port registered → should fail gracefully
@@ -176,6 +211,61 @@ mod tests {
             _scope: Scope,
             _config: &crate::domain::config::ConfigFile,
         ) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct FakeMcpRegistry {
+        servers: std::collections::HashMap<String, McpServer>,
+    }
+    impl FakeMcpRegistry {
+        fn new() -> Self {
+            Self {
+                servers: std::collections::HashMap::new(),
+            }
+        }
+    }
+    impl McpRegistryPort for FakeMcpRegistry {
+        fn register(
+            &self,
+            _name: &str,
+            _command: &str,
+            _args: Option<&str>,
+            _env: Option<&str>,
+            _transport: &str,
+            _description: Option<&str>,
+        ) -> Result<McpServer> {
+            anyhow::bail!("not implemented in fake")
+        }
+        fn list(&self) -> Result<Vec<McpServer>> {
+            Ok(self.servers.values().cloned().collect())
+        }
+        fn test_server(&self, _name: &str) -> Result<()> {
+            Ok(())
+        }
+        fn build_providers(
+            &self,
+            _workspace_root: &std::path::Path,
+        ) -> Vec<Box<dyn crate::app::ports::McpProvider>> {
+            vec![]
+        }
+        fn enable(
+            &self,
+            _name: &str,
+            _provider_id: &str,
+            _scope: crate::domain::scope::Scope,
+        ) -> Result<()> {
+            Ok(())
+        }
+        fn disable(
+            &self,
+            _name: &str,
+            _provider_id: &str,
+            _scope: crate::domain::scope::Scope,
+        ) -> Result<()> {
+            Ok(())
+        }
+        fn unregister(&self, _name: &str) -> Result<()> {
             Ok(())
         }
     }

@@ -37,6 +37,8 @@ pub fn dispatch(
             *dry_run,
             core.store.as_ref(),
             &core.runtime_ports,
+            core.registry.as_ref(),
+            core.mcp_registry.as_ref(),
             sink,
         )),
         CoreCommand::DeleteProfile { id, scope } => {

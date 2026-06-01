@@ -58,7 +58,7 @@ pub fn resolve_and_install_deps(
     store: &dyn ConfigStorePort,
     registry: &Registry,
     mcp_registry: &dyn McpRegistryPort,
-    providers: &[Box<dyn ProviderPort>],
+    providers: &[&dyn ProviderPort],
     sink: &mut dyn CoreEventSink,
 ) -> BatchInstallResult {
     let mut result = BatchInstallResult {
@@ -122,6 +122,11 @@ pub fn resolve_and_install_deps(
                     "Auto-registered MCP '{}' for profile '{}'",
                     mcp.name, profile_name,
                 )));
+                sink.on_event(CoreEvent::Info(format!(
+                    "Note: MCP '{}' auto-registered with command '{}' — \
+                     verify with `agk mcp list` and update if needed",
+                    mcp.name, mcp.name,
+                )));
                 result.succeeded.push(label);
                 installed.push(InstalledItem::Mcp {
                     name: mcp.name.clone(),
@@ -169,7 +174,7 @@ fn resolve_and_install_asset(
     scope: Scope,
     store: &dyn ConfigStorePort,
     registry: &Registry,
-    providers: &[Box<dyn ProviderPort>],
+    providers: &[&dyn ProviderPort],
     sink: &mut dyn CoreEventSink,
 ) -> Result<()> {
     // Try to find the package in the vault scan
@@ -208,12 +213,9 @@ fn resolve_and_install_asset(
     // Install via each active provider
     let mut any_failed = false;
     for provider in providers {
-        if let Err(e) = crate::app::features::asset::install::install_asset(
-            scope,
-            &pkg,
-            store,
-            provider.as_ref(),
-        ) {
+        if let Err(e) =
+            crate::app::features::asset::install::install_asset(scope, &pkg, store, *provider)
+        {
             sink.on_error(format!("Provider {}: {}", provider.id(), e));
             any_failed = true;
         }
@@ -229,10 +231,10 @@ fn resolve_and_install_asset(
 /// Roll back a skill installation by removing it from config and provider.
 fn rollback_skill(
     name: &str,
-    _vault_id: &str,
+    vault_id: &str,
     scope: Scope,
     store: &dyn ConfigStorePort,
-    providers: &[Box<dyn ProviderPort>],
+    providers: &[&dyn ProviderPort],
 ) -> Result<()> {
     let mut config = store.load(scope)?;
     for provider in providers {
@@ -243,15 +245,57 @@ fn rollback_skill(
             Some(&config),
         );
     }
-    // Remove from config
-    for section in config.vault_defs.values_mut() {
-        if let Some(ref mut bucket) = section.skills {
-            bucket.items.retain(|item| {
-                // Items are "[name:version:sha10]" — check name prefix
-                !item.starts_with(&format!("[{}:", name))
-            });
-        }
+    // Remove from config using robust parse-based matching
+    config.remove_skill_installed(vault_id, name);
+    // Also try "auto" vault in case vault_id differs from the actual vault
+    if vault_id != "auto" {
+        config.remove_skill_installed("auto", name);
     }
     store.save(scope, &config)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn batch_result_all_succeeded_when_no_failures() {
+        let result = BatchInstallResult {
+            succeeded: vec!["skill:rust".into()],
+            failed: vec![],
+            rollback_failed: vec![],
+        };
+        assert!(result.all_succeeded());
+    }
+
+    #[test]
+    fn batch_result_not_all_succeeded_with_failures() {
+        let result = BatchInstallResult {
+            succeeded: vec!["skill:rust".into()],
+            failed: vec![("skill:python".into(), "not found".into())],
+            rollback_failed: vec![],
+        };
+        assert!(!result.all_succeeded());
+    }
+
+    #[test]
+    fn batch_result_not_all_succeeded_with_rollback_failures() {
+        let result = BatchInstallResult {
+            succeeded: vec![],
+            failed: vec![],
+            rollback_failed: vec![("skill:rust".into(), "config error".into())],
+        };
+        assert!(!result.all_succeeded());
+    }
+
+    #[test]
+    fn batch_result_all_succeeded_empty() {
+        let result = BatchInstallResult {
+            succeeded: vec![],
+            failed: vec![],
+            rollback_failed: vec![],
+        };
+        assert!(result.all_succeeded());
+    }
 }

@@ -7,6 +7,7 @@
 //! This reproduces the actual user experience without a real terminal or
 //! async event loop, giving us deterministic frame-level assertions.
 
+mod auto_install_deps;
 mod common;
 mod mcp_register;
 mod mcp_roundtrip;
