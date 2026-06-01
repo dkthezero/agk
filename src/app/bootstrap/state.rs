@@ -130,11 +130,45 @@ pub fn build_profile_entries(config: &ConfigFile) -> Vec<ProfileEntry> {
         .profiles
         .iter()
         .cloned()
-        .map(|p| ProfileEntry {
-            name: p.name,
-            provider_id: p.provider_id,
-            skills: p.skills,
-            mcps: p.mcps,
+        .map(|p| {
+            // Check if this profile exists in any vault
+            let found_in_vault = config.vault_defs.values().any(|section| {
+                section
+                    .profiles
+                    .as_ref()
+                    .map(|bucket| {
+                        bucket
+                            .items
+                            .iter()
+                            .any(|id_str| {
+                                let trimmed = id_str.trim_start_matches('[').trim_end_matches(']');
+                                let name = trimmed.split(':').next().unwrap_or(trimmed);
+                                name == p.name
+                            })
+                    })
+                    .unwrap_or(false)
+            });
+
+            // If the profile has a vault source, compute drift.
+            // If no vault source, it's a local-only profile — no drift.
+            let has_drift = if found_in_vault {
+                // Vault profile found. Compare local refs against empty vault refs
+                // (we don't have vault profile details in config — only the identity string).
+                // A future enhancement should query VaultPort for exact vault profile.
+                // Current heuristic: if profile has any skills/mcps and has a vault source,
+                // it may have drifted. We mark it as potentially drifted.
+                !p.skills.is_empty() || !p.mcps.is_empty()
+            } else {
+                false
+            };
+
+            ProfileEntry {
+                name: p.name,
+                provider_id: p.provider_id,
+                skills: p.skills,
+                mcps: p.mcps,
+                has_drift,
+            }
         })
         .collect()
 }

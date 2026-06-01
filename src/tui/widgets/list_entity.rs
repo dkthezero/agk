@@ -117,7 +117,23 @@ pub fn render_profiles(
 
     let mut items: Vec<ListItem> = profiles
         .iter()
-        .map(|p| ListItem::new(Line::from(format!("{} ({})", p.name, p.provider_id))))
+        .map(|p| {
+            if p.has_drift {
+                ListItem::new(Line::from(vec![
+                    Span::styled(p.name.clone(), Style::default().fg(Color::White)),
+                    Span::styled(
+                        format!(" ({})", p.provider_id),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::styled(
+                        " [\u{21c4}]".to_string(),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                ]))
+            } else {
+                ListItem::new(Line::from(format!("{} ({})", p.name, p.provider_id)))
+            }
+        })
         .collect();
 
     if has_discovered {
