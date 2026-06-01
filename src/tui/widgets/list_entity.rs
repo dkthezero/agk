@@ -120,11 +120,7 @@ pub fn render_profiles(
         .map(|p| {
             if p.has_drift {
                 ListItem::new(Line::from(vec![
-                    Span::styled(p.name.clone(), Style::default().fg(Color::White)),
-                    Span::styled(
-                        format!(" ({})", p.provider_id),
-                        Style::default().fg(Color::DarkGray),
-                    ),
+                    Span::raw(format!("{} ({})", p.name, p.provider_id)),
                     Span::styled(
                         " [\u{21c4}]".to_string(),
                         Style::default().fg(Color::Yellow),
