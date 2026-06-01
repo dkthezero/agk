@@ -4,7 +4,7 @@
 //! import from `infra`.
 
 pub use registry::build;
-pub use scan::{build_vaults, filter_scan, scan, ScanResult};
+pub use scan::{build_vaults, filter_scan, scan, ScanError, ScanResult};
 pub use state::{
     build_profile_entries, build_provider_entries, build_tab_kinds, build_vault_entries,
 };

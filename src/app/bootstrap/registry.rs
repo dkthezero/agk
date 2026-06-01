@@ -88,6 +88,7 @@ pub fn build_with_store(
         packages_by_tab: std::iter::repeat_with(Vec::new)
             .take(registry.feature_sets.len())
             .collect(),
+        scan_errors: Vec::new(),
     };
 
     Ok((
