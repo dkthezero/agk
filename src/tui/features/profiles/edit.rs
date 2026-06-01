@@ -1,3 +1,4 @@
+use crate::app::features::profile::token_estimate::estimate_tokens;
 use crate::domain::profile::ProfileAssetRef;
 use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, EventContext};
@@ -79,6 +80,22 @@ pub fn enter_edit_profile(state: &mut AppState, ctx: &EventContext) {
         .position(|m| *m == current_pm)
         .unwrap_or(0);
 
+    // Compute estimated tokens from the names of checked skills and MCPs.
+    let checked_text: String = skills
+        .iter()
+        .zip(skills_checked.iter())
+        .filter(|(_, &checked)| checked)
+        .map(|(name, _)| name.as_str())
+        .chain(
+            mcps.iter()
+                .zip(mcps_checked.iter())
+                .filter(|(_, &checked)| checked)
+                .map(|(name, _)| name.as_str()),
+        )
+        .collect::<Vec<&str>>()
+        .join(" ");
+    let estimated_tokens = estimate_tokens(&checked_text);
+
     state.edit_profile_state = Some(crate::tui::app::EditProfileState {
         profile_name: entry.name.clone(),
         field_index: 0,
@@ -89,6 +106,7 @@ pub fn enter_edit_profile(state: &mut AppState, ctx: &EventContext) {
         mcps_checked,
         permission_modes,
         permission_index,
+        estimated_tokens,
     });
     state.list_mode = ListMode::EditProfile;
     state.status_line.clear();

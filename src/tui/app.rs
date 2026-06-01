@@ -26,6 +26,8 @@ pub struct EditProfileState {
     pub permission_modes: Vec<String>,
     /// Selected permission mode index.
     pub permission_index: usize,
+    /// Estimated token count for the profile (advisory only).
+    pub estimated_tokens: usize,
 }
 
 pub struct AppState {
