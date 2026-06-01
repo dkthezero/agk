@@ -7,6 +7,12 @@ use crate::domain::profile_diff::compute_diff;
 use crate::domain::scope::Scope;
 
 /// Compare a local profile against its vault source and emit the diff.
+///
+/// **Limitation:** Vault profile resolution is currently a stub — vault-side
+/// skill/MCP/instruction/tool refs are always empty. This means every local
+/// asset appears as an "addition" in the diff. Once `VaultPort` can fetch
+/// actual vault profile contents, this use-case should be updated to pass
+/// real vault refs into `compute_diff`.
 pub fn run(
     id: &ProfileId,
     scope: Scope,
@@ -62,9 +68,11 @@ pub fn run(
         vault_permission_mode,
     );
 
+    let has_drift = diff.has_drift();
+
     sink.on_event(CoreEvent::ProfileDiffResult {
         profile_name: id.as_str().to_string(),
-        diff: diff.clone(),
+        diff,
     });
 
     if !found_in_vault {
@@ -75,7 +83,7 @@ pub fn run(
                 id.as_str()
             ),
         });
-    } else if diff.has_drift() {
+    } else if has_drift {
         sink.on_event(CoreEvent::TaskCompleted {
             id: 0,
             message: format!("Profile '{}' has drifted from vault source.", id.as_str()),

@@ -149,11 +149,12 @@ pub fn build_profile_entries(config: &ConfigFile) -> Vec<ProfileEntry> {
             // If the profile has a vault source, compute drift.
             // If no vault source, it's a local-only profile — no drift.
             let has_drift = if found_in_vault {
-                // Vault profile found. Compare local refs against empty vault refs
-                // (we don't have vault profile details in config — only the identity string).
-                // A future enhancement should query VaultPort for exact vault profile.
-                // Current heuristic: if profile has any skills/mcps and has a vault source,
-                // it may have drifted. We mark it as potentially drifted.
+                // TODO(v0.4): query VaultPort for exact vault profile refs so we can
+                // compute real drift instead of this heuristic. Currently any
+                // vault-sourced profile with skills/mcps shows drift, which is
+                // overly aggressive — a profile with all matching refs still gets
+                // the badge. The `profile diff` CLI command does compute exact
+                // drift, but it requires a dedicated call per profile.
                 !p.skills.is_empty() || !p.mcps.is_empty()
             } else {
                 false

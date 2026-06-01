@@ -60,20 +60,20 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
             serde_json::json!({ "type": "ProfileImported", "profile_name": profile_name })
         }
         CoreEvent::ProfileDiffResult { profile_name, diff } => {
-            serde_json::json!({
-                "type": "ProfileDiffResult",
-                "profile_name": profile_name,
-                "has_drift": diff.has_drift(),
-                "added_skills": diff.added_skills.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "removed_skills": diff.removed_skills.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "added_mcps": diff.added_mcps.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "removed_mcps": diff.removed_mcps.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "added_instructions": diff.added_instructions.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "removed_instructions": diff.removed_instructions.iter().map(|r| &r.name).collect::<Vec<_>>(),
-                "added_tools": &diff.added_tools,
-                "removed_tools": &diff.removed_tools,
-                "permission_mode_differs": diff.permission_mode_differs,
-            })
+            let has_drift = diff.has_drift();
+            let mut obj = serde_json::to_value(diff).unwrap_or_else(|_| serde_json::json!({}));
+            if let Some(map) = obj.as_object_mut() {
+                map.insert(
+                    "type".to_string(),
+                    serde_json::Value::String("ProfileDiffResult".into()),
+                );
+                map.insert(
+                    "profile_name".to_string(),
+                    serde_json::Value::String(profile_name.clone()),
+                );
+                map.insert("has_drift".to_string(), serde_json::Value::Bool(has_drift));
+            }
+            obj
         }
         CoreEvent::VaultAttached(id) => {
             serde_json::json!({ "type": "VaultAttached", "id": id })

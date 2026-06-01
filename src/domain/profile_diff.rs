@@ -1,7 +1,8 @@
 use crate::domain::profile::ProfileAssetRef;
+use serde::Serialize;
 
 /// Result of comparing a local profile's refs against a vault-discovered version.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProfileDiff {
     /// Skills present in local but not in vault.
     pub added_skills: Vec<ProfileAssetRef>,
