@@ -1,5 +1,7 @@
 # PRD: Terminal UX (TUI)
 
+**Status:** Implemented (v0.2)
+
 ## Overview
 The `agk` Terminal UI acts as the unified user control layer handling explicit interactive visualization mapping strictly independent operational dependencies securely spanning isolated task pool executors natively ensuring smooth progressive feedback loops actively bypassing thread blocking logic independently.
 

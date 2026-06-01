@@ -1,7 +1,7 @@
 # Profiles Feature – Product Requirements (v0.3)
 
-**Status:** Draft — v0.3 update  
-**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/profiles/prd.md)  
+**Status:** Implemented (v0.3 + v0.3.1 + v0.3.2)
+**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/profiles/prd.md)
 **Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 
 ---
@@ -180,23 +180,25 @@ On first write, AGK re-serializes to the structured format.
 
 ## Out of Scope (Future)
 
-- Profile import/export across machines (fast-follow: `agk profile export/import`).
+- ~~Profile import/export across machines~~ (shipped in v0.3.1: [Profile Portability PRD](../profile-portability/prd.md)).
+- ~~Profile diff (compare local vs vault)~~ (shipped in v0.3.2: `agk profile diff`).
 - Profile versioning / rollback (depends on git integration).
 - Multi-provider profiles (one profile targeting both OpenCode and Claude Code).
 
 ## Success Criteria
 
-- TUI shows `[5] Profiles` tab with list + vault-discovered profiles.
-- `agk p <name>` starts the provider with the correct agent, skills, and MCPs.
+- [x] TUI shows `[5] Profiles` tab with list + vault-discovered profiles.
+- [x] `agk p <name>` starts the provider with the correct agent, skills, and MCPs.
 - **v0.3 additions:**
-  - `agk p start` auto-installs missing dependencies from specified vaults.
-  - Installing a vault profile installs all referenced assets atomically.
-  - F3 Editor allows editing skills, MCPs, tools, and raw markdown.
-  - Claude Code provider writes `.claude/agents/<name>.md` with frontmatter.
-  - Old flat-string profiles continue to work and migrate on save.
-- `cargo test` passes; `cargo fmt --check` passes.
-- Architecture tests pass with zero allowlists.
+  - [x] `agk p start` auto-installs missing dependencies from specified vaults.
+  - [x] Installing a vault profile installs all referenced assets atomically.
+  - [x] F3 Editor allows editing skills, MCPs, tools, and raw markdown.
+  - [x] Claude Code provider writes `.claude/agents/<name>.md` with frontmatter.
+  - [x] Old flat-string profiles continue to work and migrate on save (write-migration shipped in v0.3.2).
+- [x] `agk profile diff <name>` shows which skills/MCPs/tools differ between local and vault (v0.3.2).
+- [x] `cargo test` passes; `cargo fmt --check` passes.
+- [x] Architecture tests pass with zero allowlists.
 
 ---
 
-*PRD v0.3 — updated 2026-05-30*
+*PRD v0.3 — updated 2026-06-01*

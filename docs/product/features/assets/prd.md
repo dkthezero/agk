@@ -1,5 +1,7 @@
 # PRD: Assets Management (Skills & Instructions)
 
+**Status:** Implemented (v0.2)
+
 ## Overview
 Assets are the core manageable components within `agk` representing logical functionality units tailored exclusively for AI agent execution workflows. 
 

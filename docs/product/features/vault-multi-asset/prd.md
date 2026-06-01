@@ -247,15 +247,15 @@ agk pack <vault>/filesystem --kind mcp
 
 ## Success Criteria
 
-- [ ] `mcps/` directory in vault is scanned and MCP definitions appear in TUI MCP tab.
-- [ ] `profiles/` directory in vault is scanned and profiles appear in TUI Profile tab.
-- [ ] Installing a vault profile installs all referenced skills, instructions, and MCPs.
-- [ ] `agk sync` detects changes to vault MCPs and profiles via SHA10.
-- [ ] `agk validate` checks MCP and profile definitions in vaults.
-- [ ] `StubFeatureSet("mcp")` and `StubFeatureSet("profile")` are deleted from bootstrap.
-- [ ] `filter_scan` handles `AssetKind::McpServer` and `AssetKind::Profile` correctly.
-- [ ] No regression: manually-registered MCPs and locally-created profiles continue to work.
-- [ ] Architecture tests pass: `domain/` remains pure, `infra/feature/` owns scanning.
+- [x] `mcps/` directory in vault is scanned and MCP definitions appear in TUI MCP tab.
+- [x] `profiles/` directory in vault is scanned and profiles appear in TUI Profile tab.
+- [x] Installing a vault profile installs all referenced skills, instructions, and MCPs.
+- [x] `agk sync` detects changes to vault MCPs and profiles via SHA10.
+- [ ] `agk validate` checks MCP and profile definitions in vaults (future).
+- [x] `StubFeatureSet("mcp")` and `StubFeatureSet("profile")` are replaced by real scanners (`McpFeatureSet`, `ProfileFeatureSet`).
+- [x] `filter_scan` handles `AssetKind::McpServer` and `AssetKind::Profile` correctly.
+- [x] No regression: manually-registered MCPs and locally-created profiles continue to work.
+- [x] Architecture tests pass: `domain/` remains pure, `infra/feature/` owns scanning.
 
 ---
 
@@ -275,4 +275,4 @@ This enhancement is the **prerequisite backbone** for:
 
 ---
 
-*PRD v0.1 — 2026-05-30*
+*PRD v0.1 — updated 2026-06-01*

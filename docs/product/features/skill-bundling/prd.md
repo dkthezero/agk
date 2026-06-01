@@ -1,5 +1,7 @@
 # PRD: Skill Bundling & Meta-Skills
 
+**Status:** Implemented (v0.2)
+
 > **Product Mindset:** `agk` is the agent kit for teams to share the way they work with AI agents together. Meta-skills are the ultimate team onboarding tool — one identifier deploys an entire standardized workflow.
 
 ---

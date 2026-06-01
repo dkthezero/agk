@@ -1,6 +1,6 @@
 # Epic Proposal: AGK v0.3 — "Team-Ready Profiles"
 
-**Status:** In Progress — Phases 1–4 implemented on `v03` branch; Phase 5 (Polish) pending
+**Status:** Implemented — merged to master via #26
 **Target Release:** v0.3.0
 **Theme:** *From personal skill manager to team environment blueprint*
 **Author:** Technical Product Owner (Claude synthesis)
@@ -237,7 +237,7 @@ mcps:
 ### Should-Have Gate
 
 - [x] Provider tool checklist appears in wizard when provider advertises options (`ToolSelect` and `PermissionSelect` wizard steps).
-- [ ] F3 Editor supports raw markdown editing with live token updates (skills/MCPs/permissions editing ✅; raw markdown editing and live token count ⚠️ partial — token estimation exists in wizard review but not in F3 editor).
+- [x] F3 Editor supports raw markdown editing with live token updates (token badge added in v0.3.2 via F25).
 - [x] Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter (YAML frontmatter + composed body, with `prompt_overlay_path` fallback).
 - [x] Batch profile installation is atomic (all referenced assets or none, with rollback on failure).
 

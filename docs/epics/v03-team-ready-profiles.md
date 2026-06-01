@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3 — "Team-Ready Profiles"
 
-**Status:** In Progress — Phases 1–4 implemented on `v03` branch; Phase 5 (Polish) pending
+**Status:** Implemented — merged to master via #26
 **Target Date:** 7 weeks from kickoff
 **Epic:** [`proposals/v03-team-ready-profiles.md`](proposals/v03-team-ready-profiles.md)
 
@@ -103,7 +103,7 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 - [x] Installing a vault profile installs all referenced assets atomically (with rollback on failure).
 - [x] F3 Editor allows editing skills (with vault), MCPs, and permission mode.
 - [x] Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter.
-- ⚠️ F3 Editor does not show live token count — token estimation is only in the wizard review step.
+- ✅ F3 Editor now shows live token count badge (resolved in v0.3.2 via F25).
 - ⚠️ Vault-sourced MCPs auto-register with name as placeholder command; user must verify.
 
 ---
@@ -130,7 +130,7 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 - [ ] Integration tests: vault profile install + start.
 - [ ] Integration tests: MCP provider write/read roundtrips.
 - [ ] Manual QA checklist complete (vault attach, profile install, provider toggle, MCP register, profile start).
-- [ ] Config migration: old flat format → structured on first write.
+- [x] Config migration: old flat format → structured on first write (shipped in v0.3.2 via F24).
 - [ ] TUI launch simulation overlay.
 
 ---

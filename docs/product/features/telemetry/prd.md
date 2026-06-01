@@ -1,5 +1,7 @@
 # PRD: Telemetry & Skill Usage Analytics
 
+**Status:** Implemented (v0.2, updated v0.3.1)
+
 > **Product Mindset:** `agk` is the agent kit for teams to share the way they work with AI agents together. Telemetry helps teams prune dead weight and invest in high-value skills — but only if it is strictly local, opt-out-capable, and resilient.
 
 ---

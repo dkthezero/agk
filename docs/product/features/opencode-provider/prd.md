@@ -1,5 +1,7 @@
 # PRD: OpenCode Provider Support
 
+**Status:** Implemented (v0.2)
+
 > **Product Mindset:** `agk` is the agent kit for teams to share the way they work with AI agents together. OpenCode is a file-based, Claude-compatible agent runtime; supporting it extends agk's polyglot coverage with minimal adapter complexity.
 
 ---
