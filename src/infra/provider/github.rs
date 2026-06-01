@@ -42,6 +42,7 @@ impl GithubProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 
@@ -112,6 +113,10 @@ impl ProviderPort for GithubProvider {
             return None;
         }
         None
+    }
+
+    fn supports_mcp(&self) -> bool {
+        true
     }
 }
 

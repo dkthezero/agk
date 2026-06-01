@@ -19,11 +19,29 @@ impl ProfileRuntimePort for OpenCodeProvider {
         let base_agent_path = self.profile_agent_path(name);
 
         // Auto-generate a minimal agent markdown if the file is missing.
+        // If a prompt_overlay_path is set, use that file's content instead
+        // of the default placeholder body.
         if !base_agent_path.exists() {
             if let Some(parent) = base_agent_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let content = format!("# {}\n\nProfile agent for {}.\n", name, name);
+            let content = if let Some(ref overlay_path) = profile.prompt_overlay_path {
+                match std::fs::read_to_string(overlay_path) {
+                    Ok(overlay_content) => overlay_content,
+                    Err(e) => {
+                        // Fall back to default with a warning
+                        let mut fallback = format!("# {}\n\nProfile agent for {}.\n", name, name);
+                        fallback.push_str(&format!(
+                            "\n\n<!-- WARNING: prompt_overlay_path not found ({}): {} -->",
+                            overlay_path.display(),
+                            e
+                        ));
+                        fallback
+                    }
+                }
+            } else {
+                format!("# {}\n\nProfile agent for {}.\n", name, name)
+            };
             std::fs::write(&base_agent_path, content)?;
         }
 
@@ -46,7 +64,7 @@ impl ProfileRuntimePort for OpenCodeProvider {
             // Per-agent skill permissions
             let mut skill_perm = serde_json::json!({});
             for skill in &profile.skill_refs {
-                skill_perm[skill.0.clone()] = serde_json::json!("allow");
+                skill_perm[skill.name.clone()] = serde_json::json!("allow");
             }
             skill_perm["*"] = serde_json::json!("deny");
             agent_entry["permission"] = serde_json::json!({ "skill": skill_perm });
@@ -54,10 +72,39 @@ impl ProfileRuntimePort for OpenCodeProvider {
             // Per-agent MCP enablement
             let mut mcp_obj = serde_json::json!({});
             for mcp in &profile.mcp_refs {
-                mcp_obj[mcp.0.clone()] = serde_json::json!({ "enabled": true });
+                mcp_obj[mcp.name.clone()] = serde_json::json!({ "enabled": true });
             }
             if mcp_obj.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
                 agent_entry["mcp"] = mcp_obj;
+            }
+
+            // Per-agent tool allowlist
+            if !profile.tool_refs.is_empty() {
+                let mut tool_obj = serde_json::json!({});
+                for tool in &profile.tool_refs {
+                    tool_obj[tool.clone()] = serde_json::json!("allow");
+                }
+                tool_obj["*"] = serde_json::json!("deny");
+                if let Some(perm) = agent_entry
+                    .get_mut("permission")
+                    .and_then(|v| v.as_object_mut())
+                {
+                    perm.insert("tool".to_string(), tool_obj);
+                } else {
+                    agent_entry["permission"] = serde_json::json!({ "tool": tool_obj });
+                }
+            }
+
+            // Per-agent permission mode (e.g. "auto", "plan", "default")
+            if let Some(ref mode) = profile.permission_mode {
+                if let Some(perm) = agent_entry
+                    .get_mut("permission")
+                    .and_then(|v| v.as_object_mut())
+                {
+                    perm.insert("mode".to_string(), serde_json::json!(mode));
+                } else {
+                    agent_entry["permission"] = serde_json::json!({ "mode": mode });
+                }
             }
 
             agent_obj.insert(agent_name.clone(), agent_entry);
@@ -70,6 +117,8 @@ impl ProfileRuntimePort for OpenCodeProvider {
             patched_provider_config: Some(plan_config),
             original_provider_config_bytes: original_bytes,
             session_agent_name: Some(agent_name),
+            tool_refs: profile.tool_refs.clone(),
+            permission_mode: profile.permission_mode.clone(),
             ..LaunchPlan::default()
         })
     }

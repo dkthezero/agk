@@ -7,6 +7,15 @@ pub enum Scope {
     Workspace,
 }
 
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Scope::Global => write!(f, "global"),
+            Scope::Workspace => write!(f, "workspace"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

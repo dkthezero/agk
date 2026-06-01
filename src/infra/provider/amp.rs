@@ -42,6 +42,7 @@ impl AmpProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 
@@ -119,6 +120,10 @@ impl ProviderPort for AmpProvider {
             return None;
         }
         Some(self.asset_dir(&scope, kind, &_identity.name, None))
+    }
+
+    fn supports_mcp(&self) -> bool {
+        true
     }
 }
 

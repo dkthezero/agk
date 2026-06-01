@@ -2,31 +2,74 @@ use crate::app::registry::Registry;
 use crate::domain::asset::ScannedPackage;
 use crate::domain::config::ConfigFile;
 use anyhow::Result;
+use rayon::prelude::*;
 
+/// Result of scanning all vaults for packages across all feature tabs.
 pub struct ScanResult {
+    /// Packages grouped by tab (one Vec per feature set).
     pub packages_by_tab: Vec<Vec<ScannedPackage>>,
+    /// Errors encountered during vault scanning, keyed by vault ID.
+    pub scan_errors: Vec<ScanError>,
 }
 
+/// A non-fatal error from scanning a single vault.
+pub struct ScanError {
+    /// The vault that produced the error.
+    pub vault_id: String,
+    /// The error message.
+    pub error: String,
+}
+
+/// Scan all vaults for packages across all feature tabs.
+///
+/// Each tab's vaults are scanned in parallel using rayon. Errors from
+/// individual vaults are collected into `scan_errors` rather than
+/// causing the entire scan to fail — the caller can decide how to
+/// surface them.
 pub fn scan(
     registry: &Registry,
     vaults: &[Box<dyn crate::app::ports::VaultPort>],
 ) -> Result<ScanResult> {
     let mut packages_by_tab = Vec::new();
+    let mut all_errors = Vec::new();
+
     for feature in &registry.feature_sets {
+        if feature.is_stub() {
+            packages_by_tab.push(Vec::new());
+            continue;
+        }
+
+        // Scan all vaults in parallel for this tab.
+        let results: Vec<(String, Result<Vec<ScannedPackage>>)> = vaults
+            .par_iter()
+            .map(|vault| {
+                let id = vault.id().to_string();
+                let result = vault.list_packages(feature.as_ref());
+                (id, result)
+            })
+            .collect();
+
         let mut tab_packages = Vec::new();
-        if !feature.is_stub() {
-            for vault in vaults {
-                match vault.list_packages(feature.as_ref()) {
-                    Ok(mut pkgs) => tab_packages.append(&mut pkgs),
-                    Err(e) => eprintln!("vault '{}' scan error: {}", vault.id(), e),
-                }
+        for (vault_id, result) in results {
+            match result {
+                Ok(pkgs) => tab_packages.extend(pkgs),
+                Err(e) => all_errors.push(ScanError {
+                    vault_id,
+                    error: e.to_string(),
+                }),
             }
         }
         packages_by_tab.push(tab_packages);
     }
-    Ok(ScanResult { packages_by_tab })
+
+    Ok(ScanResult {
+        packages_by_tab,
+        scan_errors: all_errors,
+    })
 }
 
+/// Filter scanned packages to only those in enabled vaults or explicitly
+/// installed in global/workspace config.
 pub fn filter_scan(
     scan: &mut ScanResult,
     global_config: &ConfigFile,
@@ -50,7 +93,12 @@ pub fn filter_scan(
                     crate::domain::asset::AssetKind::Instruction => {
                         global_config.is_instruction_installed(&pkg.vault_id, &pkg.identity.name)
                     }
-                    crate::domain::asset::AssetKind::McpServer => false,
+                    crate::domain::asset::AssetKind::McpServer => {
+                        global_config.is_mcp_installed(&pkg.vault_id, &pkg.identity.name)
+                    }
+                    crate::domain::asset::AssetKind::Profile => {
+                        global_config.is_profile_installed(&pkg.vault_id, &pkg.identity.name)
+                    }
                 };
                 let is_ws = if let Some(ws) = workspace_config {
                     match pkg.kind {
@@ -60,7 +108,12 @@ pub fn filter_scan(
                         crate::domain::asset::AssetKind::Instruction => {
                             ws.is_instruction_installed(&pkg.vault_id, &pkg.identity.name)
                         }
-                        crate::domain::asset::AssetKind::McpServer => false,
+                        crate::domain::asset::AssetKind::McpServer => {
+                            ws.is_mcp_installed(&pkg.vault_id, &pkg.identity.name)
+                        }
+                        crate::domain::asset::AssetKind::Profile => {
+                            ws.is_profile_installed(&pkg.vault_id, &pkg.identity.name)
+                        }
                     }
                 } else {
                     false

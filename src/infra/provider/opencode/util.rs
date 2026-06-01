@@ -2,6 +2,12 @@
 ///
 /// Shared by `session.rs` and `legacy_session.rs` to mint per-session
 /// agent names.
+///
+/// **Predictability note:** This is NOT cryptographically random — it
+/// derives the suffix from `SystemTime::now()` truncated to nanoseconds.
+/// Two sessions started within the same nanosecond window on the same host
+/// will collide.  This is acceptable for local dev-session naming where
+/// uniqueness is best-effort, not a security property.
 pub fn random_6_digits() -> String {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

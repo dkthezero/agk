@@ -24,4 +24,6 @@ pub enum ListMode {
     /// Profile creation wizard (provider-specific step stack)
     ProfileWizard,
     ConfirmDeleteProfile,
+    /// Profile editor modal (F3 on Profile tab)
+    EditProfile,
 }

@@ -52,8 +52,13 @@ mod tests {
         config.profiles.push(crate::domain::config::Profile {
             name: "dev".into(),
             provider_id: "opencode".into(),
-            skills: vec!["rust".into()],
+            scope: "workspace".into(),
+            skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let encoded = codec.encode_config(&config).unwrap();
         let decoded = codec.decode_config(&encoded).unwrap();

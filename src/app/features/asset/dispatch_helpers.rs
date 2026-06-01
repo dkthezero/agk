@@ -55,7 +55,7 @@ pub(super) fn install_asset_cmd(
         Ok(None) => {
             // Attempt remote fetch via ClawHub for simple slugs.
             if !identity.contains('/') {
-                if let Err(e) = crate::infra::vault::clawhub::cli_install(identity) {
+                if let Err(e) = core.clawhub.cli_install(identity) {
                     sink.on_event(CoreEvent::TaskFailed {
                         id: 0,
                         error: format!("Fetch failed: {}", e),

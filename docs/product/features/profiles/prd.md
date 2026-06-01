@@ -1,91 +1,99 @@
-# Profiles Feature – Product Requirements
+# Profiles Feature – Product Requirements (v0.3)
+
+**Status:** Draft — v0.3 update  
+**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/profiles/prd.md)  
+**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
+
+---
 
 ## Overview
 
-A **Profile** is a named, self-contained agentic context that bundles an AI agent CLI (e.g. OpenCode), a curated set of skills, selected MCP servers, and a custom agent definition. Launching a Profile starts the agent CLI in a fully pre-configured session and cleans up all session artifacts on exit, leaving the workspace pristine.
+A **Profile** is a named, self-contained agentic context that bundles an AI agent CLI (e.g. OpenCode, Claude Code), a curated set of skills, selected MCP servers, and a custom agent definition. In v0.3, profiles become **portable, versioned, team-distributable environment blueprints** that can be discovered from vaults, self-heal their dependencies on launch, and store vault provenance for every referenced asset.
+
+---
 
 ## User-Facing Behavior
 
 ### TUI Tab [5] Profiles
 
-The AGK TUI gains a new tab **Profiles** rendered at position `[5]` (between `[4] Providers` and `[0] Vault`).
+The AGK TUI retains the **Profiles** tab at position `[5]` (between `[4] Providers` and `[0] Vault`).
 
 - **Navigation:** `[5]` key switches to Profiles tab.
 - **List existing profiles:** Displays profiles stored in the active scope config (Workspace or Global).
-- **F2 — Add new profile:** Opens a provider-specific multi-step modal wizard.
-
-#### Profile Creation Wizard (OpenCode Provider)
-
-The wizard is **owned by the provider** — each `ProfileProvider` implementation declares its own step sequence via a `Vec<WizardStep>` stack. This lets future providers (Gemini, Claude Code, etc.) define entirely different on-boarding flows.
-
-OpenCode provider steps (current default):
-
-1. **Profile name** — Enter a unique alphanumeric name with hyphens.
-2. **Tailor the agent** (Q&A loop) — Answer a short questionnaire so the final agent description matches the user's actual need. Each question is shown one at a time:
-   - *What is the primary task this agent should handle?*
-   - *What tone or style should the agent use?*
-   - *Are there any specific constraints or rules?*
-   Answers are accumulated and later joined into a single `--description` string passed to `opencode agent create`.
-3. **Select skills** — Scrollable checklist of all available skills across active vaults (`Space` toggles, `Enter` confirms).
-4. **Select MCP servers** — Scrollable checklist of registered MCP servers.
-5. **Review & confirm** — Read-only overview pane showing: profile name, generated description, selected skills count, selected MCPs count. `Enter` proceeds; `Esc` goes back to step 4.
-6. **Interactive agent creation** — AGK suspends its TUI, yields the terminal to `opencode agent create`, waits for the user to finish the interactive OpenCode wizard, then resumes AGK. The resulting agent markdown is moved to `.agk/profiles/<profile_name>/agent.md`.
-
+- **Vault-discovered profiles:** Profiles found in attached vaults (`profiles/*/PROFILE.md`) appear in the list with a `[Vault]` badge and an `[ ]` checkbox. Pressing `Space` installs them (batch-installs all referenced skills, instructions, and MCPs).
+- **F2 — Add new profile:** Opens the enhanced provider-specific multi-step modal wizard. See [Profile Wizard PRD](../profile-wizard/prd.md).
+- **F3 — Edit profile:** Opens the Profile Editor for the selected profile. See §Profile Editor below.
 - **Delete profile:** `Delete` key on selected profile opens a confirmation modal, then removes it from config and deletes its `.agk/profiles/` subdirectory.
+- **Enter — Start profile:** Launches the profile session. If dependencies are missing, a dependency-resolution overlay shows progress; missing skills/MCPs are auto-installed from their specified vaults before the provider starts.
+
+#### Profile Editor (F3)
+
+The editor is a tabbed modal:
+
+1. **Overview** — Profile name, provider, scope, estimated token count of the composed prompt.
+2. **Skills** — Checklist of available skills across vaults. Each skill shows its originating vault (e.g., `rust-patterns [clawhub]`). `Space` toggles attachment.
+3. **MCPs** — Checklist of registered + vault-discovered MCPs. Each shows vault if vault-sourced. `Space` toggles attachment.
+4. **Tools / Permissions** — If the provider advertises configurable tools, a checklist appears here. `Space` toggles.
+5. **Raw Markdown** — Editable text area showing the composed `agent.md` content. Live token count updates as the user types.
+
+**Save:** `Ctrl+S` or `Enter` writes changes back to `config.toml` and `.agk/profiles/<name>/agent.md`.
+
+---
 
 ### CLI Commands
 
-#### Launch a profile session
+#### Launch a profile session (updated for v0.3)
 
 ```
 agk p <profile_name>
 # alias: agk profile start <profile_name>
 ```
 
-**Launch flow:**
+**Launch flow (v0.3 enhancements in bold):**
 
 1. Load profile from config (workspace scope preferred, fallback to global).
-2. Generate a random 6-digit session suffix (e.g. `123456`).
-3. **Provider-specific session setup** (delegated to the profile's target provider):
-   - OpenCode provider:
-     - Copy `.agk/profiles/<name>/agent.md` → `.opencode/agents/<name>_<suffix>.md`
+2. **Resolve missing dependencies:**
+   - Read `profile.skill_refs` + `skill_vault_refs`.
+   - For any skill not installed in the current scope, resolve its vault.
+   - If vault is `"auto"`, scan all attached vaults for the skill name (warn if ambiguous).
+   - Auto-install missing skills from the identified vault.
+   - Repeat for MCP servers: check global registry; if missing, resolve vault and auto-register.
+   - Emit clear error if a specified vault is unavailable or the asset is not found.
+3. Generate a random 6-digit session suffix (e.g. `123456`).
+4. **Provider-specific session setup:**
+   - **OpenCode provider:**
+     - Copy `.agk/profiles/<name>/agent.md` → `.opencode/agents/<name>_<suffix>.md`.
+     - If `agent.md` is missing, use the structured markdown composed by the wizard.
      - Set `mode: primary` and name in frontmatter.
      - Under `agent.<name>_<suffix>` in workspace `opencode.json`, set:
        - `permission.skill` — allow listed skills, deny `*`.
        - `mcp` — enable selected MCP servers (`enabled: true`).
-4. **Start agent CLI** — `opencode` (or provider-specific command).
-5. **Block until exit**.
-6. **Cleanup** — Remove session agent file, remove the `agent.<name>_<suffix>` entry from `opencode.json`, delete `opencode.json` if empty, prune `.opencode/` if empty.
+       - **NEW:** `tools` — if `tool_refs` present, restrict tool access.
+   - **Claude Code provider (NEW in v0.3):**
+     - Copy `.agk/profiles/<name>/agent.md` → `.claude/agents/<name>.md`.
+     - `agent.md` contains full YAML frontmatter (`name`, `description` with `<example>` blocks, `tools`, `model`, `color`, `memory`) + structured body.
+5. **Start agent CLI** — provider-specific command.
+6. **Block until exit**.
+7. **Cleanup** — Remove session agent file, remove the provider-config entry, prune if empty.
 
-#### Create a profile headlessly
+#### Create a profile headlessly (updated for v0.3)
 
-```
+```bash
 agk profile create <name> \
   --provider opencode \
-  --skills skill1,skill2 \
-  --mcps mcp1,mcp2 \
-  --description "A Rust coding assistant" \
+  --skills skill1:vault1,skill2:vault2 \
+  --mcps mcp1:vault1,mcp2 \
+  --description-file ./my-agent.md \
   --scope workspace
 ```
 
-**Args:**
+**v0.3 changes:**
+- `--skills` now accepts `name:vault` syntax. If vault omitted, defaults to `"auto"`.
+- `--mcps` now accepts `name:vault` syntax.
+- `--description-file` allows supplying a custom `agent.md` instead of wizard-generated.
+- `--tools` and `--permission-mode` flags added for providers that support them.
 
-| Flag | Short | Description | Default |
-|------|-------|-------------|---------|
-| `--provider` | `-p` | Provider ID (only `opencode` supported in v1) | `opencode` |
-| `--skills` | `-s` | Comma-separated list of skill names to bundle | (empty) |
-| `--mcps` | `-m` | Comma-separated list of MCP server names to enable | (empty) |
-| `--description` | `-d` | Raw description string passed to `opencode agent create` | (none) |
-| `--description-file` | | Path to a markdown file whose contents are used as description | (none) |
-| `--scope` | | `global` or `workspace` | `workspace` |
-
-**Flow:**
-
-1. Validate the provider is active and supports profiles.
-2. Ensure no duplicate profile name exists in the chosen scope.
-3. Write the new profile entry to `config.toml`.
-4. Run `opencode agent create --name <name> --description <desc>` headlessly.
-5. On success, copy the generated `.opencode/agents/<name>.md` → `.agk/profiles/<name>/agent.md`.
+---
 
 ### Scope
 
@@ -94,44 +102,101 @@ Profiles obey the existing scoped-config system:
 - **Global profiles** are stored in `~/.config/agk/config.toml` and are available everywhere.
 - The TUI scope toggle (`Tab` key) switches between workspace and global profiles.
 
-### Dry-run mode (Phase 5)
-
-```
-agk profile start <name> --dry-run
-agk profile create <name> ... --dry-run
-```
-
-When `--dry-run` is passed:
-1. The profile config is loaded and validated.
-2. A `LaunchPlan` is built via `ProfileRuntimePort::build_launch_plan()`.
-3. The plan is returned (and optionally emitted as JSON with `--json`) without executing.
-4. No filesystem modifications, no process spawning.
-5. The plan includes: `agent_markdown_source`, `patched_provider_config`, `original_provider_config_bytes`, `skills`, `mcps`.
-
-This allows CI pipelines and user scripts to preview exactly what a profile session will do before committing side effects.
+---
 
 ## Functional Requirements
 
-1. Profile shall bundle: `name`, `provider_id`, `skills: Vec<String>`, `mcps: Vec<String>`, `agent_file: PathBuf`.
-2. Profile config shall be stored inline in `ConfigFile` under a `profiles` field (serialized via `serde(flatten)`).
-3. The profile's base agent file shall live in `.agk/profiles/<profile_name>/agent.md`.
-4. Session agent files shall use a unique random suffix to avoid collisions.
-5. On session exit, all files created or modified for the session shall be restored to their pre-session state.
-6. If `opencode.json` was created by the session and is empty after cleanup, it shall be deleted.
-7. If `.opencode/` has no remaining user files after cleanup, it may be removed.
-8. Concurrent sessions of the same profile shall be supported via unique session suffixes.
-9. If any step of session setup fails, the partial changes shall be rolled back before reporting the error.
-10. **Wizard extensibility:** The profile creation wizard shall be a stack of `WizardStep` values produced by the active `ProfileProvider`. New providers can inject their own steps (e.g. API-key prompts, model selection) without modifying `ListMode` or TUI dispatch code.
-11. **Q&A description:** The tailor step shall concatenate question+answer pairs into a single description string. This string is passed as `--description` to `opencode agent create` so the generated agent markdown reflects the user's intent.
+### v0.3 New Requirements
+
+1. **Vault-aware dependency storage:** Profile shall store skills and MCPs as structured objects with `name` + `vault` fields. See §Config Schema.
+2. **Auto-install on start:** `agk p start` shall resolve missing skills/MCPs and install them from their specified vaults before launching the provider.
+3. **Vault-discoverable profiles:** `profiles/` directories in attached vaults shall be scanned; discovered profiles shall appear in the TUI Profile tab with `[Vault]` badge.
+4. **Batch profile installation:** Installing a vault profile shall atomically install all referenced skills, instructions, and MCPs, then create the profile config entry.
+5. **Profile editor (F3):** Post-creation editing of skills (with vault), MCPs, tools, permissions, and raw markdown with live token count.
+6. **Custom prompt overlay:** `prompt_overlay_path` shall be supported; if present, AGK uses the user-supplied file instead of wizard-generated markdown.
+7. **Tool/permission projection:** If a profile has `tool_refs` or `permission_mode`, the provider's `build_launch_plan()` shall project them into the provider-specific config.
+8. **Claude Code projection:** For the Claude Code provider, `agk p start` shall write `.agk/profiles/<name>/agent.md` to `.claude/agents/<name>.md` with full frontmatter.
+9. **Launch simulation overlay:** The TUI shall show a visual progress panel during `agk p start`: dependency resolution → install → projection → provider runtime.
+10. **Backward-compatible config migration:** Old flat `skills = ["name"]` shall deserialize into `ProfileAssetRef { name, vault: "auto" }` and rewrite to structured format on next save.
+
+### Retained v0.2 Requirements
+
+- Profile shall bundle: `name`, `provider_id`, skills, MCPs, instructions, agent file.
+- Profile config shall be stored in `ConfigFile` under a `profiles` field.
+- Session agent files shall use a unique random suffix to avoid collisions.
+- On session exit, all files created or modified for the session shall be restored to pre-session state.
+- Concurrent sessions of the same profile shall be supported via unique session suffixes.
+- If any step of session setup fails, partial changes shall be rolled back before reporting the error.
+- Wizard extensibility: The profile creation wizard shall be a stack of `WizardStep` values produced by the active provider.
+
+---
+
+## Config Schema (v0.3)
+
+### Structured Profile Format (Canonical)
+
+```toml
+[[profiles]]
+name = "web-app-team"
+provider_id = "opencode"
+scope = "workspace"
+
+[[profiles.skills]]
+name = "rust-patterns"
+vault = "clawhub"
+
+[[profiles.skills]]
+name = "docker"
+vault = "ecc"
+
+[[profiles.mcps]]
+name = "filesystem"
+vault = "workspace"
+
+[[profiles.mcps]]
+name = "github-api"
+vault = "auto"        # resolved at runtime
+
+[profiles.tools]
+refs = ["Read", "Glob", "Grep"]
+permission_mode = "acceptEdits"
+
+prompt_overlay_path = ".agk/profiles/web-app-team/custom.md"
+```
+
+### Backward-Compatible Flat Format (Read-Only Legacy)
+
+```toml
+[[profiles]]
+name = "legacy"
+provider_id = "opencode"
+skills = ["rust-patterns", "docker"]     # deserializes to vault = "auto"
+mcps = ["filesystem"]
+```
+
+On first write, AGK re-serializes to the structured format.
+
+---
 
 ## Out of Scope (Future)
 
-- Editing an existing profile after creation (users can delete and recreate).
-- Profile import/export.
+- Profile import/export across machines (fast-follow: `agk profile export/import`).
+- Profile versioning / rollback (depends on git integration).
+- Multi-provider profiles (one profile targeting both OpenCode and Claude Code).
 
 ## Success Criteria
 
-- TUI shows `[5] Profiles` tab with list/add/delete.
-- `agk p <name>` starts OpenCode with the correct agent, skills, and MCPs.
-- After `opencode` exits, workspace has no leftover session files.
+- TUI shows `[5] Profiles` tab with list + vault-discovered profiles.
+- `agk p <name>` starts the provider with the correct agent, skills, and MCPs.
+- **v0.3 additions:**
+  - `agk p start` auto-installs missing dependencies from specified vaults.
+  - Installing a vault profile installs all referenced assets atomically.
+  - F3 Editor allows editing skills, MCPs, tools, and raw markdown.
+  - Claude Code provider writes `.claude/agents/<name>.md` with frontmatter.
+  - Old flat-string profiles continue to work and migrate on save.
 - `cargo test` passes; `cargo fmt --check` passes.
+- Architecture tests pass with zero allowlists.
+
+---
+
+*PRD v0.3 — updated 2026-05-30*

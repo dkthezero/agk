@@ -62,6 +62,8 @@ mod tests {
                 vault: None,
                 skills: None,
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Global, &config).unwrap();
@@ -88,6 +90,8 @@ mod tests {
                     items: vec!["[x:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         store.save(Scope::Global, &config).unwrap();

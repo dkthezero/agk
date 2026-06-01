@@ -7,7 +7,7 @@ pub fn build_vault_entries(
     global_config: &ConfigFile,
     active_config: &ConfigFile,
     scan: &super::ScanResult,
-    registry: &Registry,
+    _registry: &Registry,
     workspace_root: &std::path::Path,
 ) -> Vec<VaultEntry> {
     let mut entries = Vec::new();
@@ -54,29 +54,22 @@ pub fn build_vault_entries(
 
         let installed_skills = active_config.installed_skills(&vault_id).len();
         let installed_instructions = active_config.installed_instructions(&vault_id).len();
+        let installed_profiles = active_config.installed_profiles(&vault_id).len();
+        let installed_mcps = active_config.installed_mcps(&vault_id).len();
 
         let mut available_skills = 0usize;
         let mut available_instructions = 0usize;
-        for (tab_idx, pkgs) in scan.packages_by_tab.iter().enumerate() {
-            let is_skill = registry
-                .feature_sets
-                .get(tab_idx)
-                .map(|f| f.kind_name() == "skill")
-                .unwrap_or(false);
-            let is_instruction = registry
-                .feature_sets
-                .get(tab_idx)
-                .map(|f| f.kind_name() == "instruction")
-                .unwrap_or(false);
-            for pkg in pkgs {
-                if pkg.vault_id == vault_id {
-                    if is_skill {
-                        available_skills += 1;
-                    }
-                    if is_instruction {
-                        available_instructions += 1;
-                    }
-                }
+        let mut available_profiles = 0usize;
+        let mut available_mcps = 0usize;
+        for pkg in scan.packages_by_tab.iter().flatten() {
+            if pkg.vault_id != vault_id {
+                continue;
+            }
+            match pkg.kind {
+                crate::domain::asset::AssetKind::Skill => available_skills += 1,
+                crate::domain::asset::AssetKind::Instruction => available_instructions += 1,
+                crate::domain::asset::AssetKind::Profile => available_profiles += 1,
+                crate::domain::asset::AssetKind::McpServer => available_mcps += 1,
             }
         }
 
@@ -88,6 +81,10 @@ pub fn build_vault_entries(
             available_skills,
             installed_instructions,
             available_instructions,
+            installed_profiles,
+            available_profiles,
+            installed_mcps,
+            available_mcps,
             source_path,
         });
     }
@@ -105,6 +102,7 @@ pub fn build_provider_entries(config: &ConfigFile, registry: &Registry) -> Vec<P
                 id: id.clone(),
                 name,
                 active: config.providers.contains(&id),
+                supports_mcp: p.supports_mcp(),
             }
         })
         .collect()

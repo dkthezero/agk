@@ -4,7 +4,7 @@
 //! limit. Callers go through `crate::tui::widgets::list::*` (re-exported by
 //! `list.rs`) so no consumer needs to change its import paths.
 
-use crate::app::snapshot::{ProfileEntry, ProviderEntry, VaultEntry};
+use crate::app::snapshot::{DiscoveredProfile, ProfileEntry, ProviderEntry, VaultEntry};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -67,7 +67,8 @@ pub fn render_providers(
         .iter()
         .map(|p| {
             let checkbox = if p.active { "[x]" } else { "[ ]" };
-            ListItem::new(Line::from(format!("{} {}", checkbox, p.name)))
+            let mcp_badge = if p.supports_mcp { " [MCP]" } else { "" };
+            ListItem::new(Line::from(format!("{} {}{}", checkbox, p.name, mcp_badge)))
         })
         .collect();
     let list = List::new(items)
@@ -86,19 +87,46 @@ pub fn render_providers(
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-pub fn render_profiles(frame: &mut Frame, area: Rect, profiles: &[ProfileEntry], selected: usize) {
+pub fn render_profiles(
+    frame: &mut Frame,
+    area: Rect,
+    profiles: &[ProfileEntry],
+    discovered: &[DiscoveredProfile],
+    selected: usize,
+) {
     let block = Block::default().borders(Borders::ALL).title("Profiles");
-    if profiles.is_empty() {
+    let has_registered = !profiles.is_empty();
+    let has_discovered = !discovered.is_empty();
+
+    if !has_registered && !has_discovered {
         let items = vec![ListItem::new(Line::from(
             "  No profiles. Press F2 to add one.",
         ))];
         frame.render_widget(List::new(items).block(block), area);
         return;
     }
-    let items: Vec<ListItem> = profiles
+
+    let mut items: Vec<ListItem> = profiles
         .iter()
         .map(|p| ListItem::new(Line::from(format!("{} ({})", p.name, p.provider_id))))
         .collect();
+
+    if has_discovered {
+        items.push(ListItem::new(
+            Line::from("── Discovered Profiles ──").style(Style::default().fg(Color::DarkGray)),
+        ));
+        for dp in discovered {
+            let desc = dp.description.as_deref().unwrap_or("").trim();
+            let label = if desc.is_empty() {
+                format!("[\u{2298}] {} ({})", dp.name, dp.vault_id)
+            } else {
+                format!("[\u{2298}] {} ({}) \u{2014} {}", dp.name, dp.vault_id, desc)
+            };
+            items.push(ListItem::new(Line::from(label)));
+        }
+    }
+
+    let total = items.len();
     let list = List::new(items)
         .block(block)
         .highlight_style(
@@ -109,7 +137,7 @@ pub fn render_profiles(frame: &mut Frame, area: Rect, profiles: &[ProfileEntry],
         )
         .highlight_symbol("> ");
     let mut state = ListState::default();
-    if !profiles.is_empty() {
+    if total > 0 && selected < total {
         state.select(Some(selected));
     }
     frame.render_stateful_widget(list, area, &mut state);

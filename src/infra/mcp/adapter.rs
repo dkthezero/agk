@@ -60,4 +60,8 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
         let providers = self.build_providers(&self.workspace_root);
         crate::infra::mcp::disable(name, provider_id, scope, &providers)
     }
+
+    fn unregister(&self, name: &str) -> Result<()> {
+        crate::infra::mcp::unregister(name)
+    }
 }

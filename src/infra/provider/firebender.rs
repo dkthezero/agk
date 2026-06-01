@@ -41,6 +41,7 @@ impl FirebenderProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 }
@@ -75,5 +76,34 @@ impl ProviderPort for FirebenderProvider {
         let dest = self.asset_dir(&scope, kind, &identity.name, config);
         common::remove_dir_and_prune_empty_parents(&dest, 2)?;
         Ok(())
+    }
+
+    fn supports_mcp(&self) -> bool {
+        false
+    }
+}
+
+use crate::app::ports::McpProvider;
+use crate::domain::mcp::McpServer;
+
+impl McpProvider for FirebenderProvider {
+    fn provider_id(&self) -> &str {
+        "firebender"
+    }
+
+    fn supports_mcp(&self) -> bool {
+        false
+    }
+
+    fn mcp_config_path(&self, _scope: Scope) -> Option<PathBuf> {
+        None
+    }
+
+    fn write_mcp_server(&self, _server: &McpServer, _scope: Scope) -> Result<()> {
+        anyhow::bail!("Firebender does not support MCP")
+    }
+
+    fn remove_mcp_server(&self, _name: &str, _scope: Scope) -> Result<()> {
+        anyhow::bail!("Firebender does not support MCP")
     }
 }

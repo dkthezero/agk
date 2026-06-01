@@ -86,6 +86,10 @@ mod tests {
                 Ok(())
             }
         }
+
+        fn unregister(&self, _name: &str) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 
     #[test]

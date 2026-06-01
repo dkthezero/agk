@@ -73,6 +73,8 @@ mod tests {
                 )),
                 skills: None,
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         config.vault_defs.insert(
@@ -81,6 +83,8 @@ mod tests {
                 vault: None,
                 skills: Some(AssetBucket { items: vec![] }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         config.vault_defs.insert(
@@ -91,6 +95,8 @@ mod tests {
                 instructions: Some(AssetBucket {
                     items: vec!["[i:--:0000000000]".to_string()],
                 }),
+                mcps: None,
+                profiles: None,
             },
         );
 

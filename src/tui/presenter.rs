@@ -142,6 +142,10 @@ mod tests {
         fn disable(&self, _: &str, _: &str, _: Scope) -> anyhow::Result<()> {
             Ok(())
         }
+
+        fn unregister(&self, _: &str) -> anyhow::Result<()> {
+            Ok(())
+        }
     }
 
     struct StubVaultSearch;
@@ -220,6 +224,7 @@ mod tests {
             Arc::new(StubProcessRunner),
             Arc::new(StubTaskTracker),
             std::path::PathBuf::from("."),
+            Arc::new(crate::app::test_support::FakeClawHub::new()),
         )
     }
 

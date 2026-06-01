@@ -49,6 +49,7 @@ impl GeminiProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 
@@ -126,6 +127,10 @@ impl ProviderPort for GeminiProvider {
             (".gemini".to_string(), "Gemini native folder".to_string()),
             (".ai".to_string(), "Legacy .ai folder".to_string()),
         ]
+    }
+
+    fn supports_mcp(&self) -> bool {
+        true
     }
 }
 

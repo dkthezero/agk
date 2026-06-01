@@ -1,6 +1,12 @@
+pub mod vault_section;
+
 use crate::domain::identity::AssetIdentity;
+use crate::domain::profile::ProfileAssetRef;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Re-export vault_section types so external callers don't need to change imports
+pub use vault_section::{AssetBucket, VaultSection};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -58,9 +64,27 @@ pub struct Profile {
     pub name: String,
     pub provider_id: String,
     #[serde(default)]
-    pub skills: Vec<String>,
+    pub scope: String,
+    /// Vault-aware skill references. Backward-compatible: deserializes from
+    /// both `skills = ["name"]` (legacy) and `[[profiles.skills]]` tables.
     #[serde(default)]
-    pub mcps: Vec<String>,
+    pub skills: Vec<ProfileAssetRef>,
+    /// Vault-aware MCP references. Backward-compatible: deserializes from
+    /// both `mcps = ["name"]` (legacy) and `[[profiles.mcps]]` tables.
+    #[serde(default)]
+    pub mcps: Vec<ProfileAssetRef>,
+    /// Vault-aware instruction references.
+    #[serde(default)]
+    pub instructions: Vec<ProfileAssetRef>,
+    /// Optional tool references for providers that support tool selection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_refs: Vec<String>,
+    /// Optional permission mode for providers that support it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub permission_mode: Option<String>,
+    /// Optional path to a prompt-overlay / agent markdown file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_overlay_path: Option<String>,
 }
 
 /// Full config.toml schema — one instance per scope.
@@ -94,89 +118,14 @@ impl Default for ConfigFile {
     }
 }
 
-/// Intermediate serde type for `[<id>.vault]` and `[<id>.skills]` / `[<id>.instructions]`
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct VaultSection {
-    pub vault: Option<VaultConfig>,
-    pub skills: Option<AssetBucket>,
-    pub instructions: Option<AssetBucket>,
-}
-
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct AssetBucket {
-    pub items: Vec<String>, // "[name:version:sha10]" strings
-}
-
 impl ConfigFile {
-    pub fn installed_skills(&self, vault_id: &str) -> Vec<AssetIdentity> {
-        self.vault_defs
-            .get(vault_id)
-            .and_then(|s| s.skills.as_ref())
-            .map(|b| b.items.iter().filter_map(|s| parse_identity(s)).collect())
-            .unwrap_or_default()
-    }
-
-    pub fn installed_instructions(&self, vault_id: &str) -> Vec<AssetIdentity> {
-        self.vault_defs
-            .get(vault_id)
-            .and_then(|s| s.instructions.as_ref())
-            .map(|b| b.items.iter().filter_map(|s| parse_identity(s)).collect())
-            .unwrap_or_default()
-    }
-
-    pub fn is_skill_installed(&self, vault_id: &str, name: &str) -> bool {
-        self.installed_skills(vault_id)
-            .iter()
-            .any(|id| id.name == name)
-    }
-
-    pub fn is_instruction_installed(&self, vault_id: &str, name: &str) -> bool {
-        self.installed_instructions(vault_id)
-            .iter()
-            .any(|id| id.name == name)
-    }
-
-    pub fn installed_skill_hash(&self, vault_id: &str, name: &str) -> Option<String> {
-        self.installed_skills(vault_id)
-            .into_iter()
-            .find(|id| id.name == name)
-            .map(|id| id.sha10)
-    }
-
-    pub fn installed_instruction_hash(&self, vault_id: &str, name: &str) -> Option<String> {
-        self.installed_instructions(vault_id)
-            .into_iter()
-            .find(|id| id.name == name)
-            .map(|id| id.sha10)
-    }
-
-    pub fn has_installed_assets(&self, vault_id: &str) -> bool {
-        if let Some(section) = self.vault_defs.get(vault_id) {
-            let s_count = section.skills.as_ref().map(|b| b.items.len()).unwrap_or(0);
-            let i_count = section
-                .instructions
-                .as_ref()
-                .map(|b| b.items.len())
-                .unwrap_or(0);
-            s_count + i_count > 0
-        } else {
-            false
-        }
-    }
-
-    pub fn find_profile(&self, name: &str) -> Option<&Profile> {
-        self.profiles.iter().find(|p| p.name == name)
-    }
-
-    pub fn remove_profile(&mut self, name: &str) -> bool {
-        let before = self.profiles.len();
-        self.profiles.retain(|p| p.name != name);
-        self.profiles.len() < before
-    }
-
     pub fn validate(&self) -> anyhow::Result<()> {
         for (id, section) in &self.vault_defs {
-            if section.vault.is_none() && section.skills.is_none() && section.instructions.is_none()
+            if section.vault.is_none()
+                && section.skills.is_none()
+                && section.instructions.is_none()
+                && section.mcps.is_none()
+                && section.profiles.is_none()
             {
                 anyhow::bail!(
                     "Unknown top-level field or empty vault definition in config: '{}'",
@@ -294,6 +243,8 @@ type = "clawhub"
                     items: vec!["[my-skill:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         assert!(config.is_skill_installed("workspace", "my-skill"));
@@ -324,8 +275,16 @@ type = "clawhub"
         config.profiles.push(Profile {
             name: "opencode-dev".to_string(),
             provider_id: "opencode".to_string(),
-            skills: vec!["skill-a".to_string(), "skill-b".to_string()],
-            mcps: vec!["mcp-server".to_string()],
+            scope: "workspace".to_string(),
+            skills: vec![
+                ProfileAssetRef::new("skill-a", "auto"),
+                ProfileAssetRef::new("skill-b", "clawhub"),
+            ],
+            mcps: vec![ProfileAssetRef::new("mcp-server", "auto")],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let toml_str = toml::to_string(&config).unwrap();
         assert!(toml_str.contains("opencode-dev"));
@@ -336,8 +295,31 @@ type = "clawhub"
         let p = &loaded.profiles[0];
         assert_eq!(p.name, "opencode-dev");
         assert_eq!(p.provider_id, "opencode");
-        assert_eq!(p.skills, vec!["skill-a", "skill-b"]);
-        assert_eq!(p.mcps, vec!["mcp-server"]);
+        assert_eq!(p.skills[0].name, "skill-a");
+        assert_eq!(p.skills[1].vault, "clawhub");
+        assert_eq!(p.mcps[0].name, "mcp-server");
+    }
+
+    #[test]
+    fn profile_backward_compatible_flat_skills() {
+        let toml_str = r#"
+[[profiles]]
+name = "legacy"
+provider_id = "opencode"
+skills = ["rust-patterns", "docker"]
+mcps = ["filesystem"]
+"#;
+        let loaded: ConfigFile = toml::from_str(toml_str).unwrap();
+        assert_eq!(loaded.profiles.len(), 1);
+        let p = &loaded.profiles[0];
+        assert_eq!(p.name, "legacy");
+        assert_eq!(p.skills.len(), 2);
+        assert_eq!(p.skills[0].name, "rust-patterns");
+        assert_eq!(p.skills[0].vault, "auto");
+        assert_eq!(p.skills[1].name, "docker");
+        assert_eq!(p.mcps.len(), 1);
+        assert_eq!(p.mcps[0].name, "filesystem");
+        assert_eq!(p.mcps[0].vault, "auto");
     }
 
     #[test]
@@ -346,8 +328,13 @@ type = "clawhub"
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
             skills: vec![],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         assert!(config.find_profile("test").is_some());
         assert!(config.find_profile("missing").is_none());
@@ -359,8 +346,13 @@ type = "clawhub"
         config.profiles.push(Profile {
             name: "a".to_string(),
             provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
             skills: vec![],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         assert!(config.remove_profile("a"));
         assert!(!config.remove_profile("a"));

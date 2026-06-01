@@ -230,14 +230,26 @@ pub fn render_profile_detail(frame: &mut Frame, area: Rect, profile: Option<&Pro
                 lines.push(Line::from(Span::raw("")));
                 lines.push(Line::from(vec![
                     label("Skills:   "),
-                    Span::raw(p.skills.join(", ")),
+                    Span::raw(
+                        p.skills
+                            .iter()
+                            .map(|s| s.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    ),
                 ]));
             }
             if !p.mcps.is_empty() {
                 lines.push(Line::from(Span::raw("")));
                 lines.push(Line::from(vec![
                     label("MCPs:     "),
-                    Span::raw(p.mcps.join(", ")),
+                    Span::raw(
+                        p.mcps
+                            .iter()
+                            .map(|m| m.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                    ),
                 ]));
             }
             lines

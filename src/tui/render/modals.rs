@@ -1,4 +1,3 @@
-use crate::app::ports::WizardStep;
 use crate::tui::app::AppState;
 use crate::tui::list_mode::ListMode;
 use crate::tui::widgets::modal;
@@ -102,66 +101,11 @@ pub fn draw_modals(frame: &mut Frame, state: &AppState) {
             );
         }
         ListMode::ProfileWizard => {
-            if let Some(ref ws) = state.wizard_state {
-                let idx = ws.step_index;
-                if let Some(step) = ws.steps.get(idx) {
-                    match step {
-                        WizardStep::TextInput { title, placeholder } => {
-                            modal::render_input_modal(
-                                frame,
-                                title,
-                                placeholder,
-                                &ws.prompt_buffer,
-                                ws.cursor_pos,
-                            );
-                        }
-                        WizardStep::QuestionAnswer {
-                            question,
-                            placeholder,
-                        } => {
-                            modal::render_input_modal(
-                                frame,
-                                question,
-                                placeholder,
-                                &ws.prompt_buffer,
-                                ws.cursor_pos,
-                            );
-                        }
-                        WizardStep::Checklist { title, options } => {
-                            let filtered_indices = ws.filtered_indices();
-                            let filtered_options: Vec<String> = filtered_indices
-                                .iter()
-                                .map(|&i| options[i].clone())
-                                .collect();
-                            let filtered_checked: Vec<bool> =
-                                filtered_indices.iter().map(|&i| ws.checked[i]).collect();
-                            let selected_filtered =
-                                ws.selected.min(filtered_options.len().saturating_sub(1));
-                            modal::render_checklist_modal(
-                                frame,
-                                title,
-                                &filtered_options,
-                                &filtered_checked,
-                                selected_filtered,
-                                &ws.filter_query,
-                            );
-                        }
-                        WizardStep::Review { title } => {
-                            let desc = ws.composed_description();
-                            modal::render_review_modal(
-                                frame,
-                                title,
-                                &ws.name,
-                                &desc,
-                                &ws.skills,
-                                &ws.mcps,
-                                "[Enter] Confirm Create  [Esc] Back  [↑/↓] Scroll",
-                                ws.scroll_offset,
-                            );
-                        }
-                        _ => {}
-                    }
-                }
+            crate::tui::render::profile_wizard::draw_profile_wizard(frame, state);
+        }
+        ListMode::EditProfile => {
+            if let Some(ref es) = state.edit_profile_state {
+                crate::tui::widgets::edit_profile_modal::render_edit_profile_modal(frame, es);
             }
         }
         ListMode::ConfirmMcpTest => {

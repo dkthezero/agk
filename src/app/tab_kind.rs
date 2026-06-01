@@ -57,5 +57,6 @@ pub fn tab_kind_for_asset_kind(kind: &AssetKind) -> TabKind {
     match kind {
         AssetKind::Skill | AssetKind::Instruction => TabKind::Asset,
         AssetKind::McpServer => TabKind::Mcp,
+        AssetKind::Profile => TabKind::Profile,
     }
 }

@@ -1,11 +1,15 @@
 pub mod attach_mcp;
 pub mod attach_skill;
+pub mod batch_install;
 pub mod command;
 pub mod create;
 pub mod delete;
 pub mod detach_mcp;
 pub mod detach_skill;
 pub mod start;
+pub mod template;
+pub mod token_estimate;
+pub mod wizard_description;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -33,6 +37,8 @@ pub fn dispatch(
             *dry_run,
             core.store.as_ref(),
             &core.runtime_ports,
+            core.registry.as_ref(),
+            core.mcp_registry.as_ref(),
             sink,
         )),
         CoreCommand::DeleteProfile { id, scope } => {

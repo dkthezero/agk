@@ -1,4 +1,4 @@
-use crate::app::snapshot::ProviderEntry;
+use crate::app::snapshot::{DiscoveredMcp, ProviderEntry};
 use crate::domain::mcp::McpTransport;
 use crate::domain::scope::Scope;
 use ratatui::{
@@ -18,6 +18,7 @@ pub fn render(
     active_selected: usize,
     active_scope: Scope,
     active_providers: &[ProviderEntry],
+    discovered_mcps: &[DiscoveredMcp],
 ) {
     let block = Block::default().borders(Borders::ALL).title("MCP Servers");
 
@@ -78,6 +79,45 @@ pub fn render(
         );
     }
 
+    // Append discovered-but-unregistered MCP servers
+    if !discovered_mcps.is_empty() {
+        let sep_style = Style::default().fg(Color::DarkGray);
+        rows.push(Row::new(vec![
+            Cell::from(Span::raw("")),
+            Cell::from(Span::raw("── Discovered ──")).style(sep_style),
+            Cell::from(Span::raw("")),
+            Cell::from(Span::raw("")),
+            Cell::from(Span::raw("")),
+        ]));
+        for (i, dm) in discovered_mcps.iter().enumerate() {
+            let idx = items.len() + 1 + i; // +1 for separator
+            let is_selected = idx == active_selected;
+            let style = if is_selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Cyan)
+            };
+            let desc = dm.description.as_deref().unwrap_or("").trim();
+            let label = if desc.is_empty() {
+                dm.name.clone()
+            } else {
+                format!("{} — {}", dm.name, desc)
+            };
+            rows.push(
+                Row::new(vec![
+                    Cell::from(Span::raw("[⊘]").style(style)),
+                    Cell::from(Span::raw(label).style(style)),
+                    Cell::from(Span::raw(dm.vault_id.clone()).style(style)),
+                    Cell::from(Span::raw("").style(style)),
+                    Cell::from(Span::raw("").style(style)),
+                ])
+                .style(style),
+            );
+        }
+    }
+
     let widths = [
         ratatui::layout::Constraint::Percentage(5),
         ratatui::layout::Constraint::Percentage(20),
@@ -92,18 +132,77 @@ pub fn render(
         .row_highlight_style(Style::default().add_modifier(Modifier::REVERSED));
     // Sync highlight to active_selected
     let mut table_state = ratatui::widgets::TableState::default();
-    if !items.is_empty() {
+    let total_rows = items.len()
+        + if !discovered_mcps.is_empty() {
+            1 + discovered_mcps.len()
+        } else {
+            0
+        };
+    if total_rows > 0 && active_selected < total_rows {
         table_state.select(Some(active_selected));
     }
     frame.render_stateful_widget(table, area, &mut table_state);
 }
 
-pub fn render_detail(frame: &mut Frame, area: Rect, state: &McpState, active_selected: usize) {
+pub fn render_detail(
+    frame: &mut Frame,
+    area: Rect,
+    state: &McpState,
+    active_selected: usize,
+    discovered_mcps: &[crate::app::snapshot::DiscoveredMcp],
+) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title("MCP Server Detail");
 
     let items = state.servers_list();
+    let registered_count = items.len();
+    let discovered_count = discovered_mcps.len();
+    let has_discovered = discovered_count > 0;
+    // Separator occupies one row if discovered section exists
+    let sep_offset = if has_discovered { 1 } else { 0 };
+
+    // Check if selection falls on a discovered MCP
+    if has_discovered && active_selected >= registered_count + sep_offset {
+        let discovered_idx = active_selected - registered_count - sep_offset;
+        if let Some(dm) = discovered_mcps.get(discovered_idx) {
+            let lines: Vec<Line> = vec![
+                Line::from(vec![
+                    Span::styled("Name: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(&dm.name),
+                ]),
+                Line::from(vec![
+                    Span::styled("Vault: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::raw(&dm.vault_id),
+                ]),
+                Line::from(vec![
+                    Span::styled(
+                        "Description: ",
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(dm.description.as_deref().unwrap_or("—")),
+                ]),
+                Line::from(""),
+                Line::from(vec![
+                    Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "Discovered (not registered)",
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]),
+                Line::from(""),
+                Line::from("Press Enter to register this MCP server."),
+            ];
+            frame.render_widget(
+                Paragraph::new(lines)
+                    .block(block)
+                    .wrap(Wrap { trim: false }),
+                area,
+            );
+            return;
+        }
+    }
+
     let Some((id, server)) = items.get(active_selected).copied() else {
         frame.render_widget(
             Paragraph::new("No server registered.\n\nUse `agk mcp add` to register a server.")

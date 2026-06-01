@@ -18,7 +18,7 @@ pub fn run(
 
     if let Some(profile) = config.profiles.iter_mut().find(|p| p.name == profile_name) {
         let before = profile.skills.len();
-        profile.skills.retain(|s| s != &skill_ref);
+        profile.skills.retain(|s| s.name != skill_ref);
         if profile.skills.len() < before {
             store.save(scope, &config)?;
             sink.on_event(CoreEvent::ProfileUpdated(profile_id.clone()));
@@ -80,8 +80,13 @@ mod tests {
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
-            skills: vec!["rust".to_string()],
+            scope: "workspace".to_string(),
+            skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let store = FakeStore {
             data: Mutex::new(config),
@@ -106,8 +111,13 @@ mod tests {
         config.profiles.push(Profile {
             name: "test".to_string(),
             provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
             skills: vec![],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         });
         let store = FakeStore {
             data: Mutex::new(config),

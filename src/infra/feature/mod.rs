@@ -1,4 +1,6 @@
 pub mod instruction;
+pub mod mcp;
+pub mod profile;
 pub mod skill;
 pub mod stub;
 

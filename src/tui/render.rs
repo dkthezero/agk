@@ -2,6 +2,7 @@ mod content;
 mod header;
 mod keybinds;
 mod modals;
+mod profile_wizard;
 
 use crate::tui::app::AppState;
 use crate::tui::layout;

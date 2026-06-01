@@ -3,9 +3,9 @@
 pub struct CreateProfileInput {
     pub id: crate::domain::profile::ProfileId,
     pub provider_id: crate::domain::profile::ProviderId,
-    pub skill_refs: Vec<crate::domain::profile::SkillId>,
-    pub mcp_refs: Vec<crate::domain::profile::McpServerId>,
-    pub instruction_refs: Vec<crate::domain::profile::InstructionId>,
+    pub skill_refs: Vec<crate::domain::profile::ProfileAssetRef>,
+    pub mcp_refs: Vec<crate::domain::profile::ProfileAssetRef>,
+    pub instruction_refs: Vec<crate::domain::profile::ProfileAssetRef>,
     pub description: String,
     pub scope: crate::domain::scope::Scope,
 }
@@ -32,9 +32,11 @@ impl CreateProfileInput {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct UpdateProfilePatch {
     pub provider_id: Option<crate::domain::profile::ProviderId>,
-    pub skill_refs: Option<Vec<crate::domain::profile::SkillId>>,
-    pub mcp_refs: Option<Vec<crate::domain::profile::McpServerId>>,
-    pub instruction_refs: Option<Vec<crate::domain::profile::InstructionId>>,
+    pub skill_refs: Option<Vec<crate::domain::profile::ProfileAssetRef>>,
+    pub mcp_refs: Option<Vec<crate::domain::profile::ProfileAssetRef>>,
+    pub instruction_refs: Option<Vec<crate::domain::profile::ProfileAssetRef>>,
+    pub tool_refs: Option<Vec<String>>,
+    pub permission_mode: Option<Option<String>>,
     pub prompt_overlay_path: Option<Option<std::path::PathBuf>>,
     pub launch_policy: Option<crate::domain::profile::LaunchPolicy>,
 }

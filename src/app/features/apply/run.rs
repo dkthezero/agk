@@ -339,8 +339,13 @@ mod tests {
         let profile = Profile {
             name: "backend".into(),
             provider_id: "opencode".into(),
-            skills: vec!["rust".into()],
+            scope: "workspace".to_string(),
+            skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
             mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
         };
         let input = ApplyConfigInput::from_url("https://example.com/team.yaml")
             .with_profile(profile.clone());

@@ -253,6 +253,7 @@ mod tests {
             id: "fake".to_string(),
             name: "Fake".to_string(),
             active: true,
+            supports_mcp: false,
         }];
 
         let mut config = ConfigFile {
@@ -267,6 +268,8 @@ mod tests {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
                 }),
                 instructions: None,
+                mcps: None,
+                profiles: None,
             },
         );
         state.configs.insert(Scope::Workspace, config.clone());

@@ -1,8 +1,8 @@
 use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{
-    ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort, ProfileRuntimePort,
-    TaskTrackerPort, VaultSearchPort,
+    ClawHubPort, ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort,
+    ProfileRuntimePort, TaskTrackerPort, VaultSearchPort,
 };
 use crate::app::registry::Registry;
 use std::collections::HashMap;
@@ -28,6 +28,7 @@ pub struct AgkCore {
     pub process_runner: Arc<dyn ProcessRunnerPort>,
     pub task_tracker: Arc<dyn TaskTrackerPort>,
     pub workspace_root: std::path::PathBuf,
+    pub clawhub: Arc<dyn ClawHubPort>,
 }
 
 impl AgkCore {
@@ -42,6 +43,7 @@ impl AgkCore {
         process_runner: Arc<dyn ProcessRunnerPort>,
         task_tracker: Arc<dyn TaskTrackerPort>,
         workspace_root: std::path::PathBuf,
+        clawhub: Arc<dyn ClawHubPort>,
     ) -> Self {
         Self {
             store,
@@ -53,6 +55,7 @@ impl AgkCore {
             process_runner,
             task_tracker,
             workspace_root,
+            clawhub,
         }
     }
 
@@ -175,6 +178,10 @@ mod tests {
             Ok(())
         }
         fn disable(&self, _name: &str, _provider_id: &str, _scope: Scope) -> anyhow::Result<()> {
+            Ok(())
+        }
+
+        fn unregister(&self, _name: &str) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -301,6 +308,7 @@ mod tests {
             Arc::new(FakeProcessRunner),
             Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
+            Arc::new(crate::app::test_support::FakeClawHub::new()),
         )
     }
 
@@ -318,6 +326,7 @@ mod tests {
             Arc::new(FakeProcessRunner),
             Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
+            Arc::new(crate::app::test_support::FakeClawHub::new()),
         )
     }
 

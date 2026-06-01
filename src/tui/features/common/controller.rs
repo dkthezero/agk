@@ -104,6 +104,16 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
             }
             Ok(())
         }
+        KeyCode::F(3) => {
+            if state.tab_kinds.get(state.active_tab)
+                == Some(&crate::app::tab_kind::TabKind::Profile)
+                && state.list_mode == ListMode::Normal
+                && !state.profile_entries.is_empty()
+            {
+                crate::tui::features::profiles::edit::enter_edit_profile(state, ctx);
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
@@ -143,17 +153,31 @@ pub fn handle_enter(state: &mut AppState, ctx: &EventContext) -> Result<()> {
         .get(state.active_tab)
         .cloned()
         .unwrap_or(crate::app::tab_kind::TabKind::Asset);
-    if active_kind != crate::app::tab_kind::TabKind::Asset {
-        state.status_line = "Update only applies to Skills/Instructions tabs".to_string();
-    } else if !state.active_scope_has_provider() {
-        let providers_idx = state
-            .tab_names
-            .iter()
-            .position(|n| n == "Providers")
-            .unwrap_or(3);
-        super::actions::apply_space_no_provider(state, providers_idx);
-    } else {
-        crate::tui::features::assets::controller::handle_enter_update(state, ctx)?;
+    match active_kind {
+        crate::app::tab_kind::TabKind::Mcp => {
+            // Check if selection is on a discovered MCP
+            let registered_count = state.mcp_state.servers_list().len();
+            if !state.discovered_mcps.is_empty() && state.selected_index > registered_count {
+                crate::tui::features::mcps::controller::handle_enter_discovered_mcp(state)?;
+            } else {
+                state.status_line = "Press F2 to register a new MCP server".to_string();
+            }
+        }
+        crate::app::tab_kind::TabKind::Asset => {
+            if !state.active_scope_has_provider() {
+                let providers_idx = state
+                    .tab_names
+                    .iter()
+                    .position(|n| n == "Providers")
+                    .unwrap_or(3);
+                super::actions::apply_space_no_provider(state, providers_idx);
+            } else {
+                crate::tui::features::assets::controller::handle_enter_update(state, ctx)?;
+            }
+        }
+        _ => {
+            state.status_line = "Update only applies to Skills/Instructions tabs".to_string();
+        }
     }
     Ok(())
 }

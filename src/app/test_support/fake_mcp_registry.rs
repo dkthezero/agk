@@ -130,6 +130,14 @@ impl McpRegistryPort for FakeMcpRegistry {
         }
         Ok(())
     }
+
+    fn unregister(&self, name: &str) -> Result<()> {
+        let mut servers = self.servers.lock().unwrap();
+        if servers.remove(name).is_none() {
+            anyhow::bail!("MCP server '{}' not found", name);
+        }
+        Ok(())
+    }
 }
 
 fn parse_transport(t: &str) -> crate::domain::mcp::McpTransport {

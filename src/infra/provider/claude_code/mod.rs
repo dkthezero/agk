@@ -1,15 +1,14 @@
-use crate::app::ports::{McpProvider, ProviderPort};
-use crate::domain::asset::{AssetKind, ScannedPackage};
-use crate::domain::identity::AssetIdentity;
-use crate::domain::mcp::McpServer;
+use crate::app::ports::ProviderPort;
+use crate::domain::asset::AssetKind;
 use crate::domain::scope::Scope;
-use crate::infra::provider::common;
-use crate::infra::provider::common::copy_dir;
-use anyhow::Result;
 use std::path::PathBuf;
 
+pub mod install;
+pub mod mcp;
+pub mod session;
+
 pub struct ClaudeCodeProvider {
-    workspace_root: PathBuf,
+    pub(crate) workspace_root: PathBuf,
 }
 
 impl ClaudeCodeProvider {
@@ -37,6 +36,14 @@ impl ClaudeCodeProvider {
         }
     }
 
+    pub(crate) fn profile_agent_path(&self, profile_name: &str) -> PathBuf {
+        // Claude Code stores agent markdown at .claude/agents/<name>.md
+        self.workspace_root
+            .join(".claude")
+            .join("agents")
+            .join(format!("{}.md", profile_name))
+    }
+
     fn asset_dir(
         &self,
         scope: &Scope,
@@ -49,6 +56,7 @@ impl ClaudeCodeProvider {
             AssetKind::Skill => root.join("skills").join(name),
             AssetKind::Instruction => root.join("instructions").join(name),
             AssetKind::McpServer => PathBuf::new(),
+            AssetKind::Profile => PathBuf::new(),
         }
     }
 
@@ -56,7 +64,7 @@ impl ClaudeCodeProvider {
         self.provider_root(scope, None).join("mcp.json")
     }
 
-    fn load_mcp_config(&self, scope: &Scope) -> Result<serde_json::Value> {
+    fn load_mcp_config(&self, scope: &Scope) -> anyhow::Result<serde_json::Value> {
         let path = self.mcp_json_path(scope);
         if !path.exists() {
             return Ok(serde_json::json!({ "mcpServers": {} }));
@@ -66,7 +74,7 @@ impl ClaudeCodeProvider {
         Ok(config)
     }
 
-    fn save_mcp_config(&self, scope: &Scope, config: &serde_json::Value) -> Result<()> {
+    fn save_mcp_config(&self, scope: &Scope, config: &serde_json::Value) -> anyhow::Result<()> {
         let path = self.mcp_json_path(scope);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -77,112 +85,13 @@ impl ClaudeCodeProvider {
     }
 }
 
-impl ProviderPort for ClaudeCodeProvider {
-    fn id(&self) -> &str {
-        "claude-code"
-    }
-
-    fn name(&self) -> &str {
-        "Claude Code"
-    }
-
-    fn install(
-        &self,
-        pkg: &ScannedPackage,
-        scope: Scope,
-        config: Option<&crate::domain::config::ConfigFile>,
-        _include_evals: bool,
-    ) -> Result<()> {
-        let dest = self.asset_dir(&scope, &pkg.kind, &pkg.identity.name, config);
-        copy_dir(&pkg.path, &dest)
-    }
-
-    fn remove(
-        &self,
-        identity: &AssetIdentity,
-        kind: &AssetKind,
-        scope: Scope,
-        config: Option<&crate::domain::config::ConfigFile>,
-    ) -> Result<()> {
-        let dest = self.asset_dir(&scope, kind, &identity.name, config);
-        common::remove_dir_and_prune_empty_parents(&dest, 2)?;
-        Ok(())
-    }
-
-    fn install_path_for(
-        &self,
-        identity: &AssetIdentity,
-        kind: &AssetKind,
-        scope: Scope,
-    ) -> Option<PathBuf> {
-        if *kind == AssetKind::McpServer {
-            return None;
-        }
-        Some(self.asset_dir(&scope, kind, &identity.name, None))
-    }
-
-    fn available_config_roots(&self) -> Vec<(String, String)> {
-        vec![
-            (
-                ".claude".to_string(),
-                "Claude Code native folder".to_string(),
-            ),
-            (".agents".to_string(), "Shared agents folder".to_string()),
-        ]
-    }
-}
-
-impl McpProvider for ClaudeCodeProvider {
-    fn provider_id(&self) -> &str {
-        "claude-code"
-    }
-
-    fn supports_mcp(&self) -> bool {
-        true
-    }
-
-    fn mcp_config_path(&self, scope: Scope) -> Option<PathBuf> {
-        Some(self.mcp_json_path(&scope))
-    }
-
-    fn write_mcp_server(&self, server: &McpServer, scope: Scope) -> Result<()> {
-        let mut config = self.load_mcp_config(&scope)?;
-        if !config.is_object() {
-            config = serde_json::json!({});
-        }
-        if config.get("mcpServers").is_none() {
-            config["mcpServers"] = serde_json::json!({});
-        }
-        let mcp_servers = config["mcpServers"]
-            .as_object_mut()
-            .ok_or_else(|| anyhow::anyhow!(".claude/mcp.json 'mcpServers' key is not an object"))?;
-
-        let entry = serde_json::json!({
-            "command": server.command,
-            "args": server.args,
-            "env": server.env,
-        });
-        mcp_servers.insert(server.name.clone(), entry);
-        self.save_mcp_config(&scope, &config)
-    }
-
-    fn remove_mcp_server(&self, name: &str, scope: Scope) -> Result<()> {
-        let mut config = self.load_mcp_config(&scope)?;
-        if let Some(servers) = config
-            .as_object_mut()
-            .and_then(|obj| obj.get_mut("mcpServers"))
-            .and_then(|v| v.as_object_mut())
-        {
-            servers.remove(name);
-        }
-        self.save_mcp_config(&scope, &config)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::ports::ProviderPort;
     use crate::domain::asset::AssetKind;
+    use crate::domain::asset::ScannedPackage;
+    use crate::domain::identity::AssetIdentity;
     use std::path::Path;
 
     fn make_pkg(dir: &Path, name: &str, kind: AssetKind, marker: &str) -> ScannedPackage {

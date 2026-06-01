@@ -226,6 +226,27 @@ fn install_status(
                 "[ ]"
             }
         }
-        AssetKind::McpServer => "[MCP]",
+        AssetKind::McpServer => {
+            if let Some(installed_hash) = config.installed_mcp_hash(vault_id, name) {
+                if installed_hash != current_hash {
+                    "[!]"
+                } else {
+                    "[✓]"
+                }
+            } else {
+                "[ ]"
+            }
+        }
+        AssetKind::Profile => {
+            if let Some(installed_hash) = config.installed_profile_hash(vault_id, name) {
+                if installed_hash != current_hash {
+                    "[!]"
+                } else {
+                    "[✓]"
+                }
+            } else {
+                "[ ]"
+            }
+        }
     }
 }

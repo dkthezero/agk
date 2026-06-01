@@ -1,4 +1,4 @@
-use crate::app::ports::{FeatureSetPort, VaultPort};
+use crate::app::ports::{ClawHubPort, FeatureSetPort, VaultPort};
 use crate::domain::asset::ScannedPackage;
 use crate::infra::vault::local::LocalVaultAdapter;
 use anyhow::Result;
@@ -175,6 +175,29 @@ pub fn cli_install(name: &str) -> Result<()> {
         anyhow::bail!("clawhub install '{}' failed", slug);
     }
     Ok(())
+}
+
+/// Production adapter that delegates [`ClawHubPort`] calls to the free
+/// functions in this module. This eliminates ADR-001 violations where
+/// `app/features/` called `infra::vault::clawhub::*` directly.
+pub struct ClawHubAdapter;
+
+impl ClawHubPort for ClawHubAdapter {
+    fn is_cli_available(&self) -> bool {
+        is_cli_available()
+    }
+
+    fn is_homebrew_available(&self) -> bool {
+        is_homebrew_available()
+    }
+
+    fn install_cli(&self) -> Result<()> {
+        install_cli_via_homebrew()
+    }
+
+    fn cli_install(&self, identity: &str) -> Result<()> {
+        cli_install(identity)
+    }
 }
 
 #[cfg(test)]

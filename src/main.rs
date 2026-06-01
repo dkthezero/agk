@@ -156,10 +156,13 @@ fn build_core(
         Arc<dyn agk::app::ports::ProfileRuntimePort>,
     > = std::collections::HashMap::new();
     // Register any concrete runtime ports here as they become available.
-    // Phase 5 has OpenCodeProvider via infra/provider/opencode.rs.
     let opencode_provider =
         agk::infra::provider::opencode::OpenCodeProvider::new(workspace.to_path_buf());
     runtime_ports.insert("opencode".to_string(), Arc::new(opencode_provider));
+
+    let claude_code_provider =
+        agk::infra::provider::claude_code::ClaudeCodeProvider::new(workspace.to_path_buf());
+    runtime_ports.insert("claude-code".to_string(), Arc::new(claude_code_provider));
 
     let process_runner: Arc<dyn agk::app::ports::ProcessRunnerPort> =
         Arc::new(agk::infra::process::runner::OsProcessRunner);
@@ -177,6 +180,7 @@ fn build_core(
         process_runner,
         task_tracker,
         workspace.to_path_buf(),
+        Arc::new(agk::infra::vault::clawhub::ClawHubAdapter),
     );
 
     Ok(core)

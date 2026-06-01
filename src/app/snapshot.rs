@@ -11,6 +11,10 @@ pub struct VaultEntry {
     pub available_skills: usize,
     pub installed_instructions: usize,
     pub available_instructions: usize,
+    pub installed_profiles: usize,
+    pub available_profiles: usize,
+    pub installed_mcps: usize,
+    pub available_mcps: usize,
     /// Source path or URL for this vault (PR #5)
     pub source_path: String,
 }
@@ -18,11 +22,15 @@ pub struct VaultEntry {
 impl VaultEntry {
     pub fn counts_label(&self) -> String {
         format!(
-            "{}/{}s  {}/{}i",
+            "{}/{}s  {}/{}i  {}/{}p  {}/{}m",
             self.installed_skills,
             self.available_skills,
             self.installed_instructions,
             self.available_instructions,
+            self.installed_profiles,
+            self.available_profiles,
+            self.installed_mcps,
+            self.available_mcps,
         )
     }
 }
@@ -33,6 +41,7 @@ pub struct ProviderEntry {
     pub id: String,
     pub name: String,
     pub active: bool,
+    pub supports_mcp: bool,
 }
 
 /// Display-only struct for the Profiles tab.
@@ -40,6 +49,22 @@ pub struct ProviderEntry {
 pub struct ProfileEntry {
     pub name: String,
     pub provider_id: String,
-    pub skills: Vec<String>,
-    pub mcps: Vec<String>,
+    pub skills: Vec<crate::domain::profile::ProfileAssetRef>,
+    pub mcps: Vec<crate::domain::profile::ProfileAssetRef>,
+}
+
+/// A profile package discovered in a vault but not yet registered in config.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiscoveredProfile {
+    pub name: String,
+    pub vault_id: String,
+    pub description: Option<String>,
+}
+
+/// An MCP server package discovered in a vault but not yet registered.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiscoveredMcp {
+    pub name: String,
+    pub vault_id: String,
+    pub description: Option<String>,
 }

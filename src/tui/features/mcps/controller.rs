@@ -22,6 +22,31 @@ pub fn handle_space_mcp(state: &mut AppState, ctx: &EventContext) -> Result<()> 
     Ok(())
 }
 
+/// Handle Enter key on a discovered MCP to pre-fill registration modal.
+pub fn handle_enter_discovered_mcp(state: &mut AppState) -> Result<()> {
+    let registered_count = state.mcp_state.servers_list().len();
+    let discovered = &state.discovered_mcps;
+    if discovered.is_empty() {
+        return Ok(());
+    }
+    let sep_offset = 1; // separator row
+    let discovered_idx = state
+        .selected_index
+        .saturating_sub(registered_count + sep_offset);
+    if let Some(dm) = discovered.get(discovered_idx) {
+        // Pre-fill the MCP registration modal with discovered data
+        state.pending_mcp_name = dm.name.clone();
+        state.pending_mcp_command = String::new();
+        state.pending_mcp_args = String::new();
+        state.pending_mcp_transport = "stdio".to_string();
+        state.pending_mcp_description = dm.description.clone().unwrap_or_default();
+        state.list_mode = ListMode::RegisterMcpStepCommand;
+        state.prompt_buffer = String::new();
+        state.status_line = format!("Registering '{}' — enter command:", dm.name);
+    }
+    Ok(())
+}
+
 pub fn handle_register_mcp_input(
     state: &mut AppState,
     _ctx: &EventContext,
