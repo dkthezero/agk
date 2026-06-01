@@ -52,6 +52,38 @@ pub enum ProfileCommands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Export a profile to a portable JSON file
+    Export {
+        /// Profile name
+        name: String,
+
+        /// Output file path
+        #[arg(short, long)]
+        file: String,
+
+        /// Resolve "auto" vault refs to actual vault names
+        #[arg(long)]
+        resolve_vaults: bool,
+
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
+
+    /// Import a profile from a portable JSON file
+    Import {
+        /// Path to .agk.json file
+        file_path: String,
+
+        /// Override profile name
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
 }
 
 #[derive(Subcommand, Debug)]

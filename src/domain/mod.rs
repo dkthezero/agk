@@ -4,6 +4,7 @@ pub mod context;
 pub mod hashing;
 pub mod identity;
 pub mod mcp;
+pub mod mcp_security;
 pub mod paths;
 pub mod profile;
 pub mod scope;

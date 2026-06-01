@@ -130,6 +130,22 @@ pub fn handle(
             .map(|_| ControlFlow::Continue);
         }
 
+        // Export profile modal
+        if matches!(state.list_mode, ListMode::ExportProfile) {
+            return crate::tui::features::profiles::controller::handle_export_profile_input(
+                state, ctx, &key,
+            )
+            .map(|_| ControlFlow::Continue);
+        }
+
+        // Import profile modal
+        if matches!(state.list_mode, ListMode::ImportProfile) {
+            return crate::tui::features::profiles::controller::handle_import_profile_input(
+                state, ctx, &key,
+            )
+            .map(|_| ControlFlow::Continue);
+        }
+
         // Confirmation modals share Enter / Esc aliases
         let in_confirm = matches!(
             state.list_mode,
@@ -250,6 +266,24 @@ pub fn handle(
                     && state.list_mode == ListMode::Normal =>
             {
                 crate::tui::features::common::controller::handle_open_location(state, ctx, true)?;
+            }
+            KeyCode::Char('e')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && state.list_mode == ListMode::Normal =>
+            {
+                let active_kind = state.tab_kinds.get(state.active_tab).copied();
+                if active_kind == Some(crate::app::tab_kind::TabKind::Profile) {
+                    crate::tui::features::profiles::controller::enter_export_profile(state);
+                }
+            }
+            KeyCode::Char('i')
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && state.list_mode == ListMode::Normal =>
+            {
+                let active_kind = state.tab_kinds.get(state.active_tab).copied();
+                if active_kind == Some(crate::app::tab_kind::TabKind::Profile) {
+                    crate::tui::features::profiles::controller::enter_import_profile(state);
+                }
             }
             KeyCode::Char(c) => {
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();

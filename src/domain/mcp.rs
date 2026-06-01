@@ -18,6 +18,9 @@ pub struct McpServer {
     /// Provider activation state: provider_id → { global: bool, workspace: bool }
     #[serde(default)]
     pub activation: HashMap<String, McpActivation>,
+    /// Advisory security flags derived from command/args heuristics.
+    #[serde(default)]
+    pub security_flags: Vec<crate::domain::mcp_security::SecurityFlag>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -69,6 +72,7 @@ mod tests {
                 tested: false,
                 tested_at: None,
                 activation: HashMap::new(),
+                security_flags: vec![],
             },
         );
 
@@ -76,5 +80,37 @@ mod tests {
         let parsed: McpRegistry = toml::from_str(&toml_text).unwrap();
         assert!(parsed.servers.contains_key("fs"));
         assert_eq!(parsed.servers.get("fs").unwrap().command, "npx");
+    }
+
+    #[test]
+    fn mcp_server_security_flags_round_trip() {
+        use crate::domain::mcp_security::SecurityFlag;
+
+        let mut registry = McpRegistry::default();
+        registry.servers.insert(
+            "fs".to_string(),
+            McpServer {
+                name: "fs".to_string(),
+                command: "npx".to_string(),
+                args: vec!["-y".to_string(), "@mcp/fs".to_string(), "/".to_string()],
+                env: HashMap::new(),
+                transport: McpTransport::Stdio,
+                description: None,
+                tested: false,
+                tested_at: None,
+                activation: HashMap::new(),
+                security_flags: vec![
+                    SecurityFlag::BroadFilesystem,
+                    SecurityFlag::NetworkEgress,
+                ],
+            },
+        );
+
+        let toml_text = toml::to_string_pretty(&registry).unwrap();
+        let parsed: McpRegistry = toml::from_str(&toml_text).unwrap();
+        let server = parsed.servers.get("fs").unwrap();
+        assert_eq!(server.security_flags.len(), 2);
+        assert!(server.security_flags.contains(&SecurityFlag::BroadFilesystem));
+        assert!(server.security_flags.contains(&SecurityFlag::NetworkEgress));
     }
 }

@@ -181,13 +181,15 @@ impl CoreEventSink for CliPresenter {
                     self.print_json_event(&CoreEvent::TelemetryStatusReport(status.clone()));
                 } else {
                     self.print(&format!(
-                        "Telemetry: {} | Skills tracked: {} | Last scan: {}",
+                        "Telemetry: {} | Skills: {} | Templates: {} | Profiles: {} | Last scan: {}",
                         if status.enabled {
                             "enabled"
                         } else {
                             "disabled"
                         },
                         status.skills_tracked,
+                        status.templates_tracked,
+                        status.profiles_tracked,
                         status.last_scan.as_deref().unwrap_or("never")
                     ));
                 }
@@ -208,6 +210,25 @@ impl CoreEventSink for CliPresenter {
             }
             CoreEvent::Info(msg) => {
                 self.print(msg);
+            }
+            CoreEvent::ProfileExported {
+                profile_name,
+                content,
+                output_path,
+            } => {
+                if let Some(path) = output_path {
+                    if let Err(e) = std::fs::write(path, content) {
+                        self.eprint(&format!("Failed to write export file: {}", e));
+                    } else {
+                        self.print(&format!("Profile '{}' exported to {}", profile_name, path));
+                    }
+                } else {
+                    println!("{}", content);
+                    self.print(&format!("Profile '{}' exported", profile_name));
+                }
+            }
+            CoreEvent::ProfileImported { profile_name } => {
+                self.print(&format!("Profile '{}' imported", profile_name));
             }
             CoreEvent::TaskHungWarning {
                 id,

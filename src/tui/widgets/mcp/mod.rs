@@ -44,4 +44,5 @@ impl McpState {
     }
 }
 
+pub mod detail;
 pub mod render;

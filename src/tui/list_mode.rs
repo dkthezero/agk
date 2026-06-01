@@ -26,4 +26,8 @@ pub enum ListMode {
     ConfirmDeleteProfile,
     /// Profile editor modal (F3 on Profile tab)
     EditProfile,
+    /// Profile export modal (Ctrl+E on Profile tab)
+    ExportProfile,
+    /// Profile import modal (Ctrl+I on Profile tab)
+    ImportProfile,
 }

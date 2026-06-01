@@ -25,6 +25,10 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
         ""
     } else if matches!(state.list_mode, ListMode::EditProfile) {
         "[Tab] Switch field  [Space] Toggle  [Enter] Save  [Esc] Cancel"
+    } else if matches!(state.list_mode, ListMode::ExportProfile) {
+        "[Tab] Toggle resolve-vaults  [Enter] Export  [Esc] Cancel"
+    } else if matches!(state.list_mode, ListMode::ImportProfile) {
+        "[Enter] Import  [Esc] Cancel"
     } else if state.is_profile_wizard_mode() {
         if let Some(ref ws) = state.wizard_state {
             match ws.steps.get(ws.step_index) {
@@ -57,7 +61,7 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
                 "[↑/↓] Move  [F2] Attach New  [Space] Toggle  [F4] Refresh  [Esc]x2 Quit"
             }
             TabKind::Profile => {
-                "[↑/↓] Move  [F2] Add Profile  [F3] Edit  [Delete] Remove  [Esc]x2 Quit"
+                "[↑/↓] Move  [F2] Add Profile  [F3] Edit  [Ctrl+E] Export  [Ctrl+I] Import  [Delete] Remove  [Esc]x2 Quit"
             }
             TabKind::Analytics => "",
         }

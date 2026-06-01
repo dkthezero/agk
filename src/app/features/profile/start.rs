@@ -129,6 +129,13 @@ pub fn run(
             id: id.clone(),
             session_key: session_key.clone(),
         });
+        // Track profile launch in telemetry
+        let mut analytics = crate::domain::telemetry::AnalyticsConfig::load(
+            &crate::domain::paths::analytics_path(),
+        )
+        .unwrap_or_default();
+        analytics.increment_profile_launch(id.as_str(), &domain_profile.provider_id);
+        let _ = analytics.save(&crate::domain::paths::analytics_path());
         // Wait for process exit then clean up.
         let _ = session.wait_and_cleanup();
         Ok(CoreOutcome::Ok)

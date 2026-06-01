@@ -1,15 +1,42 @@
 use crate::app::snapshot::{DiscoveredMcp, ProviderEntry};
 use crate::domain::mcp::McpTransport;
+use crate::domain::mcp_security::{SecurityFlag, SecuritySeverity};
 use crate::domain::scope::Scope;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
+    text::Span,
+    widgets::{Block, Borders, Cell, Row, Table},
     Frame,
 };
 
 use super::McpState;
+
+/// Return the highest-severity badge string for a set of flags, or empty if none.
+fn highest_severity_badge(flags: &[SecurityFlag]) -> &'static str {
+    let best = flags.iter().map(|f| f.severity()).max_by_key(|s| match s {
+        SecuritySeverity::Low => 0,
+        SecuritySeverity::Medium => 1,
+        SecuritySeverity::High => 2,
+        SecuritySeverity::Critical => 3,
+    });
+    match best {
+        Some(SecuritySeverity::Critical) => "[!!]",
+        Some(SecuritySeverity::High) => "[!]",
+        Some(SecuritySeverity::Medium) => "[!]",
+        Some(SecuritySeverity::Low) => "[i]",
+        None => "",
+    }
+}
+
+fn severity_color(sev: &SecuritySeverity) -> Color {
+    match sev {
+        SecuritySeverity::Low => Color::Blue,
+        SecuritySeverity::Medium => Color::Yellow,
+        SecuritySeverity::High => Color::Red,
+        SecuritySeverity::Critical => Color::Magenta,
+    }
+}
 
 pub fn render(
     frame: &mut Frame,
@@ -28,6 +55,7 @@ pub fn render(
         Cell::from(Span::raw("Command")).style(Style::default().add_modifier(Modifier::BOLD)),
         Cell::from(Span::raw("Transport")).style(Style::default().add_modifier(Modifier::BOLD)),
         Cell::from(Span::raw("Tested")).style(Style::default().add_modifier(Modifier::BOLD)),
+        Cell::from(Span::raw("Sec")).style(Style::default().add_modifier(Modifier::BOLD)),
     ]);
 
     let items = state.servers_list();
@@ -67,6 +95,26 @@ pub fn render(
                 .unwrap_or(false)
         });
         let check = if enabled { "[x]" } else { "[ ]" };
+        let sec_badge = highest_severity_badge(&server.security_flags);
+        let sec_style = if server.security_flags.is_empty() {
+            style
+        } else if let Some(highest) = server
+            .security_flags
+            .iter()
+            .map(SecurityFlag::severity)
+            .max_by_key(|s| match s {
+                SecuritySeverity::Low => 0,
+                SecuritySeverity::Medium => 1,
+                SecuritySeverity::High => 2,
+                SecuritySeverity::Critical => 3,
+            })
+        {
+            Style::default()
+                .fg(severity_color(&highest))
+                .add_modifier(Modifier::BOLD)
+        } else {
+            style
+        };
         rows.push(
             Row::new(vec![
                 Cell::from(Span::raw(check)).style(style),
@@ -74,6 +122,7 @@ pub fn render(
                 Cell::from(Span::raw(cmd)).style(style),
                 Cell::from(Span::raw(transport)).style(style),
                 Cell::from(Span::raw(tested)).style(style),
+                Cell::from(Span::raw(sec_badge)).style(sec_style),
             ])
             .style(style),
         );
@@ -85,6 +134,7 @@ pub fn render(
         rows.push(Row::new(vec![
             Cell::from(Span::raw("")),
             Cell::from(Span::raw("── Discovered ──")).style(sep_style),
+            Cell::from(Span::raw("")),
             Cell::from(Span::raw("")),
             Cell::from(Span::raw("")),
             Cell::from(Span::raw("")),
@@ -112,6 +162,7 @@ pub fn render(
                     Cell::from(Span::raw(dm.vault_id.clone()).style(style)),
                     Cell::from(Span::raw("").style(style)),
                     Cell::from(Span::raw("").style(style)),
+                    Cell::from(Span::raw("").style(style)),
                 ])
                 .style(style),
             );
@@ -120,10 +171,11 @@ pub fn render(
 
     let widths = [
         ratatui::layout::Constraint::Percentage(5),
-        ratatui::layout::Constraint::Percentage(20),
-        ratatui::layout::Constraint::Percentage(35),
-        ratatui::layout::Constraint::Percentage(20),
-        ratatui::layout::Constraint::Percentage(20),
+        ratatui::layout::Constraint::Percentage(18),
+        ratatui::layout::Constraint::Percentage(32),
+        ratatui::layout::Constraint::Percentage(18),
+        ratatui::layout::Constraint::Percentage(12),
+        ratatui::layout::Constraint::Percentage(10),
     ];
 
     let table = Table::new(rows, widths)
@@ -142,136 +194,6 @@ pub fn render(
         table_state.select(Some(active_selected));
     }
     frame.render_stateful_widget(table, area, &mut table_state);
-}
-
-pub fn render_detail(
-    frame: &mut Frame,
-    area: Rect,
-    state: &McpState,
-    active_selected: usize,
-    discovered_mcps: &[crate::app::snapshot::DiscoveredMcp],
-) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title("MCP Server Detail");
-
-    let items = state.servers_list();
-    let registered_count = items.len();
-    let discovered_count = discovered_mcps.len();
-    let has_discovered = discovered_count > 0;
-    // Separator occupies one row if discovered section exists
-    let sep_offset = if has_discovered { 1 } else { 0 };
-
-    // Check if selection falls on a discovered MCP
-    if has_discovered && active_selected >= registered_count + sep_offset {
-        let discovered_idx = active_selected - registered_count - sep_offset;
-        if let Some(dm) = discovered_mcps.get(discovered_idx) {
-            let lines: Vec<Line> = vec![
-                Line::from(vec![
-                    Span::styled("Name: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(&dm.name),
-                ]),
-                Line::from(vec![
-                    Span::styled("Vault: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw(&dm.vault_id),
-                ]),
-                Line::from(vec![
-                    Span::styled(
-                        "Description: ",
-                        Style::default().add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(dm.description.as_deref().unwrap_or("—")),
-                ]),
-                Line::from(""),
-                Line::from(vec![
-                    Span::styled("Status: ", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::styled(
-                        "Discovered (not registered)",
-                        Style::default().fg(Color::Cyan),
-                    ),
-                ]),
-                Line::from(""),
-                Line::from("Press Enter to register this MCP server."),
-            ];
-            frame.render_widget(
-                Paragraph::new(lines)
-                    .block(block)
-                    .wrap(Wrap { trim: false }),
-                area,
-            );
-            return;
-        }
-    }
-
-    let Some((id, server)) = items.get(active_selected).copied() else {
-        frame.render_widget(
-            Paragraph::new("No server registered.\n\nUse `agk mcp add` to register a server.")
-                .block(block),
-            area,
-        );
-        return;
-    };
-
-    let transport = match &server.transport {
-        McpTransport::Stdio => "stdio".to_string(),
-        McpTransport::Sse { url } => format!("sse: {}", url),
-    };
-
-    let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from(vec![
-        Span::styled("ID: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(id.as_str()),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled("Command: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(server.command.as_str()),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled("Transport: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(transport.as_str()),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled(
-            "Description: ",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(server.description.as_deref().unwrap_or("—")),
-    ]));
-    lines.push(Line::from(vec![
-        Span::styled("Tested: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(if server.tested { "Yes" } else { "No" }),
-    ]));
-    if let Some(ref tested_at) = server.tested_at {
-        lines.push(Line::from(vec![
-            Span::styled("Tested at: ", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(tested_at.as_str()),
-        ]));
-    }
-
-    let mut providers: Vec<&str> = server
-        .activation
-        .iter()
-        .filter(|(_, a)| a.global || a.workspace)
-        .map(|(id, _)| id.as_str())
-        .collect();
-    providers.sort();
-    lines.push(Line::from(vec![
-        Span::styled(
-            "Active Providers: ",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(if providers.is_empty() { "none" } else { "—" }),
-    ]));
-    for p in providers {
-        lines.push(Line::from(vec![Span::raw(format!("  • {}", p))]));
-    }
-
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(block)
-            .wrap(Wrap { trim: false }),
-        area,
-    );
 }
 
 fn truncate(s: &str, max: usize) -> String {

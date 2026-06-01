@@ -57,7 +57,7 @@ impl McpRegistryPort for FakeMcpRegistry {
         transport: &str,
         description: Option<&str>,
     ) -> Result<McpServer> {
-        let parsed_args = args
+        let parsed_args: Vec<String> = args
             .map(|a| a.split_whitespace().map(String::from).collect())
             .unwrap_or_default();
         let parsed_env = env
@@ -73,6 +73,9 @@ impl McpRegistryPort for FakeMcpRegistry {
             })
             .unwrap_or_default();
 
+        let security_flags =
+            crate::domain::mcp_security::assess_mcp_security(command, &parsed_args);
+
         let server = McpServer {
             name: name.to_string(),
             command: command.to_string(),
@@ -83,6 +86,7 @@ impl McpRegistryPort for FakeMcpRegistry {
             tested: false,
             tested_at: None,
             activation: HashMap::new(),
+            security_flags,
         };
         self.servers
             .lock()

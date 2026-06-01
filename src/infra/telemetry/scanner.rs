@@ -59,6 +59,8 @@ impl Scanner {
         TelemetryStatus {
             enabled: config.settings.enabled,
             skills_tracked: config.skills.len(),
+            templates_tracked: config.templates.len(),
+            profiles_tracked: config.profiles.len(),
             last_scan: config.settings.last_scan,
         }
     }
@@ -68,6 +70,8 @@ impl Scanner {
 pub struct TelemetryStatus {
     pub enabled: bool,
     pub skills_tracked: usize,
+    pub templates_tracked: usize,
+    pub profiles_tracked: usize,
     pub last_scan: Option<String>,
 }
 

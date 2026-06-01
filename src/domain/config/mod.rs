@@ -25,6 +25,8 @@ pub struct GithubVaultSource {
     pub repo: String,
     pub r#ref: String,
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enterprise_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -320,6 +322,69 @@ mcps = ["filesystem"]
         assert_eq!(p.mcps.len(), 1);
         assert_eq!(p.mcps[0].name, "filesystem");
         assert_eq!(p.mcps[0].vault, "auto");
+    }
+
+    #[test]
+    fn github_vault_source_round_trip_without_enterprise_url() {
+        let toml_str = r#"
+version = 1
+vaults = ["gh-vault"]
+
+[gh-vault.vault]
+type = "github"
+repo = "owner/repo"
+ref = "main"
+path = "skills/"
+"#;
+        let config: ConfigFile = toml::from_str(toml_str).unwrap();
+        let section = config.vault_defs.get("gh-vault").unwrap();
+        match &section.vault {
+            Some(VaultConfig::Github(src)) => {
+                assert_eq!(src.repo, "owner/repo");
+                assert_eq!(src.r#ref, "main");
+                assert_eq!(src.path, "skills/");
+                assert!(src.enterprise_url.is_none());
+            }
+            _ => panic!("expected Github vault"),
+        }
+        // Serializing should NOT emit enterprise_url when None
+        let serialized = toml::to_string(&config).unwrap();
+        assert!(!serialized.contains("enterprise_url"));
+    }
+
+    #[test]
+    fn github_vault_source_round_trip_with_enterprise_url() {
+        let toml_str = r#"
+version = 1
+vaults = ["ghes-vault"]
+
+[ghes-vault.vault]
+type = "github"
+repo = "owner/repo"
+ref = "main"
+path = "skills/"
+enterprise_url = "https://github.example.com"
+"#;
+        let config: ConfigFile = toml::from_str(toml_str).unwrap();
+        let section = config.vault_defs.get("ghes-vault").unwrap();
+        match &section.vault {
+            Some(VaultConfig::Github(src)) => {
+                assert_eq!(src.repo, "owner/repo");
+                assert_eq!(src.r#ref, "main");
+                assert_eq!(src.path, "skills/");
+                assert_eq!(
+                    src.enterprise_url,
+                    Some("https://github.example.com".to_string())
+                );
+            }
+            _ => panic!("expected Github vault"),
+        }
+        // Serializing should preserve enterprise_url
+        let serialized = toml::to_string(&config).unwrap();
+        assert!(serialized.contains("enterprise_url"));
+        let roundtripped: ConfigFile = toml::from_str(&serialized).unwrap();
+        let section2 = roundtripped.vault_defs.get("ghes-vault").unwrap();
+        assert_eq!(section2.vault, section.vault);
     }
 
     #[test]

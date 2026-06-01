@@ -1,6 +1,8 @@
 pub(crate) mod detail;
 pub(crate) mod detail_entity;
 pub(crate) mod edit_profile_modal;
+pub(crate) mod export_profile_modal;
+pub(crate) mod import_profile_modal;
 pub(crate) mod list;
 pub(crate) mod list_entity;
 pub(crate) mod mcp;
