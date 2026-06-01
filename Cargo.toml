@@ -1,6 +1,6 @@
 [package]
 name = "agk"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 authors = ["dkthezero"]
 description = "The agent kit for teams to share the way they work with AI agents together"

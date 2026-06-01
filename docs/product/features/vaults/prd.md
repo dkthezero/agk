@@ -1,5 +1,7 @@
 # PRD: Vaults Management (Tab 4)
 
+**Status:** Implemented (v0.2, updated v0.3.1)
+
 ## Overview
 Vaults serve as the canonical upstream source to index raw assets (Skills and Instructions) into `agk`'s dependency tracking map before assigning those assets into target Provider ecosystems. A Vault is loosely defined as an external dictionary mapped by a discrete path (Local filesystem) or remote repository protocol (GitHub) containing tools.
 

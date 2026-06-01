@@ -96,6 +96,10 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 target_name: name.clone(),
                 scope: scope.into_domain_scope(),
             }),
+            ProfileCommands::Diff { name, scope } => Ok(CoreCommand::DiffProfile {
+                id: ProfileId::new(name.clone()),
+                scope: scope.into_domain_scope(),
+            }),
         },
         Commands::Mcp { command } => match command {
             McpCommands::Add {

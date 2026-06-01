@@ -130,11 +130,43 @@ pub fn build_profile_entries(config: &ConfigFile) -> Vec<ProfileEntry> {
         .profiles
         .iter()
         .cloned()
-        .map(|p| ProfileEntry {
-            name: p.name,
-            provider_id: p.provider_id,
-            skills: p.skills,
-            mcps: p.mcps,
+        .map(|p| {
+            // Check if this profile exists in any vault
+            let found_in_vault = config.vault_defs.values().any(|section| {
+                section
+                    .profiles
+                    .as_ref()
+                    .map(|bucket| {
+                        bucket.items.iter().any(|id_str| {
+                            crate::domain::config::parse_identity(id_str)
+                                .map(|id| id.name == p.name)
+                                .unwrap_or(false)
+                        })
+                    })
+                    .unwrap_or(false)
+            });
+
+            // If the profile has a vault source, compute drift.
+            // If no vault source, it's a local-only profile — no drift.
+            let has_drift = if found_in_vault {
+                // TODO(v0.4): query VaultPort for exact vault profile refs so we can
+                // compute real drift instead of this heuristic. Currently any
+                // vault-sourced profile with skills/mcps shows drift, which is
+                // overly aggressive — a profile with all matching refs still gets
+                // the badge. The `profile diff` CLI command does compute exact
+                // drift, but it requires a dedicated call per profile.
+                !p.skills.is_empty() || !p.mcps.is_empty()
+            } else {
+                false
+            };
+
+            ProfileEntry {
+                name: p.name,
+                provider_id: p.provider_id,
+                skills: p.skills,
+                mcps: p.mcps,
+                has_drift,
+            }
         })
         .collect()
 }

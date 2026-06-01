@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3.1 — "Enterprise Bridge & Profile Portability"
 
-**Status:** Ready for planning — v0.3 Phases 1–4 complete
+**Status:** Implemented — merged to master via #27
 **Target Date:** 3–4 weeks from kickoff
 **Epic:** [`proposals/v031-enterprise-bridge.md`](proposals/v031-enterprise-bridge.md)
 **Parent Epic:** [`v03-team-ready-profiles.md`](v03-team-ready-profiles.md)
@@ -31,9 +31,9 @@ This release is a **fast-follow bridge** between v0.3 (team-ready profiles) and 
 | Integration test: GHES mock server vault scan | QA | [GHES Vault](../../product/features/ghes-vault/prd.md) §Tests | 2d | Adapter |
 
 **Phase 1 Exit Criteria:**
-- `cargo test` passes; architecture tests pass.
-- Integration test proves GHES vault scanning against a mock API.
-- Manual QA: attach GHES vault, list skills, install skill.
+- [x] `cargo test` passes; architecture tests pass.
+- [x] Integration test proves GHES vault scanning against a mock API.
+- [ ] Manual QA: attach GHES vault, list skills, install skill.
 
 ---
 
@@ -52,9 +52,9 @@ This release is a **fast-follow bridge** between v0.3 (team-ready profiles) and 
 | Integration test: export → import roundtrip | QA | [Profile Portability](../../product/features/profile-portability/prd.md) §Tests | 1d | Both use cases |
 
 **Phase 2 Exit Criteria:**
-- Export produces valid JSON that validates against schema.
-- Import creates profile entry + writes `agent.md`.
-- Roundtrip test: export profile A → import as profile B → assert same config.
+- [x] Export produces valid JSON that validates against schema.
+- [x] Import creates profile entry + writes `agent.md`.
+- [x] Roundtrip test: export profile A → import as profile B → assert same config.
 
 ---
 
@@ -74,9 +74,9 @@ This release is a **fast-follow bridge** between v0.3 (team-ready profiles) and 
 | Background scanner: parse template + profile events | Backend | [Telemetry](../../product/features/telemetry/prd.md) §Background | 1d | Tracking |
 
 **Phase 3 Exit Criteria:**
-- Parallel scan reduces sync time by ≥ 50% on 4+ directory vaults.
-- Telemetry tab shows template and profile usage data.
-- Background scanner writes new fields without corrupting old `analytics.toml`.
+- [x] Parallel scan reduces sync time by ≥ 50% on 4+ directory vaults.
+- [x] Telemetry tab shows template and profile usage data.
+- [x] Background scanner writes new fields without corrupting old `analytics.toml`.
 
 ---
 
@@ -94,9 +94,9 @@ This release is a **fast-follow bridge** between v0.3 (team-ready profiles) and 
 | Full integration test suite + manual QA | QA | — | 2d | All |
 
 **Phase 4 Exit Criteria:**
-- All tests pass (`cargo test`, architecture tests, clippy, fmt).
-- Manual QA checklist: GHES attach, profile export/import, sync performance, telemetry display, MCP security badges.
-- Documentation updated for all new features.
+- [x] All tests pass (`cargo test`, architecture tests, clippy, fmt).
+- [ ] Manual QA checklist: GHES attach, profile export/import, sync performance, telemetry display, MCP security badges.
+- [ ] Documentation updated for all new features.
 
 ---
 

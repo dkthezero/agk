@@ -1,6 +1,6 @@
 # PRD: Profile Export / Import
 
-**Status:** Draft
+**Status:** Implemented (v0.3.1)
 **Epic:** [v0.3.1 Enterprise Bridge & Profile Portability](../../../epics/v031-enterprise-bridge.md)
 **Related:** [Profiles PRD](../profiles/prd.md) (parent feature)
 
@@ -116,14 +116,14 @@ agk profile import ./web-app-team.agk.json --name web-app-team-contractor
 
 ## Acceptance Criteria
 
-- [ ] `agk profile export` produces valid JSON matching the schema.
-- [ ] `agk profile import` creates profile entry + writes `agent.md`.
-- [ ] Export/import roundtrip produces equivalent profile config.
-- [ ] Major version mismatch blocks import with clear error.
-- [ ] Missing vaults in import set to `"auto"` with warning.
-- [ ] Name collision fails with clear error; `--name` override works.
-- [ ] TUI export/import modals show preview and confirmation.
-- [ ] Architecture tests pass with zero allowlists.
+- [x] `agk profile export` produces valid JSON matching the schema.
+- [x] `agk profile import` creates profile entry + writes `agent.md`.
+- [x] Export/import roundtrip produces equivalent profile config.
+- [x] Major version mismatch blocks import with clear error.
+- [x] Missing vaults in import set to `"auto"` with warning.
+- [x] Name collision fails with clear error; `--name` override works.
+- [x] TUI export/import modals show preview and confirmation.
+- [x] Architecture tests pass with zero allowlists.
 
 ---
 

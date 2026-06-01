@@ -1,5 +1,7 @@
 # PRD: Headless CLI Operations
 
+**Status:** Implemented (v0.2)
+
 > **Product Mindset:** `agk` is the agent kit for teams to share the way they work with AI agents together. The CLI is the contract; the TUI is the discoverability layer.
 
 ---

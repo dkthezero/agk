@@ -1,7 +1,7 @@
 # PRD: Providers Management (v0.3)
 
-**Status:** Draft — v0.3 update  
-**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/providers/prd.md)  
+**Status:** Implemented (v0.3)
+**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/providers/prd.md)
 **Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 
 ---
@@ -145,17 +145,17 @@ Each provider row now shows additional indicators:
 
 ## Acceptance Criteria
 
-- [ ] Copilot CLI `McpProvider` writes correct `~/.copilot/mcp-config.json` schema.
-- [ ] Gemini CLI `McpProvider` writes correct `~/.gemini/settings.json` schema.
-- [ ] AMP `McpProvider` writes correct `.amp/settings.json` schema, preserving other settings.
-- [ ] Letta, Snowflake, Firebender return `supports_mcp: false` and are excluded from MCP operations.
-- [ ] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
-- [ ] All new provider configs preserve existing JSON content (no destructive overwrites).
+- [x] Copilot CLI `McpProvider` writes correct `~/.copilot/mcp-config.json` schema.
+- [x] Gemini CLI `McpProvider` writes correct `~/.gemini/settings.json` schema.
+- [x] AMP `McpProvider` writes correct `.amp/settings.json` schema, preserving other settings.
+- [x] Letta, Snowflake, Firebender return `supports_mcp: false` and are excluded from MCP operations.
+- [x] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
+- [x] All new provider configs preserve existing JSON content (no destructive overwrites).
 - [ ] Tests cover write/read roundtrips for all 3 new providers.
-- [ ] `available_profile_tools()` returns correct lists for Claude Code and OpenCode.
-- [ ] `available_permission_modes()` returns correct lists for Claude Code.
-- [ ] Wizard injects tool/permission steps only when provider returns non-empty lists.
-- [ ] Architecture tests pass with zero allowlists.
+- [x] `available_profile_tools()` returns correct lists for Claude Code and OpenCode.
+- [x] `available_permission_modes()` returns correct lists for Claude Code.
+- [x] Wizard injects tool/permission steps only when provider returns non-empty lists.
+- [x] Architecture tests pass with zero allowlists.
 
 ---
 

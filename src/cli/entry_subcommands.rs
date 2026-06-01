@@ -84,6 +84,16 @@ pub enum ProfileCommands {
         #[arg(short, long, value_enum, default_value = "workspace")]
         scope: ScopeArg,
     },
+
+    /// Show differences between a local profile and its vault source
+    Diff {
+        /// Profile name
+        name: String,
+
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
 }
 
 #[derive(Subcommand, Debug)]

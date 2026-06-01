@@ -138,6 +138,7 @@ pub fn run(
             provider_id: input.provider_id.as_str().to_string(),
             skills: input.skill_refs.clone(),
             mcps: input.mcp_refs.clone(),
+            has_drift: false,
         }],
         ..WorkspaceSnapshot::default()
     };

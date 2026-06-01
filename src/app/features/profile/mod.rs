@@ -6,6 +6,7 @@ pub mod create;
 pub mod delete;
 pub mod detach_mcp;
 pub mod detach_skill;
+pub mod diff;
 pub mod export;
 pub mod import;
 pub mod start;
@@ -106,6 +107,9 @@ pub fn dispatch(
             core.store.as_ref(),
             sink,
         )),
+        CoreCommand::DiffProfile { id, scope } => {
+            Some(diff::run(id, *scope, core.store.as_ref(), sink))
+        }
         _ => None,
     }
 }

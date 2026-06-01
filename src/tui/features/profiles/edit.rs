@@ -1,3 +1,4 @@
+use crate::app::features::profile::token_estimate::estimate_tokens;
 use crate::domain::profile::ProfileAssetRef;
 use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, EventContext};
@@ -79,7 +80,8 @@ pub fn enter_edit_profile(state: &mut AppState, ctx: &EventContext) {
         .position(|m| *m == current_pm)
         .unwrap_or(0);
 
-    state.edit_profile_state = Some(crate::tui::app::EditProfileState {
+    // Compute estimated tokens from the names of checked skills and MCPs.
+    let es_preview = crate::tui::app::EditProfileState {
         profile_name: entry.name.clone(),
         field_index: 0,
         selected: 0,
@@ -89,6 +91,13 @@ pub fn enter_edit_profile(state: &mut AppState, ctx: &EventContext) {
         mcps_checked,
         permission_modes,
         permission_index,
+        estimated_tokens: 0,
+    };
+    let estimated_tokens = estimate_tokens(&checked_text_from(&es_preview));
+
+    state.edit_profile_state = Some(crate::tui::app::EditProfileState {
+        estimated_tokens,
+        ..es_preview
     });
     state.list_mode = ListMode::EditProfile;
     state.status_line.clear();
@@ -134,6 +143,7 @@ pub fn handle_edit_profile_input(
         }
         KeyCode::Char(' ') => {
             toggle_current_item(&mut es);
+            recompute_tokens(&mut es);
         }
         KeyCode::Enter => {
             // Save changes.
@@ -176,6 +186,29 @@ fn toggle_current_item(es: &mut crate::tui::app::EditProfileState) {
             }
         }
     }
+}
+
+/// Collect the names of currently checked skills and MCPs into a single string.
+fn checked_text_from(es: &crate::tui::app::EditProfileState) -> String {
+    es.skills
+        .iter()
+        .zip(es.skills_checked.iter())
+        .filter(|(_, &checked)| checked)
+        .map(|(name, _)| name.as_str())
+        .chain(
+            es.mcps
+                .iter()
+                .zip(es.mcps_checked.iter())
+                .filter(|(_, &checked)| checked)
+                .map(|(name, _)| name.as_str()),
+        )
+        .collect::<Vec<&str>>()
+        .join(" ")
+}
+
+/// Recompute the estimated token count from the currently checked skills and MCPs.
+fn recompute_tokens(es: &mut crate::tui::app::EditProfileState) {
+    es.estimated_tokens = estimate_tokens(&checked_text_from(es));
 }
 
 /// Persist the edited profile back to config and trigger a reload.

@@ -1,6 +1,6 @@
 # Epic Proposal: AGK v0.3.1 — "Enterprise Bridge & Profile Portability"
 
-**Status:** Ready for planning — v0.3 Phases 1–4 complete
+**Status:** Implemented — merged to master via #27
 **Target Release:** v0.3.1
 **Theme:** *Connect team-ready profiles to enterprise infrastructure and make them portable across environments*
 **Author:** Technical Product Owner (Claude synthesis)
@@ -248,21 +248,21 @@ provider = "opencode"
 ## 6. Acceptance Criteria
 
 ### Must-Have Gate
-- [ ] GHES private repo can be added as vault and listed successfully via `agk vault attach`.
-- [ ] `gh auth` SSO token is respected for GHES vaults when `gh` CLI is installed.
-- [ ] `GITHUB_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` env vars work as fallback.
-- [ ] `agk profile export <name> --file <path>` produces valid JSON with all profile data.
-- [ ] `agk profile import <path>` creates profile config and writes `agent.md`.
-- [ ] Parallel vault scanning reduces `agk sync` time by ≥ 50% on multi-directory vaults.
-- [ ] Telemetry tracks template selections and profile launches.
-- [ ] TUI Telemetry tab shows "Templates" and "Profiles" sections.
-- [ ] Old `analytics.toml` without new fields deserializes correctly (backward compatible).
-- [ ] `cargo test` passes; architecture tests pass with zero allowlists.
+- [x] GHES private repo can be added as vault and listed successfully via `agk vault attach`.
+- [x] `gh auth` SSO token is respected for GHES vaults when `gh` CLI is installed.
+- [x] `GITHUB_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` env vars work as fallback.
+- [x] `agk profile export <name> --file <path>` produces valid JSON with all profile data.
+- [x] `agk profile import <path>` creates profile config and writes `agent.md`.
+- [x] Parallel vault scanning reduces `agk sync` time by ≥ 50% on multi-directory vaults.
+- [x] Telemetry tracks template selections and profile launches.
+- [x] TUI Telemetry tab shows "Templates" and "Profiles" sections.
+- [x] Old `analytics.toml` without new fields deserializes correctly (backward compatible).
+- [x] `cargo test` passes (413 tests); architecture tests pass with zero allowlists (14/14).
 
 ### Should-Have Gate
-- [ ] MCP security flags appear in `agk mcp list --json`.
-- [ ] TUI MCP tab shows `[!]` badge for high-risk MCPs.
-- [ ] Telemetry CSV export command produces shareable report.
+- [x] MCP security flags appear in `agk mcp list --json`.
+- [x] TUI MCP tab shows `[!]` badge for high-risk MCPs.
+- [x] Telemetry CSV export command produces shareable report.
 
 ---
 

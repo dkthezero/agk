@@ -62,6 +62,10 @@ pub enum CoreCommand {
         target_name: Option<String>,
         scope: crate::domain::scope::Scope,
     },
+    DiffProfile {
+        id: crate::domain::profile::ProfileId,
+        scope: crate::domain::scope::Scope,
+    },
 
     // -----------------------------------------------------------------------
     // Vault commands

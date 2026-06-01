@@ -55,6 +55,8 @@ pub struct ProfileEntry {
     pub provider_id: String,
     pub skills: Vec<crate::domain::profile::ProfileAssetRef>,
     pub mcps: Vec<crate::domain::profile::ProfileAssetRef>,
+    /// True if this profile differs from its vault source.
+    pub has_drift: bool,
 }
 
 /// A profile package discovered in a vault but not yet registered in config.

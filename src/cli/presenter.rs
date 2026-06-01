@@ -230,6 +230,10 @@ impl CoreEventSink for CliPresenter {
             CoreEvent::ProfileImported { profile_name } => {
                 self.print(&format!("Profile '{}' imported", profile_name));
             }
+            CoreEvent::ProfileDiffResult { profile_name, diff } => {
+                self.print(&format!("Profile: {}", profile_name));
+                self.print(&diff.summary());
+            }
             CoreEvent::TaskHungWarning {
                 id,
                 name,

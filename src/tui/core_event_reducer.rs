@@ -219,5 +219,13 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::ProfileImported { profile_name } => {
             state.status_line = format!("Profile '{}' imported", profile_name);
         }
+        CoreEvent::ProfileDiffResult { profile_name, diff } => {
+            if diff.has_drift() {
+                state.status_line =
+                    format!("Profile '{}' has drifted from vault source", profile_name);
+            } else {
+                state.status_line = format!("Profile '{}' matches vault source", profile_name);
+            }
+        }
     }
 }

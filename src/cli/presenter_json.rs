@@ -59,6 +59,22 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::ProfileImported { profile_name } => {
             serde_json::json!({ "type": "ProfileImported", "profile_name": profile_name })
         }
+        CoreEvent::ProfileDiffResult { profile_name, diff } => {
+            let has_drift = diff.has_drift();
+            let mut obj = serde_json::to_value(diff).unwrap_or_else(|_| serde_json::json!({}));
+            if let Some(map) = obj.as_object_mut() {
+                map.insert(
+                    "type".to_string(),
+                    serde_json::Value::String("ProfileDiffResult".into()),
+                );
+                map.insert(
+                    "profile_name".to_string(),
+                    serde_json::Value::String(profile_name.clone()),
+                );
+                map.insert("has_drift".to_string(), serde_json::Value::Bool(has_drift));
+            }
+            obj
+        }
         CoreEvent::VaultAttached(id) => {
             serde_json::json!({ "type": "VaultAttached", "id": id })
         }

@@ -155,6 +155,35 @@ impl ConfigFile {
 
         Ok(())
     }
+
+    /// Normalize profiles so that every `ProfileAssetRef` has a non-empty `vault`.
+    ///
+    /// Old configs may contain `skills = ["name"]` which deserializes with
+    /// `vault: "auto"` via the custom deserializer, but profiles created
+    /// programmatically might have empty vault strings. This method ensures
+    /// all refs use `"auto"` as the default, making the serialized output
+    /// consistently use the structured `[[profiles.skills]]` format.
+    ///
+    /// This is idempotent — already-migrated configs are unchanged.
+    pub fn migrate_profiles(&mut self) {
+        for profile in &mut self.profiles {
+            for skill in &mut profile.skills {
+                if skill.vault.is_empty() {
+                    skill.vault = "auto".to_string();
+                }
+            }
+            for mcp in &mut profile.mcps {
+                if mcp.vault.is_empty() {
+                    mcp.vault = "auto".to_string();
+                }
+            }
+            for instr in &mut profile.instructions {
+                if instr.vault.is_empty() {
+                    instr.vault = "auto".to_string();
+                }
+            }
+        }
+    }
 }
 
 /// Parse "[name:version:sha10]" into AssetIdentity. Returns None on malformed input.
@@ -422,5 +451,87 @@ enterprise_url = "https://github.example.com"
         assert!(config.remove_profile("a"));
         assert!(!config.remove_profile("a"));
         assert!(config.profiles.is_empty());
+    }
+
+    #[test]
+    fn migrate_old_flat_skills_to_profile_asset_ref() {
+        let old_toml = r#"
+version = 1
+vaults = ["workspace"]
+providers = ["claude-code"]
+
+[[profiles]]
+name = "web-app"
+provider_id = "opencode"
+skills = ["rust-patterns", "docker"]
+mcps = ["filesystem"]
+"#;
+        let mut config: ConfigFile = toml::from_str(old_toml).unwrap();
+        assert_eq!(config.profiles[0].skills.len(), 2);
+        assert_eq!(config.profiles[0].skills[0].name, "rust-patterns");
+        assert_eq!(config.profiles[0].skills[0].vault, "auto");
+
+        config.migrate_profiles();
+
+        let new_toml = toml::to_string_pretty(&config).unwrap();
+        assert!(
+            new_toml.contains("[[profiles.skills]]"),
+            "Expected structured skills format in:\n{}",
+            new_toml
+        );
+        assert!(
+            new_toml.contains("vault = \"auto\""),
+            "Expected vault field in:\n{}",
+            new_toml
+        );
+        let reloaded: ConfigFile = toml::from_str(&new_toml).unwrap();
+        assert_eq!(reloaded.profiles[0].skills.len(), 2);
+        assert_eq!(reloaded.profiles[0].skills[0].name, "rust-patterns");
+    }
+
+    #[test]
+    fn migrate_profiles_is_idempotent() {
+        let mut config = ConfigFile::default();
+        config.profiles.push(Profile {
+            name: "dev".to_string(),
+            provider_id: "opencode".to_string(),
+            scope: "workspace".to_string(),
+            skills: vec![
+                ProfileAssetRef::new("rust-patterns", "auto"),
+                ProfileAssetRef::new("docker", "clawhub"),
+            ],
+            mcps: vec![ProfileAssetRef::new("filesystem", "auto")],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
+        });
+        let before = config.clone();
+        config.migrate_profiles();
+        assert_eq!(
+            config, before,
+            "migrate_profiles should be idempotent for already-migrated configs"
+        );
+    }
+
+    #[test]
+    fn migrate_empty_vault_defaults_to_auto() {
+        let mut config = ConfigFile::default();
+        config.profiles.push(Profile {
+            name: "old".to_string(),
+            provider_id: "claude-code".to_string(),
+            scope: String::new(),
+            skills: vec![ProfileAssetRef::new("skill-a", "")],
+            mcps: vec![],
+            instructions: vec![],
+            tool_refs: vec![],
+            permission_mode: None,
+            prompt_overlay_path: None,
+        });
+        config.migrate_profiles();
+        assert_eq!(
+            config.profiles[0].skills[0].vault, "auto",
+            "empty vault should be migrated to 'auto'"
+        );
     }
 }

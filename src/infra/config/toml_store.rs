@@ -60,7 +60,9 @@ impl ConfigStorePort for TomlConfigStore {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let content = toml::to_string_pretty(config)?;
+        let mut config = config.clone();
+        config.migrate_profiles();
+        let content = toml::to_string_pretty(&config)?;
         std::fs::write(path, content)?;
         Ok(())
     }
@@ -155,5 +157,44 @@ mod tests {
         let store = make_store(dir.path());
         store.save(Scope::Global, &ConfigFile::default()).unwrap();
         assert!(dir.path().join("global").join("config.toml").exists());
+    }
+
+    #[test]
+    fn save_migrates_old_format_profiles() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = make_store(dir.path());
+
+        // Write an old-format config directly to disk
+        let old_toml = r#"
+version = 1
+vaults = ["workspace"]
+providers = ["claude-code"]
+
+[[profiles]]
+name = "web-app"
+provider_id = "opencode"
+skills = ["rust-patterns", "docker"]
+mcps = ["filesystem"]
+"#;
+        let global_path = dir.path().join("global").join("config.toml");
+        std::fs::create_dir_all(global_path.parent().unwrap()).unwrap();
+        std::fs::write(&global_path, old_toml).unwrap();
+
+        // Load + save through the store
+        let config = store.load(Scope::Global).unwrap();
+        store.save(Scope::Global, &config).unwrap();
+
+        // Verify the file now uses structured format
+        let content = std::fs::read_to_string(global_path).unwrap();
+        assert!(
+            content.contains("[[profiles.skills]]"),
+            "Expected structured skills format after save:\n{}",
+            content
+        );
+        assert!(
+            content.contains("vault = \"auto\""),
+            "Expected vault field after save:\n{}",
+            content
+        );
     }
 }

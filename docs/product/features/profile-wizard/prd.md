@@ -1,7 +1,7 @@
 # Profile Wizard Feature – Product Requirements
 
-**Status:** Draft  
-**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)  
+**Status:** Implemented (v0.3 + v0.3.2)
+**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 **Related:** [Profiles PRD](../profiles/prd.md) (parent feature)
 
 ---
@@ -230,16 +230,16 @@ OUT OF SCOPE:
 
 ## Success Criteria
 
-- [ ] Wizard generates structured markdown from 6–8 structured prompts (not raw Q&A).
-- [ ] OpenCode provider receives structured markdown via `opencode agent create --description`.
-- [ ] TUI Review step shows scrollable preview of composed markdown.
-- [ ] TUI shows estimated token count for composed prompt.
-- [ ] At least 5 archetype templates available in wizard.
-- [ ] Template path completes in ≤ 10 steps (excluding checklist/review).
-- [ ] Provider tool/permission selection appears when provider advertises options.
-- [ ] Skill/MCP checklist shows originating vault.
-- [ ] F3 Editor allows raw markdown editing with live token updates.
-- [ ] `cargo test` passes; architecture tests pass with zero allowlists.
+- [x] Wizard generates structured markdown from 6–8 structured prompts (not raw Q&A).
+- [x] OpenCode provider receives structured markdown via `opencode agent create --description`.
+- [x] TUI Review step shows scrollable preview of composed markdown.
+- [x] TUI shows estimated token count for composed prompt.
+- [x] At least 5 archetype templates available in wizard (6 shipped: Code Reviewer, Feature Implementer, Security Auditor, Documentation Writer, Test Generator, Custom).
+- [x] Template path completes in ≤ 10 steps (excluding checklist/review).
+- [x] Provider tool/permission selection appears when provider advertises options.
+- [x] Skill/MCP checklist shows originating vault.
+- [x] F3 Editor allows raw markdown editing with live token updates (token badge added in v0.3.2).
+- [x] `cargo test` passes; architecture tests pass with zero allowlists.
 
 ---
 

@@ -1,3 +1,4 @@
+use crate::app::features::profile::token_estimate::token_badge_color;
 use crate::tui::app::EditProfileState;
 use crate::tui::widgets::modal::{centered_rect, color_keys};
 use ratatui::{
@@ -35,8 +36,21 @@ pub fn render_edit_profile_modal(frame: &mut Frame, state: &EditProfileState) {
 
     frame.render_widget(Clear, popup);
 
+    let token_color = match token_badge_color(state.estimated_tokens) {
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        "red" => Color::Red,
+        _ => Color::White,
+    };
+    let title_text = format!(
+        "Edit Profile: {}  [Est. ~{} tok]",
+        state.profile_name, state.estimated_tokens
+    );
     let block = Block::default()
-        .title(format!("Edit Profile: {}", state.profile_name))
+        .title(Line::from(vec![
+            Span::styled(title_text, Style::default().fg(Color::Yellow)),
+            Span::styled(" ●", Style::default().fg(token_color)),
+        ]))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
 

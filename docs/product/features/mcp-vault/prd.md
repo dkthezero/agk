@@ -1,7 +1,7 @@
 # PRD: MCP Vault Management (v0.3)
 
-**Status:** Draft — v0.3 update  
-**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/mcp-vault/prd.md)  
+**Status:** Implemented (v0.3 + v0.3.1)
+**Previous:** [v0.2 PRD](https://github.com/dkthezero/agk/blob/4088606/docs/product/features/mcp-vault/prd.md)
 **Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 
 ---

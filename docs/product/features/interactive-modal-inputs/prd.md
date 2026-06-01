@@ -1,5 +1,7 @@
 # Interactive Modal Inputs
 
+**Status:** Implemented (v0.2)
+
 ## Overview
 Replace bottom-of-screen question-and-answer interactive prompts with centered pop-up modals, matching the existing provider config root selection UX.
 

@@ -1,21 +1,21 @@
 # Proposal: Enterprise Feature Pack (P7)
 
 **Target Audience:** Engineering orgs, platform teams, AI governance officers
-**Status:** Planning — seeking PO review
+**Status:** Planning — 4 remaining features (GHES vault shipped in v0.3.1)
 
 ---
 
 ## Executive Summary
 
-agk v0.2.x serves individuals and small teams well. Enterprise customers (100+ developers, regulated industries) need governance, auditability, security, and orchestration features. This proposal adds 5 capabilities that transform agk from a personal tool into a team platform.
+AGK v0.3.x serves individuals and small teams well with vault-discoverable profiles, MCP server distribution, and team-ready onboarding. Enterprise customers (100+ developers, regulated industries) need governance, auditability, and security features on top of this foundation. This proposal covers 4 remaining capabilities that transform AGK from a team tool into an enterprise platform.
 
-| # | Feature | Problem | Solution |
-|---|---------|---------|----------|
-| 1 | **Enterprise Policy & Compliance** | CISO wants to ban unverified skills; legal needs audit trails | Policy engine with denylists, mandatory sign-offs, compliance reports |
-| 2 | **Team Config Synchronization** | Onboarding 50 devs means installing 20 skills each by hand | Org-level `.agk/team.toml` synced from central repo; auto-install on `agk sync` |
-| 3 | **Skill Signing & Provenance** | Installing a skill from internet ≈ running `curl | bash` | GPG-signed skills; `agk verify --team-key` checks signatures before install |
-| 4 | **Centralized Telemetry & Reporting** | PM asks "which skills does the frontend team actually use?" | Anonymized org telemetry export; per-team breakdown CSV; stale-skill report |
-| 5 | **GitHub Enterprise Vaults + SSO** | Company uses GHES, not github.com | GHES vault adapter + `gh auth` token pass-through for private enterprise repos |
+| # | Feature | Problem | Solution | Status |
+|---|---------|---------|----------|--------|
+| 1 | **Enterprise Policy & Compliance** | CISO wants to ban unverified skills; legal needs audit trails | Policy engine with denylists, mandatory sign-offs, compliance reports | Planning |
+| 2 | **Team Config Synchronization** | Onboarding 50 devs means installing 20 skills each by hand | Org-level `.agk/team.toml` synced from central repo; auto-install on `agk sync` | Planning |
+| 3 | **Skill Signing & Provenance** | Installing a skill from internet ≈ running `curl \| bash` | GPG-signed skills; `agk verify --team-key` checks signatures before install | Planning |
+| 4 | **Centralized Telemetry & Reporting** | PM asks "which skills does the frontend team actually use?" | Anonymized org telemetry export; per-team breakdown CSV; stale-skill report | Planning |
+| 5 | ~~GitHub Enterprise Vaults + SSO~~ | Company uses GHES, not github.com | GHES vault adapter + `gh auth` token pass-through | ✅ Shipped v0.3.1 |
 
 ---
 
@@ -180,34 +180,9 @@ report_endpoint = "https://agk-analytics.acme.internal/api/v1/usage"
 
 ---
 
-## 5. GitHub Enterprise Vaults + SSO
+## 5. ~~GitHub Enterprise Vaults + SSO~~ — ✅ Shipped in v0.3.1
 
-### Problem
-- Company runs GHES. agk's `github` vault only supports github.com.
-- Enterprise users authenticate via SSO; can't use personal access tokens.
-
-### Solution
-Extend vault definition with `enterprise_url`:
-
-```toml
-[[vault]]
-id = "acme-private"
-type = "github"
-url = "https://github.acme.internal/acme-org/ai-workflows"
-enterprise_url = "https://github.acme.internal"
-# Token from `gh auth status` or `GITHUB_TOKEN` env
-```
-
-### Behavior
-- Vault adapter detects `enterprise_url` → uses GHES API base URL
-- Respects `gh auth` SSO session if available
-- Falls back to `GITHUB_TOKEN` env var
-- Private repos work the same as public (assuming token has access)
-
-### Files
-- `src/infra/vault/github.rs` — add `enterprise_url` field, customize API base URL
-- `src/infra/vault/mod.rs` — parse `enterprise_url` from vault config
-- `src/app/ports.rs` — vault def gains optional `enterprise_url`
+> This feature shipped as part of the [v0.3.1 Enterprise Bridge](../epics/v031-enterprise-bridge.md) release. See [GHES Vault PRD](../product/features/ghes-vault/prd.md) for implementation details.
 
 ---
 
@@ -217,7 +192,7 @@ enterprise_url = "https://github.acme.internal"
 2. [ ] `agk sync` auto-installs all `team.toml` requirements within 30s
 3. [ ] `agk verify --team-key` returns `exit(0)` for signed skills, `exit(5)` for invalid signatures
 4. [ ] Telemetry team report CSV contains no PII (no usernames, no machine names)
-5. [ ] GHES private repo can be added as vault and listed successfully
+5. [x] GHES private repo can be added as vault and listed successfully (shipped in v0.3.1)
 6. [ ] All features have `--json` output mode for CI integration
 7. [ ] Policy enforcement works in both TUI and headless CLI
 
@@ -235,4 +210,4 @@ enterprise_url = "https://github.acme.internal"
 
 ---
 
-*End of proposal — awaiting PO review and prioritization.*
+*End of proposal — updated 2026-06-01 to reflect GHES vault shipped in v0.3.1.*

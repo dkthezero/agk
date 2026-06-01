@@ -1,5 +1,7 @@
 # Provider Config Root Selection — PRD
 
+**Status:** Partially Implemented (v0.2)
+
 ## Overview
 
 Allow each provider to support multiple config folder names (e.g., OpenCode can use `.opencode` or `.agents`). When the user first enables a provider in the TUI, show a floating modal that lets them pick which folder to use for that provider in the current workspace. The choice is persisted in `.agk/config.toml`. When multiple providers select the same folder, they share it (no separate subdirectories).

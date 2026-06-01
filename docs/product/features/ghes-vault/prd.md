@@ -1,6 +1,6 @@
 # PRD: GitHub Enterprise Server (GHES) Vault Support
 
-**Status:** Draft
+**Status:** Implemented (v0.3.1)
 **Epic:** [v0.3.1 Enterprise Bridge & Profile Portability](../../../epics/v031-enterprise-bridge.md)
 
 ---
@@ -80,13 +80,13 @@ path = "vault"
 
 ## Acceptance Criteria
 
-- [ ] `agk vault attach` with GHES URL succeeds and lists skills/instructions/MCPs/profiles.
-- [ ] `gh auth` token is used automatically when `gh` CLI is installed and authenticated.
-- [ ] `GITHUB_ENTERPRISE_TOKEN` works as fallback when `gh` CLI is absent.
-- [ ] TUI shows `[GHES]` badge for GHES vaults.
-- [ ] Clear error message when token lacks `repo` scope.
-- [ ] Old github.com vaults continue to work without changes.
-- [ ] Architecture tests pass with zero allowlists.
+- [x] `agk vault attach` with GHES URL succeeds and lists skills/instructions/MCPs/profiles.
+- [x] `gh auth` token is used automatically when `gh` CLI is installed and authenticated.
+- [x] `GITHUB_ENTERPRISE_TOKEN` works as fallback when `gh` CLI is absent.
+- [x] TUI shows `[GHES]` badge for GHES vaults.
+- [x] Clear error message when token lacks `repo` scope.
+- [x] Old github.com vaults continue to work without changes.
+- [x] Architecture tests pass with zero allowlists.
 
 ---
 
