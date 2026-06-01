@@ -2,7 +2,7 @@ use crate::app::ports::{FeatureSetPort, VaultPort};
 use crate::domain::asset::ScannedPackage;
 use crate::infra::vault::local::LocalVaultAdapter;
 use anyhow::{bail, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command as StdCommand;
 use tokio::process::Command;
 
@@ -95,76 +95,14 @@ impl GithubVaultAdapter {
             return format!("{}/{}", base, self.repo);
         }
 
-        // Parse host from base_url
+        // Parse host from base_url, stripping any trailing slashes
         let host = base
             .strip_prefix("https://")
             .or_else(|| base.strip_prefix("http://"))
-            .unwrap_or(base);
+            .unwrap_or(base)
+            .trim_end_matches('/');
 
         format!("https://{}/{}.git", host, self.repo)
-    }
-
-    /// Create a temporary askpass script that provides the auth token.
-    ///
-    /// The script echoes the token when git requests a password,
-    /// and returns "x-access-token" for username requests.
-    /// The script is written to a temp file with restrictive permissions
-    /// and must be cleaned up by the caller via `cleanup_askpass`.
-    fn create_askpass_script(&self) -> Result<Option<PathBuf>> {
-        let token = match &self.auth_token {
-            Some(t) => t.clone(),
-            None => return Ok(None),
-        };
-
-        let temp_dir = std::env::temp_dir();
-        let script_path = temp_dir.join(format!("agk-askpass-{}", &self.id));
-
-        // GIT_ASKPASS scripts receive the prompt as $1 (e.g. "Password for ...").
-        // We echo the token for password prompts and "x-access-token" for username prompts.
-        #[cfg(unix)]
-        {
-            let script_content = format!(
-                "#!/bin/sh\nif echo \"$1\" | grep -qi 'password'; then\n  echo '{}'\nelse\n  echo 'x-access-token'\nfi\n",
-                token
-            );
-            std::fs::write(&script_path, script_content)?;
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o500))?;
-        }
-
-        #[cfg(not(unix))]
-        {
-            let bat_path = script_path.with_extension("bat");
-            let script_content = format!(
-                "@echo off\nif echo %1 | findstr /i \"password\" >nul (\n  echo {}\n) else (\n  echo x-access-token\n)\n",
-                token
-            );
-            std::fs::write(&bat_path, script_content)?;
-        }
-
-        Ok(Some(script_path))
-    }
-
-    /// Remove the temporary askpass script to prevent credential leakage.
-    fn cleanup_askpass(&self, script_path: &PathBuf) {
-        // On Unix, remove the shell script. On Windows, remove the .bat file.
-        let _ = std::fs::remove_file(script_path);
-        #[cfg(not(unix))]
-        let _ = std::fs::remove_file(&script_path.with_extension("bat"));
-    }
-
-    /// Get the executable path for the askpass script.
-    ///
-    /// On Unix, this is the script path itself. On Windows, it's the .bat variant.
-    fn askpass_executable_path(script_path: &Path) -> PathBuf {
-        #[cfg(not(unix))]
-        {
-            script_path.with_extension("bat")
-        }
-        #[cfg(unix)]
-        {
-            script_path.to_path_buf()
-        }
     }
 }
 
@@ -186,7 +124,8 @@ impl VaultPort for GithubVaultAdapter {
 
         // Set up secure credential delivery via GIT_ASKPASS when we have a token.
         // This avoids embedding the token in the URL (visible in ps, git config, logs).
-        let askpass_script = self.create_askpass_script()?;
+        let askpass_script =
+            crate::infra::vault::askpass::create_askpass_script(&self.id, &self.auth_token)?;
 
         let log_file_path = crate::domain::paths::global_config_root().join("git.log");
         if let Some(parent) = log_file_path.parent() {
@@ -208,7 +147,10 @@ impl VaultPort for GithubVaultAdapter {
                     &self.target_ref,
                 ]);
                 if let Some(ref script) = askpass_script {
-                    cmd.env("GIT_ASKPASS", Self::askpass_executable_path(script));
+                    cmd.env(
+                        "GIT_ASKPASS",
+                        crate::infra::vault::askpass::askpass_executable_path(script),
+                    );
                     cmd.env("GIT_TERMINAL_PROMPT", "0");
                 }
                 let status = cmd
@@ -239,7 +181,10 @@ impl VaultPort for GithubVaultAdapter {
                     dir.to_str().unwrap(),
                 ]);
                 if let Some(ref script) = askpass_script {
-                    cmd.env("GIT_ASKPASS", Self::askpass_executable_path(script));
+                    cmd.env(
+                        "GIT_ASKPASS",
+                        crate::infra::vault::askpass::askpass_executable_path(script),
+                    );
                     cmd.env("GIT_TERMINAL_PROMPT", "0");
                 }
                 let clone_status = cmd
@@ -263,7 +208,10 @@ impl VaultPort for GithubVaultAdapter {
                     ]);
                     // sparse-checkout doesn't need auth, but set env for consistency
                     if let Some(ref script) = askpass_script {
-                        sparse_cmd.env("GIT_ASKPASS", Self::askpass_executable_path(script));
+                        sparse_cmd.env(
+                            "GIT_ASKPASS",
+                            crate::infra::vault::askpass::askpass_executable_path(script),
+                        );
                         sparse_cmd.env("GIT_TERMINAL_PROMPT", "0");
                     }
                     let sparse_status = sparse_cmd
@@ -283,7 +231,7 @@ impl VaultPort for GithubVaultAdapter {
 
         // Always clean up the askpass script, even on error
         if let Some(ref script_path) = askpass_script {
-            self.cleanup_askpass(script_path);
+            crate::infra::vault::askpass::cleanup_askpass(script_path);
         }
 
         result
@@ -366,8 +314,14 @@ mod tests {
             .with_auth_token("ghp_abcdef123");
         let url = adapter.build_remote_url();
         assert_eq!(url, "https://github.com/owner/repo.git");
-        assert!(!url.contains("ghp_abcdef123"), "token must not appear in URL");
-        assert!(!url.contains("x-access-token"), "credentials must not appear in URL");
+        assert!(
+            !url.contains("ghp_abcdef123"),
+            "token must not appear in URL"
+        );
+        assert!(
+            !url.contains("x-access-token"),
+            "credentials must not appear in URL"
+        );
     }
 
     #[test]
@@ -377,69 +331,27 @@ mod tests {
             .with_auth_token("ghp_abcdef123");
         let url = adapter.build_remote_url();
         assert_eq!(url, "https://github.example.com/owner/repo.git");
-        assert!(!url.contains("ghp_abcdef123"), "token must not appear in URL");
+        assert!(
+            !url.contains("ghp_abcdef123"),
+            "token must not appear in URL"
+        );
     }
 
     #[test]
     fn test_build_remote_url_file_protocol() {
         let adapter = GithubVaultAdapter::new("test", "test/repo", "main", "skills/")
             .with_base_url("file:///tmp/repos");
+        assert_eq!(adapter.build_remote_url(), "file:///tmp/repos/test/repo");
+    }
+
+    #[test]
+    fn test_build_remote_url_strips_trailing_slash() {
+        let adapter = GithubVaultAdapter::new("test", "owner/repo", "main", "skills/")
+            .with_base_url("https://github.example.com/");
         assert_eq!(
             adapter.build_remote_url(),
-            "file:///tmp/repos/test/repo"
+            "https://github.example.com/owner/repo.git"
         );
-    }
-
-    #[test]
-    fn test_askpass_script_creates_file_with_token() {
-        let adapter = GithubVaultAdapter::new("askpass-test", "owner/repo", "main", "skills/")
-            .with_auth_token("ghp_test_token_123");
-
-        let script_path = adapter.create_askpass_script().expect("create_askpass_script failed");
-        let path = script_path.expect("expected Some(script_path)");
-
-        // Script should exist
-        assert!(path.exists(), "askpass script should be created on disk");
-
-        // Script should contain the token (it's the password source)
-        let content = std::fs::read_to_string(&path).expect("failed to read script");
-        assert!(content.contains("ghp_test_token_123"), "script must contain the token");
-        assert!(content.contains("x-access-token"), "script must provide username");
-
-        // Script should be executable and restricted (owner-only on unix)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
-            // Owner read+execute, no group/other permissions
-            assert_eq!(mode & 0o777, 0o500, "script must have owner-only r-x permissions");
-        }
-
-        // Cleanup
-        adapter.cleanup_askpass(&path);
-        assert!(!path.exists(), "askpass script must be removed after cleanup");
-    }
-
-    #[test]
-    fn test_askpass_script_returns_none_without_token() {
-        let adapter = GithubVaultAdapter::new("no-token", "owner/repo", "main", "skills/");
-        let result = adapter.create_askpass_script().expect("create_askpass_script failed");
-        assert!(result.is_none(), "no askpass script needed without a token");
-    }
-
-    #[test]
-    fn test_askpass_script_cleanup_idempotent() {
-        let adapter = GithubVaultAdapter::new("cleanup-test", "owner/repo", "main", "skills/")
-            .with_auth_token("ghp_test");
-
-        let script_path = adapter.create_askpass_script().unwrap().unwrap();
-        assert!(script_path.exists());
-
-        adapter.cleanup_askpass(&script_path);
-        assert!(!script_path.exists());
-
-        // Second cleanup should not panic
-        adapter.cleanup_askpass(&script_path);
     }
 
     #[tokio::test]

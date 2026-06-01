@@ -97,22 +97,20 @@ pub fn render_export_profile_modal(frame: &mut Frame, state: &AppState) {
         "[N]"
     };
     let vault_style = if state.export_resolve_vaults {
-        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::DarkGray)
     };
     lines.push(Line::from(vec![
         Span::styled("Resolve vaults: ", Style::default().fg(Color::White)),
-        Span::styled(
-            format!("{} resolve-vaults", vault_marker),
-            vault_style,
-        ),
+        Span::styled(format!("{} resolve-vaults", vault_marker), vault_style),
     ]));
     lines.push(Line::from(""));
 
     // Key hints
-    let hint_spans =
-        color_keys("[Tab] Toggle resolve-vaults  [Enter] Export  [Esc] Cancel");
+    let hint_spans = color_keys("[Tab] Toggle resolve-vaults  [Enter] Export  [Esc] Cancel");
     lines.push(Line::from(hint_spans));
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });

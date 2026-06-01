@@ -76,7 +76,9 @@ pub fn assess_mcp_security(command: &str, args: &[String]) -> Vec<SecurityFlag> 
 
     // arbitrary-execution: command is bash/sh/python with script args
     if (command == "bash" || command == "sh" || command == "python" || command == "python3")
-        && args.iter().any(|a| a.ends_with(".sh") || a.ends_with(".py"))
+        && args
+            .iter()
+            .any(|a| a.ends_with(".sh") || a.ends_with(".py"))
     {
         flags.push(SecurityFlag::ArbitraryExecution);
     }
@@ -158,11 +160,26 @@ mod tests {
 
     #[test]
     fn severity_levels() {
-        assert_eq!(SecurityFlag::UnspecifiedArgs.severity(), SecuritySeverity::Low);
-        assert_eq!(SecurityFlag::EnvExfiltration.severity(), SecuritySeverity::Medium);
-        assert_eq!(SecurityFlag::BroadFilesystem.severity(), SecuritySeverity::High);
-        assert_eq!(SecurityFlag::NetworkEgress.severity(), SecuritySeverity::High);
-        assert_eq!(SecurityFlag::ArbitraryExecution.severity(), SecuritySeverity::Critical);
+        assert_eq!(
+            SecurityFlag::UnspecifiedArgs.severity(),
+            SecuritySeverity::Low
+        );
+        assert_eq!(
+            SecurityFlag::EnvExfiltration.severity(),
+            SecuritySeverity::Medium
+        );
+        assert_eq!(
+            SecurityFlag::BroadFilesystem.severity(),
+            SecuritySeverity::High
+        );
+        assert_eq!(
+            SecurityFlag::NetworkEgress.severity(),
+            SecuritySeverity::High
+        );
+        assert_eq!(
+            SecurityFlag::ArbitraryExecution.severity(),
+            SecuritySeverity::Critical
+        );
     }
 
     #[test]
@@ -176,10 +193,8 @@ mod tests {
 
     #[test]
     fn no_flags_for_safe_config() {
-        let flags = assess_mcp_security(
-            "npx",
-            &["-y".to_string(), "some-safe-package".to_string()],
-        );
+        let flags =
+            assess_mcp_security("npx", &["-y".to_string(), "some-safe-package".to_string()]);
         assert!(flags.is_empty());
     }
 }

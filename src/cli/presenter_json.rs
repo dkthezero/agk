@@ -44,7 +44,11 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::ProfileSessionFinished { id, exit_status } => {
             serde_json::json!({ "type": "ProfileSessionFinished", "id": id.as_str(), "exit_status": exit_status })
         }
-        CoreEvent::ProfileExported { profile_name, content, output_path } => {
+        CoreEvent::ProfileExported {
+            profile_name,
+            content,
+            output_path,
+        } => {
             serde_json::json!({
                 "type": "ProfileExported",
                 "profile_name": profile_name,

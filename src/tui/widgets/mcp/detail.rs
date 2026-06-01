@@ -127,12 +127,10 @@ pub fn render_detail(
     // Security Assessment section
     if !server.security_flags.is_empty() {
         lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled(
-                "Security Assessment:",
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            "Security Assessment:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]));
         for flag in &server.security_flags {
             let badge = flag.badge();
             let desc = flag.description();

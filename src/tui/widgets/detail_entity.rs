@@ -32,11 +32,7 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
             if v.is_ghes {
                 lines.push(Line::from(vec![
                     label("Enterprise: "),
-                    Span::raw(
-                        v.enterprise_url
-                            .as_deref()
-                            .unwrap_or("unknown"),
-                    ),
+                    Span::raw(v.enterprise_url.as_deref().unwrap_or("unknown")),
                 ]));
                 lines.push(Line::from(vec![
                     label("Token Src:  "),
@@ -71,25 +67,15 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
 
 /// Determine a human-readable label for the token source of a GHES vault.
 ///
-/// Mirrors the resolution order in `infra::vault::token::resolve_token`:
-/// 1. gh auth (with hostname) → "gh auth (<host>)"
-/// 2. GITHUB_TOKEN env var → "GITHUB_TOKEN"
-/// 3. GITHUB_ENTERPRISE_TOKEN env var → "GITHUB_ENTERPRISE_TOKEN"
-/// 4. gh auth (default) → "gh auth"
-/// 5. none available → "none configured"
+/// This is a best-effort display label that checks available env vars first
+/// (deterministic, no subprocess) then infers gh auth from the enterprise_url.
+/// It does NOT perfectly mirror `infra::vault::token::resolve_token` which
+/// actually runs `gh auth token` first.
 fn token_source_label(vault: &VaultEntry) -> String {
-    // Check env vars first (deterministic, no subprocess)
-    if std::env::var("GITHUB_TOKEN").is_ok_and(|v| !v.is_empty()) {
-        return "GITHUB_TOKEN".to_string();
-    }
-    if std::env::var("GITHUB_ENTERPRISE_TOKEN")
-        .is_ok_and(|v| !v.is_empty())
-    {
-        return "GITHUB_ENTERPRISE_TOKEN".to_string();
-    }
-    // If we have an enterprise URL, gh auth with --hostname would be tried first
+    // This is a display-only label. The actual resolution in resolve_token()
+    // tries gh auth first, then env vars. Since we can't run gh auth during
+    // rendering, we show the most likely source based on available info.
     if let Some(eu) = &vault.enterprise_url {
-        // Extract hostname from the URL (strip scheme and trailing slash/path)
         let host = eu
             .strip_prefix("https://")
             .or_else(|| eu.strip_prefix("http://"))
@@ -98,6 +84,13 @@ fn token_source_label(vault: &VaultEntry) -> String {
             .next()
             .unwrap_or(eu);
         return format!("gh auth ({})", host);
+    }
+    // No enterprise URL: check env vars as fallback indicators
+    if std::env::var("GITHUB_TOKEN").is_ok_and(|v| !v.is_empty()) {
+        return "GITHUB_TOKEN".to_string();
+    }
+    if std::env::var("GITHUB_ENTERPRISE_TOKEN").is_ok_and(|v| !v.is_empty()) {
+        return "GITHUB_ENTERPRISE_TOKEN".to_string();
     }
     "none configured".to_string()
 }

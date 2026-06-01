@@ -1,7 +1,7 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::ConfigStorePort;
-use crate::domain::profile::{ExportedProfile, ExportPayload, ProfileId};
+use crate::domain::profile::{ExportPayload, ExportedProfile, ProfileId};
 use crate::domain::scope::Scope;
 
 /// Export a profile to a portable JSON structure.
@@ -101,6 +101,7 @@ fn resolve_vault_refs(
                     .find(|v| {
                         config.is_skill_installed(v.as_str(), &r.name)
                             || config.is_mcp_installed(v.as_str(), &r.name)
+                            || config.is_instruction_installed(v.as_str(), &r.name)
                     })
                     .cloned()
                     .unwrap_or_else(|| "auto".to_string());
@@ -184,7 +185,9 @@ mod tests {
     #[test]
     fn export_profile_found() {
         let store = FakeStore::new();
-        store.save(Scope::Workspace, &make_config_with_profile()).unwrap();
+        store
+            .save(Scope::Workspace, &make_config_with_profile())
+            .unwrap();
         let mut sink = CollectingSink { events: vec![] };
         let result = run(
             &ProfileId::new("dev"),
@@ -196,10 +199,10 @@ mod tests {
             &mut sink,
         );
         assert!(result.is_ok());
-        assert!(sink.events.iter().any(|e| matches!(
-            e,
-            CoreEvent::ProfileExported { .. }
-        )));
+        assert!(sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::ProfileExported { .. })));
     }
 
     #[test]

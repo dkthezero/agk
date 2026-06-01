@@ -164,6 +164,9 @@ pub fn build_vaults(
                             let hostname = enterprise_url
                                 .strip_prefix("https://")
                                 .or_else(|| enterprise_url.strip_prefix("http://"))
+                                .unwrap_or(enterprise_url)
+                                .split('/')
+                                .next()
                                 .unwrap_or(enterprise_url);
 
                             if let Ok(token) =

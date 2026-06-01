@@ -23,12 +23,14 @@ pub fn run(
 ) -> CoreResult {
     // 1. Read and deserialize JSON
     let content = std::fs::read_to_string(json_path).map_err(|e| {
-        anyhow::anyhow!("Failed to read import file '{}': {}", json_path.display(), e)
+        anyhow::anyhow!(
+            "Failed to read import file '{}': {}",
+            json_path.display(),
+            e
+        )
     })?;
-    let exported: ExportedProfile =
-        serde_json::from_str(&content).map_err(|e| {
-            anyhow::anyhow!("Failed to parse import file: {}", e)
-        })?;
+    let exported: ExportedProfile = serde_json::from_str(&content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse import file: {}", e))?;
 
     // 2. Check version compatibility
     let current_version = env!("CARGO_PKG_VERSION");
@@ -321,7 +323,10 @@ mod tests {
             &mut sink,
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Major version mismatch"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Major version mismatch"));
     }
 
     #[test]

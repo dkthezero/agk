@@ -16,7 +16,14 @@ use std::collections::HashMap;
 
 #[test]
 fn broad_filesystem_root_path() {
-    let flags = assess_mcp_security("npx", &["-y".into(), "@modelcontextprotocol/server-filesystem".into(), "/".into()]);
+    let flags = assess_mcp_security(
+        "npx",
+        &[
+            "-y".into(),
+            "@modelcontextprotocol/server-filesystem".into(),
+            "/".into(),
+        ],
+    );
     assert!(flags.contains(&SecurityFlag::BroadFilesystem));
 }
 
@@ -77,13 +84,19 @@ fn arbitrary_execution_bash_no_script() {
 
 #[test]
 fn env_exfiltration_home() {
-    let flags = assess_mcp_security("npx", &["-y".into(), "some-server".into(), "$HOME/path".into()]);
+    let flags = assess_mcp_security(
+        "npx",
+        &["-y".into(), "some-server".into(), "$HOME/path".into()],
+    );
     assert!(flags.contains(&SecurityFlag::EnvExfiltration));
 }
 
 #[test]
 fn env_exfiltration_ssh_key() {
-    let flags = assess_mcp_security("npx", &["-y".into(), "some-server".into(), "$SSH_KEY".into()]);
+    let flags = assess_mcp_security(
+        "npx",
+        &["-y".into(), "some-server".into(), "$SSH_KEY".into()],
+    );
     assert!(flags.contains(&SecurityFlag::EnvExfiltration));
 }
 
@@ -95,7 +108,13 @@ fn unspecified_args_no_args() {
 
 #[test]
 fn safe_mcp_no_flags() {
-    let flags = assess_mcp_security("npx", &["-y".into(), "@modelcontextprotocol/server-filesystem".into()]);
+    let flags = assess_mcp_security(
+        "npx",
+        &[
+            "-y".into(),
+            "@modelcontextprotocol/server-filesystem".into(),
+        ],
+    );
     // This has no broad-filesystem, no network, no env exfil, has args
     assert!(!flags.contains(&SecurityFlag::BroadFilesystem));
     assert!(!flags.contains(&SecurityFlag::NetworkEgress));
@@ -118,11 +137,26 @@ fn multiple_flags_simultaneously() {
 
 #[test]
 fn severity_mapping() {
-    assert_eq!(SecurityFlag::UnspecifiedArgs.severity(), SecuritySeverity::Low);
-    assert_eq!(SecurityFlag::EnvExfiltration.severity(), SecuritySeverity::Medium);
-    assert_eq!(SecurityFlag::BroadFilesystem.severity(), SecuritySeverity::High);
-    assert_eq!(SecurityFlag::NetworkEgress.severity(), SecuritySeverity::High);
-    assert_eq!(SecurityFlag::ArbitraryExecution.severity(), SecuritySeverity::Critical);
+    assert_eq!(
+        SecurityFlag::UnspecifiedArgs.severity(),
+        SecuritySeverity::Low
+    );
+    assert_eq!(
+        SecurityFlag::EnvExfiltration.severity(),
+        SecuritySeverity::Medium
+    );
+    assert_eq!(
+        SecurityFlag::BroadFilesystem.severity(),
+        SecuritySeverity::High
+    );
+    assert_eq!(
+        SecurityFlag::NetworkEgress.severity(),
+        SecuritySeverity::High
+    );
+    assert_eq!(
+        SecurityFlag::ArbitraryExecution.severity(),
+        SecuritySeverity::Critical
+    );
 }
 
 #[test]
@@ -147,15 +181,22 @@ fn description_text() {
 #[test]
 fn mcp_server_with_security_flags_roundtrip() {
     let mut activation = HashMap::new();
-    activation.insert("claude-code".to_string(), McpActivation {
-        global: true,
-        workspace: false,
-    });
+    activation.insert(
+        "claude-code".to_string(),
+        McpActivation {
+            global: true,
+            workspace: false,
+        },
+    );
 
     let server = McpServer {
         name: "filesystem".to_string(),
         command: "npx".to_string(),
-        args: vec!["-y".into(), "@modelcontextprotocol/server-filesystem".into(), "/".into()],
+        args: vec![
+            "-y".into(),
+            "@modelcontextprotocol/server-filesystem".into(),
+            "/".into(),
+        ],
         env: HashMap::new(),
         transport: McpTransport::Stdio,
         description: Some("File system access".to_string()),

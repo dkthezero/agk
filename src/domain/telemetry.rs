@@ -219,7 +219,10 @@ last_used = "2025-01-01T00:00:00+00:00"
         assert!(config.settings.enabled);
         assert!(config.templates.is_empty());
         assert!(config.profiles.is_empty());
-        assert_eq!(config.skills.get("web-browser").unwrap().total_invocations, 5);
+        assert_eq!(
+            config.skills.get("web-browser").unwrap().total_invocations,
+            5
+        );
     }
 
     #[test]

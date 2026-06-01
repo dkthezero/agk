@@ -18,7 +18,10 @@ fn template_analytics_serde_roundtrip() {
     let toml_text = toml::to_string(&ta).unwrap();
     let parsed: TemplateAnalytics = toml::from_str(&toml_text).unwrap();
     assert_eq!(parsed.selections, 15);
-    assert_eq!(parsed.last_selected, Some("2026-06-01T09:00:00Z".to_string()));
+    assert_eq!(
+        parsed.last_selected,
+        Some("2026-06-01T09:00:00Z".to_string())
+    );
 }
 
 #[test]

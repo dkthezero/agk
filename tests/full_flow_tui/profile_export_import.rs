@@ -9,7 +9,7 @@
 //! - Missing vault fallback to "auto" works
 
 use agk::domain::profile::{
-    check_version_compatibility, ExportedProfile, ExportPayload, ProfileAssetRef,
+    check_version_compatibility, ExportPayload, ExportedProfile, ProfileAssetRef,
 };
 use std::collections::HashMap;
 
@@ -65,8 +65,19 @@ fn export_payload_skips_empty_collections() {
     };
 
     let json = serde_json::to_string_pretty(&payload).unwrap();
-    // Empty collections should be skipped in serialization
-    assert!(!json.contains("\"skills\": []") || json.contains("\"skills\": []"));
+    // Fields with skip_serializing_if should be absent from serialized JSON
+    assert!(
+        !json.contains("\"structured_answers\""),
+        "structured_answers is None and should be skipped"
+    );
+    assert!(
+        !json.contains("\"permission_mode\""),
+        "permission_mode is None and should be skipped"
+    );
+    assert!(
+        !json.contains("\"tools\""),
+        "tools is empty and should be skipped"
+    );
 }
 
 #[test]

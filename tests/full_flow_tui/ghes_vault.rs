@@ -8,6 +8,27 @@
 
 use agk::domain::config::{GithubVaultSource, VaultConfig};
 
+/// Save and restore GITHUB_TOKEN and GITHUB_ENTERPRISE_TOKEN around a closure.
+/// Guarantees both env vars are restored even if the closure panics.
+fn with_saved_env_vars<F: FnOnce() -> R, R>(f: F) -> R {
+    let github = std::env::var("GITHUB_TOKEN").ok();
+    let ghe = std::env::var("GITHUB_ENTERPRISE_TOKEN").ok();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    // Always restore, even on panic
+    match github {
+        Some(v) => std::env::set_var("GITHUB_TOKEN", v),
+        None => std::env::remove_var("GITHUB_TOKEN"),
+    }
+    match ghe {
+        Some(v) => std::env::set_var("GITHUB_ENTERPRISE_TOKEN", v),
+        None => std::env::remove_var("GITHUB_ENTERPRISE_TOKEN"),
+    }
+    match result {
+        Ok(r) => r,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
 #[test]
 fn github_vault_source_round_trip_with_enterprise_url() {
     let source = GithubVaultSource {
@@ -72,51 +93,58 @@ path = "vault"
 fn token_resolution_prefers_gh_auth_for_enterprise() {
     use agk::infra::vault::token::resolve_token;
 
-    // When an enterprise host is given, the function tries gh auth first.
-    // We can't easily test gh auth in CI, so we test env var fallback.
-    // Clear any existing tokens to test the fallback path.
-    std::env::remove_var("GITHUB_TOKEN");
-    std::env::remove_var("GITHUB_ENTERPRISE_TOKEN");
+    with_saved_env_vars(|| {
+        // When an enterprise host is given, the function tries gh auth first.
+        // We can't easily test gh auth in CI, so we test env var fallback.
+        // Clear any existing tokens to test the fallback path.
+        std::env::remove_var("GITHUB_TOKEN");
+        std::env::remove_var("GITHUB_ENTERPRISE_TOKEN");
 
-    // With no gh CLI and no env vars, it should fail
-    let result = resolve_token(Some("nonexistent.ghes.example.com"));
-    // This may succeed or fail depending on the environment, but should not panic
-    let _ = result;
+        // With no gh CLI and no env vars, it should fail
+        let result = resolve_token(Some("nonexistent.ghes.example.com"));
+        // If gh happens to be authenticated for this nonexistent host, it could
+        // succeed — but that is extremely unlikely. Accept either outcome, but
+        // at minimum verify the function returns a Result (no panic).
+        if let Err(e) = result {
+            // Expected path: no token source available
+            assert!(
+                e.to_string().contains("No GitHub token found"),
+                "Error message should mention missing token"
+            );
+        }
+        // If it somehow succeeds (gh auth configured), that is also acceptable.
+    });
 }
 
 #[test]
 fn token_resolution_env_var_fallback() {
     use agk::infra::vault::token::resolve_token;
 
-    // Save and clear GITHUB_TOKEN so we can test the fallback path
-    let saved_github_token = std::env::var("GITHUB_TOKEN").ok();
-    std::env::remove_var("GITHUB_TOKEN");
+    with_saved_env_vars(|| {
+        // Clear GITHUB_TOKEN so we can test the fallback path
+        std::env::remove_var("GITHUB_TOKEN");
 
-    // Set GITHUB_ENTERPRISE_TOKEN as fallback
-    std::env::set_var("GITHUB_ENTERPRISE_TOKEN", "test-ghes-token-123");
+        // Set GITHUB_ENTERPRISE_TOKEN as fallback
+        std::env::set_var("GITHUB_ENTERPRISE_TOKEN", "test-ghes-token-123");
 
-    let result = resolve_token(Some("nonexistent.ghes.example.com"));
-    // gh auth will likely fail for a nonexistent host, so we should
-    // fall back to env vars. But if gh auth succeeds, that's fine too
-    // (it takes precedence). We just verify the function doesn't panic
-    // and returns a valid token.
-    if let Ok(token) = result {
-        // The token is either from gh auth or from GITHUB_ENTERPRISE_TOKEN
-        assert!(!token.is_empty(), "Token should not be empty");
-    }
-    // If no token is found (gh auth not installed, no env vars), that's also valid
-
-    // Restore original state
-    std::env::remove_var("GITHUB_ENTERPRISE_TOKEN");
-    if let Some(token) = saved_github_token {
-        std::env::set_var("GITHUB_TOKEN", token);
-    }
+        let result = resolve_token(Some("nonexistent.ghes.example.com"));
+        // gh auth will likely fail for a nonexistent host, so we should
+        // fall back to env vars. But if gh auth succeeds, that's fine too
+        // (it takes precedence). We just verify the function doesn't panic
+        // and returns a valid token.
+        if let Ok(token) = result {
+            // The token is either from gh auth or from GITHUB_ENTERPRISE_TOKEN
+            assert!(!token.is_empty(), "Token should not be empty");
+        }
+        // If no token is found (gh auth not installed, no env vars), that's also valid
+    });
+    // Environment is automatically restored by with_saved_env_vars
 }
 
 #[test]
 fn ghes_adapter_uses_custom_base_url() {
-    use agk::infra::vault::github::GithubVaultAdapter;
     use agk::app::ports::VaultPort;
+    use agk::infra::vault::github::GithubVaultAdapter;
 
     let adapter = GithubVaultAdapter::new("acme-private", "acme-org/ai-workflows", "main", "vault")
         .with_base_url("https://github.acme.internal");
@@ -127,8 +155,8 @@ fn ghes_adapter_uses_custom_base_url() {
 
 #[test]
 fn ghes_adapter_default_base_url() {
-    use agk::infra::vault::github::GithubVaultAdapter;
     use agk::app::ports::VaultPort;
+    use agk::infra::vault::github::GithubVaultAdapter;
 
     let adapter = GithubVaultAdapter::new("public-vault", "clawhub/ai-workflows", "main", "vault");
     // Default base URL should be github.com

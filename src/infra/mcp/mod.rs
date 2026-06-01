@@ -46,8 +46,7 @@ pub fn register(
         _ => McpTransport::Stdio,
     };
 
-    let security_flags =
-        crate::domain::mcp_security::assess_mcp_security(command, &args_vec);
+    let security_flags = crate::domain::mcp_security::assess_mcp_security(command, &args_vec);
 
     let server = McpServer {
         name: name.to_string(),

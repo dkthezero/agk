@@ -72,11 +72,19 @@ fn try_gh_auth_token(hostname: Option<&str>) -> Result<String> {
 mod tests {
     use super::*;
 
+    /// Mutex to serialize tests that mutate process-wide environment variables,
+    /// preventing parallel races under `cargo test` (which runs tests in
+    /// parallel by default).
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// Test that resolution falls through to GITHUB_TOKEN when no enterprise
     /// host is given and gh CLI is unavailable.
     #[test]
     fn resolve_token_prefers_github_token_env() {
-        // GITHUB_TOKEN should be picked up
+        let _lock = ENV_LOCK.lock().unwrap();
+
+        // Save and restore prior GITHUB_TOKEN
+        let saved_github_token = std::env::var("GITHUB_TOKEN").ok();
         std::env::set_var("GITHUB_TOKEN", "test-token-123");
         let result = resolve_token(None);
         assert!(result.is_ok());
@@ -84,21 +92,34 @@ mod tests {
         // it would win. Either way, we get a token.
         assert!(!result.unwrap().is_empty());
         std::env::remove_var("GITHUB_TOKEN");
+        if let Some(token) = saved_github_token {
+            std::env::set_var("GITHUB_TOKEN", token);
+        }
     }
 
     /// Test that GITHUB_ENTERPRISE_TOKEN is used when GITHUB_TOKEN is absent.
     #[test]
     fn resolve_token_falls_back_to_ghe_env() {
+        let _lock = ENV_LOCK.lock().unwrap();
+
         // Save and clear GITHUB_TOKEN so GITHUB_ENTERPRISE_TOKEN is tested
         let saved_github_token = std::env::var("GITHUB_TOKEN").ok();
         std::env::remove_var("GITHUB_TOKEN");
+
+        // Save and restore prior GITHUB_ENTERPRISE_TOKEN
+        let saved_ghe_token = std::env::var("GITHUB_ENTERPRISE_TOKEN").ok();
         std::env::set_var("GITHUB_ENTERPRISE_TOKEN", "ghe-token-456");
+
         let result = resolve_token(None);
         assert!(result.is_ok());
         // The resolved token should be non-empty. It comes from either
         // GITHUB_ENTERPRISE_TOKEN or gh auth (if available).
         assert!(!result.unwrap().is_empty());
+
         std::env::remove_var("GITHUB_ENTERPRISE_TOKEN");
+        if let Some(token) = saved_ghe_token {
+            std::env::set_var("GITHUB_ENTERPRISE_TOKEN", token);
+        }
         if let Some(token) = saved_github_token {
             std::env::set_var("GITHUB_TOKEN", token);
         }
@@ -107,14 +128,28 @@ mod tests {
     /// Test that resolution errors when no token source is available.
     #[test]
     fn resolve_token_errors_when_none_available() {
+        let _lock = ENV_LOCK.lock().unwrap();
+
+        // Save and clear both env vars
+        let saved_github_token = std::env::var("GITHUB_TOKEN").ok();
+        let saved_ghe_token = std::env::var("GITHUB_ENTERPRISE_TOKEN").ok();
         std::env::remove_var("GITHUB_TOKEN");
         std::env::remove_var("GITHUB_ENTERPRISE_TOKEN");
-        // gh auth token will likely fail in CI/test env; if it somehow
-        // succeeds, the test still validates the shape.
+
         let result = resolve_token(Some("nonexistent.ghes.example.com"));
-        // We just verify it returns a Result; in most environments it will be
-        // an error, but if gh is authenticated it could succeed.
-        assert!(result.is_ok() || result.is_err());
+        // Cannot strongly assert error vs success: gh CLI availability and
+        // authentication state vary across environments. In most CI/test
+        // environments this will be an error, but if gh happens to return a
+        // token that is also valid.
+        let _ = result;
+
+        // Restore both env vars
+        if let Some(token) = saved_github_token {
+            std::env::set_var("GITHUB_TOKEN", token);
+        }
+        if let Some(token) = saved_ghe_token {
+            std::env::set_var("GITHUB_ENTERPRISE_TOKEN", token);
+        }
     }
 
     /// Test that an enterprise host is passed to gh auth token --hostname.
@@ -125,13 +160,13 @@ mod tests {
         let result = try_gh_auth_token(Some("github.example.com"));
         // We don't assert success/failure since gh may not be installed,
         // but we verify it returns a Result without panicking.
-        assert!(result.is_ok() || result.is_err());
+        let _ = result;
     }
 
     /// Test that gh auth token without hostname works (or gracefully fails).
     #[test]
     fn try_gh_auth_token_no_hostname() {
         let result = try_gh_auth_token(None);
-        assert!(result.is_ok() || result.is_err());
+        let _ = result;
     }
 }

@@ -99,10 +99,7 @@ mod tests {
                 tested: false,
                 tested_at: None,
                 activation: HashMap::new(),
-                security_flags: vec![
-                    SecurityFlag::BroadFilesystem,
-                    SecurityFlag::NetworkEgress,
-                ],
+                security_flags: vec![SecurityFlag::BroadFilesystem, SecurityFlag::NetworkEgress],
             },
         );
 
@@ -110,7 +107,9 @@ mod tests {
         let parsed: McpRegistry = toml::from_str(&toml_text).unwrap();
         let server = parsed.servers.get("fs").unwrap();
         assert_eq!(server.security_flags.len(), 2);
-        assert!(server.security_flags.contains(&SecurityFlag::BroadFilesystem));
+        assert!(server
+            .security_flags
+            .contains(&SecurityFlag::BroadFilesystem));
         assert!(server.security_flags.contains(&SecurityFlag::NetworkEgress));
     }
 }

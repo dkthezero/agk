@@ -120,7 +120,9 @@ pub fn handle_profile_wizard_input(
                     ws.selected_tools = tmpl.default_tools.clone();
                     ws.selected_permission_mode = tmpl.default_permission_mode.clone();
                     // Track template selection in telemetry
-                    state.analytics_config.increment_template_selection(&tmpl.id);
+                    state
+                        .analytics_config
+                        .increment_template_selection(&tmpl.id);
                     let _ = crate::domain::telemetry::AnalyticsConfig::save(
                         &state.analytics_config,
                         &crate::domain::paths::analytics_path(),

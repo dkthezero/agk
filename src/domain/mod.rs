@@ -7,6 +7,7 @@ pub mod mcp;
 pub mod mcp_security;
 pub mod paths;
 pub mod profile;
+pub mod profile_export;
 pub mod scope;
 pub mod telemetry;
 pub mod validation;

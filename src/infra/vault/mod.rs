@@ -1,3 +1,4 @@
+pub mod askpass;
 pub mod clawhub;
 pub mod github;
 pub mod local;
