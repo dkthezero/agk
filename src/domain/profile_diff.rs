@@ -48,7 +48,11 @@ impl ProfileDiff {
             lines.push(format!("  + skills: {}", names.join(", ")));
         }
         if !self.removed_skills.is_empty() {
-            let names: Vec<&str> = self.removed_skills.iter().map(|r| r.name.as_str()).collect();
+            let names: Vec<&str> = self
+                .removed_skills
+                .iter()
+                .map(|r| r.name.as_str())
+                .collect();
             lines.push(format!("  - skills: {}", names.join(", ")));
         }
         if !self.added_mcps.is_empty() {
@@ -60,11 +64,19 @@ impl ProfileDiff {
             lines.push(format!("  - mcps: {}", names.join(", ")));
         }
         if !self.added_instructions.is_empty() {
-            let names: Vec<&str> = self.added_instructions.iter().map(|r| r.name.as_str()).collect();
+            let names: Vec<&str> = self
+                .added_instructions
+                .iter()
+                .map(|r| r.name.as_str())
+                .collect();
             lines.push(format!("  + instructions: {}", names.join(", ")));
         }
         if !self.removed_instructions.is_empty() {
-            let names: Vec<&str> = self.removed_instructions.iter().map(|r| r.name.as_str()).collect();
+            let names: Vec<&str> = self
+                .removed_instructions
+                .iter()
+                .map(|r| r.name.as_str())
+                .collect();
             lines.push(format!("  - instructions: {}", names.join(", ")));
         }
         if !self.added_tools.is_empty() {
@@ -83,7 +95,10 @@ impl ProfileDiff {
 /// Compare two sets of `ProfileAssetRef` by name (ignoring vault ID).
 ///
 /// Vault resolution is runtime-dependent, so we compare by identity name only.
-fn diff_refs(local: &[ProfileAssetRef], vault: &[ProfileAssetRef]) -> (Vec<ProfileAssetRef>, Vec<ProfileAssetRef>) {
+fn diff_refs(
+    local: &[ProfileAssetRef],
+    vault: &[ProfileAssetRef],
+) -> (Vec<ProfileAssetRef>, Vec<ProfileAssetRef>) {
     let local_names: std::collections::HashSet<&str> =
         local.iter().map(|r| r.name.as_str()).collect();
     let vault_names: std::collections::HashSet<&str> =
@@ -105,10 +120,8 @@ fn diff_refs(local: &[ProfileAssetRef], vault: &[ProfileAssetRef]) -> (Vec<Profi
 
 /// Compare two sets of tool strings by name.
 fn diff_tools(local: &[String], vault: &[String]) -> (Vec<String>, Vec<String>) {
-    let local_set: std::collections::HashSet<&str> =
-        local.iter().map(|s| s.as_str()).collect();
-    let vault_set: std::collections::HashSet<&str> =
-        vault.iter().map(|s| s.as_str()).collect();
+    let local_set: std::collections::HashSet<&str> = local.iter().map(|s| s.as_str()).collect();
+    let vault_set: std::collections::HashSet<&str> = vault.iter().map(|s| s.as_str()).collect();
 
     let added = local
         .iter()
@@ -127,6 +140,7 @@ fn diff_tools(local: &[String], vault: &[String]) -> (Vec<String>, Vec<String>) 
 /// Pure function: compute the diff between a local profile and a vault source.
 ///
 /// Compares by identity name, ignoring vault ID (vault resolution is runtime).
+#[allow(clippy::too_many_arguments)]
 pub fn compute_diff(
     local_skills: &[ProfileAssetRef],
     vault_skills: &[ProfileAssetRef],
@@ -141,7 +155,8 @@ pub fn compute_diff(
 ) -> ProfileDiff {
     let (added_skills, removed_skills) = diff_refs(local_skills, vault_skills);
     let (added_mcps, removed_mcps) = diff_refs(local_mcps, vault_mcps);
-    let (added_instructions, removed_instructions) = diff_refs(local_instructions, vault_instructions);
+    let (added_instructions, removed_instructions) =
+        diff_refs(local_instructions, vault_instructions);
     let (added_tools, removed_tools) = diff_tools(local_tools, vault_tools);
     let permission_mode_differs = local_permission_mode != vault_permission_mode;
 
@@ -165,13 +180,7 @@ mod tests {
     #[test]
     fn no_drift_when_identical() {
         let skills = vec![ProfileAssetRef::new("rust-patterns", "auto")];
-        let diff = compute_diff(
-            &skills, &skills,
-            &[], &[],
-            &[], &[],
-            &[], &[],
-            None, None,
-        );
+        let diff = compute_diff(&skills, &skills, &[], &[], &[], &[], &[], &[], None, None);
         assert!(!diff.has_drift());
         assert!(diff.summary().contains("No drift"));
     }
@@ -203,12 +212,26 @@ mod tests {
         let local = vec![ProfileAssetRef::new("rust-patterns", "auto")];
         let vault = vec![ProfileAssetRef::new("rust-patterns", "clawhub")];
         let diff = compute_diff(&local, &vault, &[], &[], &[], &[], &[], &[], None, None);
-        assert!(!diff.has_drift(), "same name with different vault should not count as drift");
+        assert!(
+            !diff.has_drift(),
+            "same name with different vault should not count as drift"
+        );
     }
 
     #[test]
     fn permission_mode_diff_detected() {
-        let diff = compute_diff(&[], &[], &[], &[], &[], &[], &[], &[], Some("auto"), Some("plan"));
+        let diff = compute_diff(
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            Some("auto"),
+            Some("plan"),
+        );
         assert!(diff.has_drift());
         assert!(diff.permission_mode_differs);
     }
@@ -228,11 +251,16 @@ mod tests {
         let local_skills = vec![ProfileAssetRef::new("new-skill", "auto")];
         let vault_mcps = vec![ProfileAssetRef::new("old-mcp", "auto")];
         let diff = compute_diff(
-            &local_skills, &[],
-            &[], &vault_mcps,
-            &[], &[],
-            &[], &[],
-            Some("plan"), None,
+            &local_skills,
+            &[],
+            &[],
+            &vault_mcps,
+            &[],
+            &[],
+            &[],
+            &[],
+            Some("plan"),
+            None,
         );
         let summary = diff.summary();
         assert!(summary.contains("+ skills: new-skill"));

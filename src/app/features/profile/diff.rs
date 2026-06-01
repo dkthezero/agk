@@ -19,12 +19,14 @@ pub fn run(
         .profiles
         .iter()
         .find(|p| p.name == id.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in {:?} scope", id.as_str(), scope))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("Profile '{}' not found in {:?} scope", id.as_str(), scope)
+        })?;
 
     // Search vault definitions for a matching vault profile
     let mut found_in_vault = false;
 
-    for (_vault_id, section) in &config.vault_defs {
+    for section in config.vault_defs.values() {
         if let Some(ref profiles_bucket) = section.profiles {
             for identity_str in &profiles_bucket.items {
                 let trimmed = identity_str.trim_start_matches('[').trim_end_matches(']');

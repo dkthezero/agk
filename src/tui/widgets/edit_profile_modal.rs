@@ -49,10 +49,7 @@ pub fn render_edit_profile_modal(frame: &mut Frame, state: &EditProfileState) {
     let block = Block::default()
         .title(Line::from(vec![
             Span::styled(title_text, Style::default().fg(Color::Yellow)),
-            Span::styled(
-                " ●",
-                Style::default().fg(token_color),
-            ),
+            Span::styled(" ●", Style::default().fg(token_color)),
         ]))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
