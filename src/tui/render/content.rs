@@ -67,14 +67,22 @@ pub fn draw_content(frame: &mut Frame, state: &AppState, list_area: Rect, detail
                 state.selected_index,
                 state.active_scope,
                 &active_providers,
+                &state.discovered_mcps,
             );
-            mcp::render::render_detail(frame, detail_area, &state.mcp_state, state.selected_index);
+            mcp::render::render_detail(
+                frame,
+                detail_area,
+                &state.mcp_state,
+                state.selected_index,
+                &state.discovered_mcps,
+            );
         }
         TabKind::Profile => {
             list::render_profiles(
                 frame,
                 list_area,
                 &state.profile_entries,
+                &state.discovered_profiles,
                 state.selected_index,
             );
             let selected_profile = state.profile_entries.get(state.selected_index);

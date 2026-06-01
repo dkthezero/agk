@@ -6,6 +6,28 @@ use crate::tui::list_mode::ListMode;
 use crate::tui::progress::{Progress, ProgressStatus};
 use std::collections::{HashMap, HashSet};
 
+/// State for the F3 profile editor modal.
+pub struct EditProfileState {
+    /// Profile name being edited (read-only).
+    pub profile_name: String,
+    /// Active field: 0 = skills, 1 = mcps, 2 = permission_mode.
+    pub field_index: usize,
+    /// Cursor / selected item within the active field.
+    pub selected: usize,
+    /// Available skill names.
+    pub skills: Vec<String>,
+    /// Checkbox state for skills (parallel with `skills`).
+    pub skills_checked: Vec<bool>,
+    /// Available MCP names.
+    pub mcps: Vec<String>,
+    /// Checkbox state for MCPs (parallel with `mcps`).
+    pub mcps_checked: Vec<bool>,
+    /// Available permission modes.
+    pub permission_modes: Vec<String>,
+    /// Selected permission mode index.
+    pub permission_index: usize,
+}
+
 pub struct AppState {
     pub active_tab: usize,
     pub search_query: String,
@@ -24,6 +46,8 @@ pub struct AppState {
     pub vault_entries: Vec<crate::app::snapshot::VaultEntry>,
     pub provider_entries: Vec<crate::app::snapshot::ProviderEntry>,
     pub profile_entries: Vec<crate::app::snapshot::ProfileEntry>,
+    pub discovered_profiles: Vec<crate::app::snapshot::DiscoveredProfile>,
+    pub discovered_mcps: Vec<crate::app::snapshot::DiscoveredMcp>,
     pub active_tasks: HashMap<usize, Progress>,
     pub latest_task_id: Option<usize>,
     pub pending_detach_vault: Option<String>,
@@ -51,6 +75,8 @@ pub struct AppState {
     pub pending_mcp_description: String,
     // Profile wizard state (replaces old pending_profile_* fields)
     pub wizard_state: Option<crate::app::ports::WizardState>,
+    // Profile editor state (F3 on Profile tab)
+    pub edit_profile_state: Option<EditProfileState>,
 }
 
 impl AppState {
@@ -77,6 +103,8 @@ impl AppState {
             vault_entries: Vec::new(),
             provider_entries: Vec::new(),
             profile_entries: Vec::new(),
+            discovered_profiles: Vec::new(),
+            discovered_mcps: Vec::new(),
             active_tasks: HashMap::new(),
             latest_task_id: None,
             pending_detach_vault: None,
@@ -102,6 +130,7 @@ impl AppState {
             pending_mcp_description: String::new(),
             wizard_state: None,
             hung_warnings_shown: HashSet::new(),
+            edit_profile_state: None,
         }
     }
 
@@ -139,8 +168,16 @@ impl AppState {
         match self.tab_kinds.get(self.active_tab) {
             Some(TabKind::Vault) => self.vault_entries.len(),
             Some(TabKind::Provider) => self.provider_entries.len(),
-            Some(TabKind::Mcp) => self.mcp_state.servers_list().len(),
-            Some(TabKind::Profile) => self.profile_entries.len(),
+            Some(TabKind::Mcp) => {
+                let registered = self.mcp_state.servers_list().len();
+                let discovered = self.discovered_mcps.len();
+                registered + discovered + if discovered > 0 { 1 } else { 0 } // separator line
+            }
+            Some(TabKind::Profile) => {
+                let registered = self.profile_entries.len();
+                let discovered = self.discovered_profiles.len();
+                registered + discovered + if discovered > 0 { 1 } else { 0 } // separator line
+            }
             _ => self.filtered_packages().len(),
         }
     }

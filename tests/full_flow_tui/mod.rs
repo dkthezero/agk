@@ -9,7 +9,10 @@
 
 mod common;
 mod mcp_register;
+mod mcp_roundtrip;
 mod provider_toggle;
 mod skill_install;
 mod sync_update;
 mod vault_attach;
+mod vault_profile_install_start;
+mod wizard_full_flow;

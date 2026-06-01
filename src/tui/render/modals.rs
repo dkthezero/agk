@@ -103,6 +103,11 @@ pub fn draw_modals(frame: &mut Frame, state: &AppState) {
         ListMode::ProfileWizard => {
             crate::tui::render::profile_wizard::draw_profile_wizard(frame, state);
         }
+        ListMode::EditProfile => {
+            if let Some(ref es) = state.edit_profile_state {
+                crate::tui::widgets::edit_profile_modal::render_edit_profile_modal(frame, es);
+            }
+        }
         ListMode::ConfirmMcpTest => {
             let msg = format!(
                 "WARNING: This will execute '{} {}' on your machine.\nProceed?",

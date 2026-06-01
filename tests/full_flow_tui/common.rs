@@ -99,7 +99,11 @@ impl<'a> CoreEventSink for StateSink<'a> {
 
 pub fn execute(core: &AgkCore, state: &mut AppState, cmd: CoreCommand) -> CoreResult {
     let mut sink = StateSink { state };
-    core.execute(cmd, &mut sink)
+    let result = core.execute(cmd, &mut sink);
+    if let Err(ref e) = result {
+        sink.state.status_line = format!("Error: {}", e);
+    }
+    result
 }
 
 // ---------------------------------------------------------------------------

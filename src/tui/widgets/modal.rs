@@ -6,10 +6,11 @@ use ratatui::{
     Frame,
 };
 
-// Re-export the long-modal renderers that live in `modal_long.rs` (extracted
-// for ADR-001 §6.4 file-size compliance) so callers continue to use
+// Re-export the modal renderers that live in split files (extracted for
+// ADR-001 §6.4 file-size compliance) so callers continue to use
 // `crate::tui::widgets::modal::render_review_modal` / `render_checklist_modal`.
-pub use crate::tui::widgets::modal_long::{render_checklist_modal, render_review_modal};
+pub use crate::tui::widgets::modal_checklist::render_checklist_modal;
+pub use crate::tui::widgets::modal_long::render_review_modal;
 
 /// Estimate how many display lines `text` will occupy when wrapped to `width`.
 pub(super) fn estimate_wrapped_lines(text: &str, width: u16) -> u16 {

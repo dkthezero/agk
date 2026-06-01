@@ -122,6 +122,14 @@ pub fn handle(
             .map(|_| ControlFlow::Continue);
         }
 
+        // Profile editor modal
+        if matches!(state.list_mode, ListMode::EditProfile) {
+            return crate::tui::features::profiles::edit::handle_edit_profile_input(
+                state, ctx, &key,
+            )
+            .map(|_| ControlFlow::Continue);
+        }
+
         // Confirmation modals share Enter / Esc aliases
         let in_confirm = matches!(
             state.list_mode,
@@ -216,7 +224,7 @@ pub fn handle(
             KeyCode::Enter if state.list_mode == ListMode::Normal => {
                 crate::tui::features::common::controller::handle_enter(state, ctx)?;
             }
-            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(2)
+            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(3) | KeyCode::F(2)
                 if state.list_mode == ListMode::Normal =>
             {
                 crate::tui::features::common::controller::handle_f_keys(state, ctx, &key.code)?;
