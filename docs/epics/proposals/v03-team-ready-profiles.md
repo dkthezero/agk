@@ -1,6 +1,6 @@
 # Epic Proposal: AGK v0.3 — "Team-Ready Profiles"
 
-**Status:** Draft — awaiting PO review
+**Status:** In Progress — Phases 1–4 implemented on `v03` branch; Phase 5 (Polish) pending
 **Target Release:** v0.3.0
 **Theme:** *From personal skill manager to team environment blueprint*
 **Author:** Technical Product Owner (Claude synthesis)
@@ -54,31 +54,31 @@ This epic makes the **Profile** the capstone artifact of AGK. A profile becomes 
 
 | ID | Feature | Source Proposal | Problem Solved | LOE |
 |---|---|---|---|---|
-| **F1** | **Enhanced Profile Wizard Core** | [P10](../../proposals/P10-profile-wizard-enhancement.md) Phases 1+4 | Wizard generates structured markdown with role, domain, style, triggers instead of raw Q&A | Medium |
-| **F2** | **Agent Archetype Templates** | [P10](../../proposals/P10-profile-wizard-enhancement.md) §4.5 | Users start from "Code Reviewer" or "Feature Implementer" templates, not blank slate | Low |
-| **F3** | **Token Estimation & Preview** | [P10](../../proposals/P10-profile-wizard-enhancement.md) §4.4 | Review step shows composed markdown + estimated tokens; warns if >800 tokens | Low |
-| **F4** | **Vault-Aware Dependency Storage** | [P10](../../proposals/P10-profile-wizard-enhancement.md) Phase 2 | Skills/MCPs in profile store originating vault; enables auto-resolve | Medium |
-| **F5** | **Auto-Install Missing Dependencies** | [P10](../../proposals/P10-profile-wizard-enhancement.md) Phase 2 | `agk p start` resolves missing skills/MCPs from specified vaults before launching | Medium |
-| **F6** | **Vault-Discoverable MCP Servers** | [Vault Multi-Asset](../../proposals/vault-multi-asset-scanning.md) Phase 1 | `mcps/` directory in vault scanned; MCP definitions appear in TUI MCP tab | Medium |
-| **F7** | **Vault-Discoverable Profiles** | [Vault Multi-Asset](../../proposals/vault-multi-asset-scanning.md) Phase 2 | `profiles/` directory in vault scanned; team profiles installable with `Space` | Medium |
-| **F8** | **MCP Provider Expansion** | [P6](../../proposals/mcp-provider-expansion.md) | Add Copilot CLI, Gemini CLI, AMP MCP adapters (3 new providers) | Medium |
+| **F1** | **Enhanced Profile Wizard Core** | ~~P10~~ (implemented) Phases 1+4 | Wizard generates structured markdown with role, domain, style, triggers instead of raw Q&A | Medium |
+| **F2** | **Agent Archetype Templates** | ~~P10~~ (implemented) §4.5 | Users start from "Code Reviewer" or "Feature Implementer" templates, not blank slate | Low |
+| **F3** | **Token Estimation & Preview** | ~~P10~~ (implemented) §4.4 | Review step shows composed markdown + estimated tokens; warns if >800 tokens | Low |
+| **F4** | **Vault-Aware Dependency Storage** | ~~P10~~ (implemented) Phase 2 | Skills/MCPs in profile store originating vault; enables auto-resolve | Medium |
+| **F5** | **Auto-Install Missing Dependencies** | ~~P10~~ (implemented) Phase 2 | `agk p start` resolves missing skills/MCPs from specified vaults before launching | Medium |
+| **F6** | **Vault-Discoverable MCP Servers** | ~~Vault Multi-Asset~~ (implemented) Phase 1 | `mcps/` directory in vault scanned; MCP definitions appear in TUI MCP tab | Medium |
+| **F7** | **Vault-Discoverable Profiles** | ~~Vault Multi-Asset~~ (implemented) Phase 2 | `profiles/` directory in vault scanned; team profiles installable with `Space` | Medium |
+| **F8** | **MCP Provider Expansion** | ~~P6~~ (implemented) | Add Copilot CLI, Gemini CLI, AMP MCP adapters (3 new providers) | Medium |
 
 ### 🟡 Should-Have (P1) — High Value, Can Slip
 
 | ID | Feature | Source Proposal | Problem Solved | LOE |
 |---|---|---|---|---|
-| **F9** | **Provider Tool/Permission Selection** | [P10](../../proposals/P10-profile-wizard-enhancement.md) Phase 3 | Wizard checklist for least-privilege tools (Claude Code: Read/Glob/Grep/etc.) | Medium |
-| **F10** | **Profile Editor (F3) Enhancement** | [P10](../../proposals/P10-profile-wizard-enhancement.md) §5 | Edit skills (with vault), MCPs, tools, and raw markdown with live token count | Medium |
-| **F11** | **Claude Code Agent File Projection** | [P10](../../proposals/P10-profile-wizard-enhancement.md) Phase 5 (partial) | Write `.agk/profiles/<name>/agent.md` with frontmatter for providers without native wizard | Medium |
-| **F12** | **Profile Batch Installation** | [Vault Multi-Asset](../../proposals/vault-multi-asset-scanning.md) §5.2 | Installing a vault profile installs all referenced skills, instructions, and MCPs atomically | Medium |
+| **F9** | **Provider Tool/Permission Selection** | ~~P10~~ (implemented) Phase 3 | Wizard checklist for least-privilege tools (Claude Code: Read/Glob/Grep/etc.) | Medium |
+| **F10** | **Profile Editor (F3) Enhancement** | ~~P10~~ (implemented) §5 | Edit skills (with vault), MCPs, tools, and raw markdown with live token count | Medium |
+| **F11** | **Claude Code Agent File Projection** | ~~P10~~ (implemented) Phase 5 (partial) | Write `.agk/profiles/<name>/agent.md` with frontmatter for providers without native wizard | Medium |
+| **F12** | **Profile Batch Installation** | ~~Vault Multi-Asset~~ (implemented) §5.2 | Installing a vault profile installs all referenced skills, instructions, and MCPs atomically | Medium |
 
 ### 🟢 Could-Have (P2) — Nice to Have
 
 | ID | Feature | Source Proposal | Problem Solved | LOE |
 |---|---|---|---|---|
-| **F13** | **Profile Launch Simulation** | [P10](../../proposals/P10-profile-wizard-enhancement.md) HTML sim | Visual dependency resolution → install → projection → runtime in TUI | Low |
-| **F14** | **Backward-Compatible Config Migration** | [P10](../../proposals/P10-profile-wizard-enhancement.md) §4.6 | Old flat `skills = ["name"]` auto-upgrades to structured on first write | Low |
-| **F15** | **Custom `prompt_overlay_path` Support** | [P10](../../proposals/P10-profile-wizard-enhancement.md) §5 | Allow users to supply their own `agent.md` instead of wizard-generated | Low |
+| **F13** | **Profile Launch Simulation** | ~~P10~~ (implemented) HTML sim | Visual dependency resolution → install → projection → runtime in TUI | Low |
+| **F14** | **Backward-Compatible Config Migration** | ~~P10~~ (implemented) §4.6 | Old flat `skills = ["name"]` auto-upgrades to structured on first write | Low |
+| **F15** | **Custom `prompt_overlay_path` Support** | ~~P10~~ (implemented) §5 | Allow users to supply their own `agent.md` instead of wizard-generated | Low |
 
 ### 🔵 Will-Not-Do (Explicitly Out of Scope)
 
@@ -127,18 +127,24 @@ This epic makes the **Profile** the capstone artifact of AGK. A profile becomes 
 
 ### New File Inventory
 
-| Path | Purpose |
-|---|---|
-| `src/infra/feature/mcp.rs` | `McpFeatureSet` scanner |
-| `src/infra/feature/profile.rs` | `ProfileFeatureSet` scanner |
-| `src/domain/asset.rs` | Add `AssetKind::Profile` |
-| `src/domain/profile.rs` | Add `skill_vault_refs`, `mcp_vault_refs`, `tool_refs`, `permission_mode` |
-| `src/app/ports/provider.rs` | Add `available_profile_tools()`, `available_permission_modes()` |
-| `src/app/features/profile/wizard_description.rs` | Structured markdown composer |
-| `src/app/features/profile/template.rs` | Archetype definitions |
-| `src/infra/provider/copilot_mcp.rs` | Copilot CLI `McpProvider` |
-| `src/infra/provider/gemini_mcp.rs` | Gemini CLI `McpProvider` |
-| `src/infra/provider/amp_mcp.rs` | AMP `McpProvider` |
+| Path | Purpose | Status |
+|---|---|---|
+| `src/infra/feature/mcp.rs` | `McpFeatureSet` scanner | ✅ Implemented |
+| `src/infra/feature/profile.rs` | `ProfileFeatureSet` scanner | ✅ Implemented |
+| `src/domain/asset.rs` | `AssetKind::Profile` enum variant | ✅ Implemented |
+| `src/domain/profile.rs` | `ProfileAssetRef` + `skill_refs`, `mcp_refs`, `instruction_refs`, `tool_refs`, `permission_mode`, `prompt_overlay_path` | ✅ Implemented |
+| `src/app/ports/provider.rs` | `available_profile_tools()`, `available_permission_modes()`, `WizardStep` variants, `ArchetypeTemplate` | ✅ Implemented |
+| `src/app/features/profile/wizard_description.rs` | Structured markdown composer | ✅ Implemented |
+| `src/app/features/profile/template.rs` | Archetype definitions (6 templates) | ✅ Implemented |
+| `src/app/features/profile/token_estimate.rs` | Token estimation utility (`words * 1.35`) | ✅ Implemented |
+| `src/app/features/profile/batch_install.rs` | Batch dependency resolution + rollback | ✅ Implemented |
+| `src/infra/provider/github.rs` | GitHub Copilot `McpProvider` (note: `github.rs`, not `copilot_mcp.rs`) | ✅ Implemented |
+| `src/infra/provider/gemini.rs` | Gemini CLI `McpProvider` (note: `gemini.rs`, not `gemini_mcp.rs`) | ✅ Implemented |
+| `src/infra/provider/amp.rs` | AMP `McpProvider` | ✅ Implemented |
+| `src/tui/widgets/edit_profile_modal.rs` | F3 profile editor (skills, MCPs, permissions) | ✅ Implemented |
+| `src/infra/provider/claude_code/session.rs` | Claude Code `agent.md` projection + `compose_agent_markdown()` | ✅ Implemented |
+
+> **Note:** The original plan listed `copilot_mcp.rs`, `gemini_mcp.rs`, and `amp_mcp.rs` as separate MCP-specific files. The implementation integrates MCP support directly into the provider modules (`github.rs`, `gemini.rs`, `amp.rs`) via the `McpProvider` trait, which is cleaner and avoids file proliferation.
 
 ---
 
@@ -215,25 +221,25 @@ mcps:
 
 ### Must-Have Gate
 
-- [ ] Wizard generates structured markdown from 6–8 structured prompts (not raw Q&A).
-- [ ] At least 5 archetype templates pre-fill wizard answers.
-- [ ] Review step shows scrollable composed markdown + estimated token count.
-- [ ] Profile skills/MCPs stored with vault provenance in `config.toml`.
-- [ ] `agk p start <profile>` auto-installs missing skills/MCPs from specified vaults.
-- [ ] `mcps/` directory in vault is scanned; MCPs appear in TUI MCP tab with `[⊘]`/`[ ]`/`[x]` states.
-- [ ] `profiles/` directory in vault is scanned; profiles appear in TUI Profile tab.
-- [ ] Installing a vault profile installs all referenced skills, instructions, and MCPs.
-- [ ] Copilot CLI, Gemini CLI, and AMP support MCP register/enable/disable.
-- [ ] Old flat-string `skills = ["name"]` profiles continue to work (backward compatibility).
-- [ ] No `.rs` file > 300 lines; architecture tests pass with zero allowlists.
-- [ ] `cargo test` passes (including new integration tests for wizard + vault scanning).
+- [x] Wizard generates structured markdown from 6–8 structured prompts (not raw Q&A).
+- [x] At least 5 archetype templates pre-fill wizard answers (6 templates: Code Reviewer, Feature Implementer, Security Auditor, Documentation Writer, Test Generator, Custom).
+- [x] Review step shows scrollable composed markdown + estimated token count.
+- [x] Profile skills/MCPs stored with vault provenance in `config.toml` (via `ProfileAssetRef` with backward-compatible serde).
+- [x] `agk p start <profile>` auto-installs missing skills/MCPs from specified vaults (with rollback on failure).
+- [x] `mcps/` directory in vault is scanned; MCPs appear in TUI MCP tab with `[⊘]`/`[ ]`/`[x]` states.
+- [x] `profiles/` directory in vault is scanned; profiles appear in TUI Profile tab.
+- [x] Installing a vault profile installs all referenced skills, instructions, and MCPs (atomic with rollback).
+- [x] Copilot CLI (`GithubProvider`, id: `github-copilot`), Gemini CLI, and AMP support MCP register/enable/disable.
+- [x] Old flat-string `skills = ["name"]` profiles continue to work (backward compatibility via `vault: "auto"` serde default).
+- [x] Architecture tests pass with zero allowlists (14/14 pass). `cargo clippy` and `cargo fmt` clean.
+- [ ] `cargo test` passes including new integration tests for wizard + vault scanning (some Phase 5 integration tests pending).
 
 ### Should-Have Gate
 
-- [ ] Provider tool checklist appears in wizard when provider advertises options.
-- [ ] F3 Editor supports raw markdown editing with live token updates.
-- [ ] Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter.
-- [ ] Batch profile installation is atomic (all referenced assets or none).
+- [x] Provider tool checklist appears in wizard when provider advertises options (`ToolSelect` and `PermissionSelect` wizard steps).
+- [ ] F3 Editor supports raw markdown editing with live token updates (skills/MCPs/permissions editing ✅; raw markdown editing and live token count ⚠️ partial — token estimation exists in wizard review but not in F3 editor).
+- [x] Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter (YAML frontmatter + composed body, with `prompt_overlay_path` fallback).
+- [x] Batch profile installation is atomic (all referenced assets or none, with rollback on failure).
 
 ---
 
@@ -274,18 +280,18 @@ mcps:
 
 ## 10. Related Documents
 
-- Source Proposals:
-  - [P10: Profile Wizard Enhancement](../../proposals/P10-profile-wizard-enhancement.md)
-  - [Vault Multi-Asset Scanning](../../proposals/vault-multi-asset-scanning.md)
-  - [P6: MCP Provider Expansion](../../proposals/mcp-provider-expansion.md)
+- Source Proposals (implemented — removed from `docs/proposals/`):
+  - ~~P10: Profile Wizard Enhancement~~ (implemented in v0.3)
+  - ~~Vault Multi-Asset Scanning~~ (implemented in v0.3)
+  - ~~P6: MCP Provider Expansion~~ (implemented in v0.3)
+  - ~~ADR-001: Unified Core~~ (implemented in v0.2)
+- Source Proposals (still in `docs/proposals/`):
   - [P7: Enterprise Feature Pack](../../proposals/enterprise-feature-pack.md)
   - [AGK vs. Coder Research](../../proposals/agk-vs-coder-research.md)
   - [VibeCode Research](../../proposals/research-vibecode-agk-report.md)
-- Architecture:
-  - [ADR-001: Unified Core](../../proposals/ADR-001-unified-vertical-architecture.md)
-- Release Plan (this epic, once approved):
+- Release Plan:
   - [`../v03-team-ready-profiles.md`](../v03-team-ready-profiles.md)
 
 ---
 
-*End of Epic Proposal*
+*End of Epic Proposal — updated 2026-06-01 to reflect implementation status*

@@ -148,8 +148,8 @@ Một **provider** là nền tảng AI nơi skill và instruction của bạn đ
 |---|---|---|---|---|---|---|
 | Claude Code | `claude-code` | ✓ | ✓ | ✓ | ✓ | `.claude`, `.agents` |
 | OpenCode | `opencode` | ✓ | ✓ | ✓ | ✓ | `.opencode`, `.agents` |
-| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ | — | — |
-| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ | — | `.gemini`, `.ai` |
+| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ (global only) | — | — |
+| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ (global only) | — | `.gemini`, `.ai` |
 | AMP Code | `amp` | ✓ | ✓ | ✓ | — | — |
 | Firebender | `firebender` | ✓ | ✓ | — | — | — |
 | Letta | `letta` | ✓ | ✓ | — | — | — |
@@ -199,6 +199,16 @@ Profile được tạo qua wizard TUI (nhấn `F2` ở tab Profiles) hoặc CLI 
 | Documentation Writer | Kỹ sư tài liệu | Read, Glob, Grep, Write, Edit | default |
 | Test Generator | Kỹ sư QA | Read, Glob, Grep, Bash, Write | default |
 | Custom | Trang trắng | — | — |
+
+**Các chế độ quyền:**
+
+| Chế độ | Hành vi |
+|---|---|
+| `default` | Xác nhận trước khi chỉnh sửa |
+| `acceptEdits` | Tự động chấp nhận chỉnh sửa |
+| `auto` | Tự động phê duyệt thao tác an toàn |
+| `dontAsk` | Không bao giờ yêu cầu xác nhận |
+| `plan` | Chế độ kế hoạch — chỉ đề xuất, không thực thi |
 
 `[Personal]` `[Team]`
 
@@ -457,6 +467,8 @@ agk mcp test my-server
 ```
 
 > **Cảnh báo:** Thử nghiệm handshake MCP chạy lệnh server trên máy của bạn. Chỉ đăng ký các MCP server mà bạn tin tưởng.
+
+> **Lưu ý:** Lệnh CLI `agk mcp add` không hỗ trợ chỉ định URL SSE trực tiếp. Để đăng ký SSE server, hãy sử dụng wizard TUI (tab MCP → `F2`) hoặc chỉnh sửa trực tiếp file `~/.config/agk/mcp.toml` với `transport = "sse"` và trường `url`.
 
 `[Personal]` `[Team]`
 
@@ -718,6 +730,7 @@ Khi bạn chuyển context, AGK thay thế vault và provider của context trư
 |---|---|
 | `Space` | Kích hoạt / Vô hiệu hóa provider |
 | `F4` | Làm mới danh sách provider |
+| `Enter` | Cập nhật provider đang chọn |
 
 > **Cảnh báo:** Vô hiệu hóa provider cuối cùng có asset đã cài sẽ hiển thị hộp thoại xác nhận. Xác nhận sẽ gỡ file skill đã cài từ thư mục của provider đó.
 
@@ -726,6 +739,7 @@ Khi bạn chuyển context, AGK thay thế vault và provider của context trư
 | Phím | Hành động |
 |---|---|
 | `F2` | Tạo profile mới (wizard) |
+| `F3` | Chỉnh sửa profile đang chọn |
 | `Delete` | Xóa profile đã chọn (kèm xác nhận) |
 
 ### 7.6 Tab Vaults
@@ -740,17 +754,22 @@ Khi bạn chuyển context, AGK thay thế vault và provider của context trư
 
 Profile wizard hướng dẫn qua các bước sau:
 
-1. **Tên profile** — chữ cái, số và gạch nối, phải duy nhất
-2. **Chọn phạm vi** — Workspace hoặc Global
-3. **Mẫu archetype** — chọn từ các mẫu có sẵn hoặc Custom
-4. **Câu hỏi định danh** — vai trò, lĩnh vực, đối tượng, trách nhiệm
-5. **Phong cách và định dạng** — phong cách viết, định dạng đầu ra
-6. **Giới hạn và kích hoạt** — những gì trong/ngoài phạm vi, khi nào kích hoạt
-7. **Danh sách skill** — chọn skill từ vault (có thể tìm kiếm, với badge vault)
-8. **Danh sách MCP** — chọn MCP server (với badge vault/đã đăng ký)
-9. **Chọn công cụ** — danh sách công cụ cho phép theo provider
-10. **Chế độ quyền** — acceptEdits, auto, default, hoặc plan
-11. **Xem lại** — bản xem trước markdown có thể cuộn với badge số token
+1. **Archetype template** — chọn từ template có sẵn hoặc Custom
+2. **Profile name** — bất kỳ ký tự nào trừ `/`, `\`, `:`, và null; phải là duy nhất
+3. **Scope selection** — Workspace hoặc Global
+4. **Role** — vai trò của agent (ví dụ: "Senior code reviewer")
+5. **Domain / Specialty** — lĩnh vực chuyên môn của agent
+6. **Collaboration Style** — cách agent giao tiếp (ví dụ: "Direct and critical")
+7. **Scope Boundaries** — những gì nằm trong và ngoài phạm vi của agent
+8. **Activation Triggers** — khi nào agent nên kích hoạt (ví dụ: "After any code change")
+9. **Constraints** — quy tắc agent phải tuân theo (ví dụ: "Always include a line reference")
+10. **Output Format** — định dạng đầu ra ưu tiên (ví dụ: "Concise bullets, max 5 items")
+11. **Core Responsibilities** — nhiệm vụ chính của agent
+12. **Tool selection** — danh sách công cụ theo provider
+13. **Permission mode** — default, acceptEdits, auto, dontAsk, hoặc plan
+14. **Skill checklist** — chọn skill từ vault (có thể tìm kiếm, hiển thị badge vault)
+15. **MCP checklist** — chọn MCP server (hiển thị badge vault/đã đăng ký)
+16. **Review** — xem trước markdown có thể cuộn, hiển thị badge số token
 
 `[Personal]` `[Team]`
 
@@ -812,6 +831,10 @@ Xác thực asset đã cài với vault nguồn.
 ```bash
 agk validate [--scope <scope>]
 ```
+
+| Flag | Mô tả |
+|---|---|
+| `--scope <scope>` / `-s` | Phạm vi mục tiêu (`global` hoặc `workspace`) |
 
 #### `agk pack <IDENTITY>`
 
@@ -943,6 +966,8 @@ agk mcp test my-server
 
 ### 8.5 Các lệnh Profile
 
+> **Mẹo:** `agk profile` có alias viết tắt `agk p` — ví dụ, `agk p start my-reviewer`.
+
 #### `agk profile start <NAME>`
 
 Khởi động phiên profile.
@@ -1030,6 +1055,9 @@ Xuất cây trace span hiện tại (yêu cầu tính năng `observability`).
 ```toml
 version = 1
 
+# ID vault đang hoạt động (phải khớp với khóa section vault bên dưới)
+vaults = ["my-vault", "team-skills"]
+
 # Provider đang kích hoạt (bật/tắt qua TUI hoặc CLI)
 providers = ["claude-code", "opencode"]
 
@@ -1084,6 +1112,7 @@ items = ["[web-browser:1.2.0:a13c9ef042]"]
 
 ```toml
 [servers.my-server]
+name = "my-server"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 transport = "stdio"
@@ -1100,6 +1129,7 @@ workspace = true
 
 # Ví dụ giao thức SSE
 [servers.remote-api]
+name = "remote-api"
 command = ""
 transport = "sse"
 url = "https://api.example.com/mcp"

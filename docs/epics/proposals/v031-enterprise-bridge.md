@@ -1,6 +1,6 @@
 # Epic Proposal: AGK v0.3.1 — "Enterprise Bridge & Profile Portability"
 
-**Status:** Draft — awaiting PO review
+**Status:** Ready for planning — v0.3 Phases 1–4 complete
 **Target Release:** v0.3.1
 **Theme:** *Connect team-ready profiles to enterprise infrastructure and make them portable across environments*
 **Author:** Technical Product Owner (Claude synthesis)
@@ -14,11 +14,11 @@
 
 | Capability | State |
 |---|---|
-| Vault-discoverable MCP servers + profiles | 🚧 In development |
-| Structured profile wizard with archetype templates | 🚧 In development |
-| Vault-aware dependency storage + auto-install | 🚧 In development |
-| MCP provider expansion (5 providers) | 🚧 In development |
-| Token estimation + live preview | 🚧 In development |
+| Vault-discoverable MCP servers + profiles | ✅ Shipped |
+| Structured profile wizard with archetype templates | ✅ Shipped |
+| Vault-aware dependency storage + auto-install | ✅ Shipped |
+| MCP provider expansion (5 providers) | ✅ Shipped |
+| Token estimation + live preview | ✅ Shipped |
 
 ### What v0.3 Leaves Behind
 

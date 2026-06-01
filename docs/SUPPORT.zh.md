@@ -148,8 +148,8 @@ MCP 服务器支持两种传输方式：
 |---|---|---|---|---|---|---|
 | Claude Code | `claude-code` | ✓ | ✓ | ✓ | ✓ | `.claude`, `.agents` |
 | OpenCode | `opencode` | ✓ | ✓ | ✓ | ✓ | `.opencode`, `.agents` |
-| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ | — | — |
-| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ | — | `.gemini`, `.ai` |
+| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ (global only) | — | — |
+| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ (global only) | — | `.gemini`, `.ai` |
 | AMP Code | `amp` | ✓ | ✓ | ✓ | — | — |
 | Firebender | `firebender` | ✓ | ✓ | — | — | — |
 | Letta | `letta` | ✓ | ✓ | — | — | — |
@@ -199,6 +199,16 @@ AGK 支持三种仓库类型：
 | Documentation Writer | 技术文档工程师 | Read, Glob, Grep, Write, Edit | default |
 | Test Generator | 测试工程师 | Read, Glob, Grep, Bash, Write | default |
 | Custom | 空白模板 | — | — |
+
+**权限模式：**
+
+| 模式 | 行为 |
+|---|---|
+| `default` | 编辑前请求确认 |
+| `acceptEdits` | 自动接受编辑 |
+| `auto` | 自动批准安全操作 |
+| `dontAsk` | 从不请求确认 |
+| `plan` | 计划模式——仅建议，不执行 |
 
 `[Personal]` `[Team]`
 
@@ -457,6 +467,8 @@ agk mcp test my-server
 ```
 
 > **警告：** MCP 握手测试会在你的机器上运行服务器命令。请只注册你信任的 MCP 服务器。
+
+> **注意：** CLI 命令 `agk mcp add` 不支持直接指定 SSE URL。要注册 SSE 服务器，请使用 TUI 向导（MCP 标签页 → `F2`）或直接编辑 `~/.config/agk/mcp.toml`，设置 `transport = "sse"` 并填写 `url` 字段。
 
 `[Personal]` `[Team]`
 
@@ -717,6 +729,7 @@ agk context switch project-alpha
 | 按键 | 操作 |
 |---|---|
 | `Space` | 激活 / 停用 provider |
+| `Enter` | 更新选中的 provider |
 | `F4` | 刷新 provider 列表 |
 
 > **警告：** 停用最后一个仍有已安装资源的 provider 时会弹出确认对话框。确认后将从该 provider 的目录中移除已安装的技能文件。
@@ -726,6 +739,7 @@ agk context switch project-alpha
 | 按键 | 操作 |
 |---|---|
 | `F2` | 创建新 profile（向导） |
+| `F3` | 编辑选中的 profile |
 | `Delete` | 删除选中的 profile（需确认） |
 
 ### 7.6 Vaults 标签页
@@ -740,17 +754,22 @@ agk context switch project-alpha
 
 Profile 向导会引导你完成以下步骤：
 
-1. **Profile 名称** —— 字母数字加连字符，必须唯一
-2. **作用域选择** —— 工作区或全局
-3. **预设模板** —— 从预定义模板中选择或选 Custom
-4. **身份问题** —— 角色、领域、受众、职责
-5. **风格和格式** —— 写作风格、输出格式
-6. **边界和触发条件** —— 职责范围内/外、何时激活
-7. **技能清单** —— 从仓库中选择技能（可搜索，带仓库徽章）
-8. **MCP 清单** —— 选择 MCP 服务器（带仓库/已注册徽章）
-9. **工具选择** —— provider 专属的工具白名单
-10. **权限模式** —— acceptEdits、auto、default 或 plan
-11. **审核** —— 可滚动的 markdown 预览，带 token 计数徽章
+1. **Archetype template** — 从预定义模板中选择或选择 Custom
+2. **Profile name** — 除 `/`、`\`、`:` 和 null 外的任意字符；必须唯一
+3. **Scope selection** — Workspace 或 Global
+4. **Role** — agent 扮演的角色（例如："Senior code reviewer"）
+5. **Domain / Specialty** — agent 的专业领域
+6. **Collaboration Style** — agent 的沟通方式（例如："Direct and critical"）
+7. **Scope Boundaries** — agent 的职责范围之内和之外
+8. **Activation Triggers** — agent 何时激活（例如："After any code change"）
+9. **Constraints** — agent 必须遵守的规则（例如："Always include a line reference"）
+10. **Output Format** — 首选输出格式（例如："Concise bullets, max 5 items"）
+11. **Core Responsibilities** — agent 的主要职责
+12. **Tool selection** — 按配置的工具白名单
+13. **Permission mode** — default、acceptEdits、auto、dontAsk 或 plan
+14. **Skill checklist** — 从仓库选择技能（可搜索，显示仓库徽标）
+15. **MCP checklist** — 选择 MCP 服务器（显示仓库/已注册徽标）
+16. **Review** — 可滚动的 Markdown 预览，显示 token 计数徽标
 
 `[Personal]` `[Team]`
 
@@ -812,6 +831,10 @@ agk install web-browser:1.2.0           # 指定版本
 ```bash
 agk validate [--scope <scope>]
 ```
+
+| 标志 | 说明 |
+|---|---|
+| `--scope <scope>` / `-s` | 目标作用域（`global` 或 `workspace`） |
 
 #### `agk pack <IDENTITY>`
 
@@ -943,6 +966,8 @@ agk mcp test my-server
 
 ### 8.5 Profile 命令
 
+> **提示：** `agk profile` 有简写别名 `agk p`——例如，`agk p start my-reviewer`。
+
 #### `agk profile start <NAME>`
 
 启动（运行）一个 profile 会话。
@@ -1030,6 +1055,9 @@ agk telemetry export --output ~/data.json  # 写入文件
 ```toml
 version = 1
 
+# 活跃的仓库 ID（必须与下方仓库段键名匹配）
+vaults = ["my-vault", "team-skills"]
+
 # 激活的 provider（通过 TUI 或 CLI 切换）
 providers = ["claude-code", "opencode"]
 
@@ -1084,6 +1112,7 @@ items = ["[web-browser:1.2.0:a13c9ef042]"]
 
 ```toml
 [servers.my-server]
+name = "my-server"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 transport = "stdio"
@@ -1100,6 +1129,7 @@ workspace = true
 
 # SSE 传输示例
 [servers.remote-api]
+name = "remote-api"
 command = ""
 transport = "sse"
 url = "https://api.example.com/mcp"

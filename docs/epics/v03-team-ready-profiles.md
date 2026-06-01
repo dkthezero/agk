@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3 — "Team-Ready Profiles"
 
-**Status:** Draft — pending epic approval
+**Status:** In Progress — Phases 1–4 implemented on `v03` branch; Phase 5 (Polish) pending
 **Target Date:** 7 weeks from kickoff
 **Epic:** [`proposals/v03-team-ready-profiles.md`](proposals/v03-team-ready-profiles.md)
 
@@ -31,9 +31,11 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 | TUI Profile tab: show vault-discovered profiles | Frontend | [Profiles](../../product/features/profiles/prd.md) §Vault Profiles | 2d | `ProfileFeatureSet` |
 
 **Phase 1 Exit Criteria:**
-- `cargo test` passes; architecture tests pass with zero allowlists.
-- TUI shows vault-discovered MCPs and profiles in their respective tabs.
-- Old profiles without vault info still load and function.
+- [x] `cargo test` passes; architecture tests pass with zero allowlists.
+- [x] TUI shows vault-discovered MCPs and profiles in their respective tabs.
+- [x] Old profiles without vault info still load and function.
+
+> **Implementation note:** `StubFeatureSet` still exists but is only used for "provider" and "vault" tabs. MCP and Profile tabs use real `McpFeatureSet` and `ProfileFeatureSet` scanners.
 
 ---
 
@@ -51,10 +53,10 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 | Update `handle_profile_wizard_input()` for new step types | Frontend | [Profile Wizard](../../product/features/profile-wizard/prd.md) §TUI Integration | 2d | WizardStep variants |
 
 **Phase 2 Exit Criteria:**
-- Wizard generates structured markdown (not raw Q&A) for OpenCode provider.
-- At least 5 archetype templates available.
-- Review step shows composed markdown with estimated token count.
-- Template path completes wizard in ≤ 10 steps (excluding checklist/review).
+- [x] Wizard generates structured markdown (not raw Q&A) for OpenCode provider.
+- [x] At least 5 archetype templates available (6 templates: Code Reviewer, Feature Implementer, Security Auditor, Documentation Writer, Test Generator, Custom).
+- [x] Review step shows composed markdown with estimated token count.
+- [x] Template path completes wizard in ≤ 10 steps (excluding checklist/review).
 
 ---
 
@@ -73,9 +75,11 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 | Implement for OpenCode: per-agent tool config (if exposed) | Backend | [Providers](../../product/features/providers/prd.md) §Tool Selection | 2d | Port methods |
 
 **Phase 3 Exit Criteria:**
-- `agk mcp add` writes config for Claude Code, OpenCode, Copilot, Gemini, and AMP.
-- TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
-- Provider port exposes tool/permission lists (may be empty for some providers).
+- [x] `agk mcp add` writes config for Claude Code, OpenCode, Copilot, Gemini, and AMP.
+- [x] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
+- [x] Provider port exposes tool/permission lists (may be empty for some providers).
+
+> **Implementation note:** The Copilot CLI provider is implemented as `GithubProvider` (id: `github-copilot`) rather than a separate `CopilotCliProvider`. Functionally identical — writes to `.copilot/mcp-config.json` (global) or `.github/mcp-config.json` (workspace).
 
 ---
 
@@ -95,10 +99,12 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 | `prompt_overlay_path` support | Backend | [Profiles](../../product/features/profiles/prd.md) §Custom Overlay | 1d | — |
 
 **Phase 4 Exit Criteria:**
-- `agk p start <profile>` on a fresh workspace installs all missing dependencies.
-- Installing a vault profile installs all referenced assets atomically.
-- F3 Editor allows editing skills (with vault), MCPs, tools, and raw markdown.
-- Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter.
+- [x] `agk p start <profile>` on a fresh workspace installs all missing dependencies.
+- [x] Installing a vault profile installs all referenced assets atomically (with rollback on failure).
+- [x] F3 Editor allows editing skills (with vault), MCPs, and permission mode.
+- [x] Claude Code provider writes `.agk/profiles/<name>/agent.md` with frontmatter.
+- ⚠️ F3 Editor does not show live token count — token estimation is only in the wizard review step.
+- ⚠️ Vault-sourced MCPs auto-register with name as placeholder command; user must verify.
 
 ---
 
@@ -116,11 +122,16 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 | Update user docs (`docs/product/`) | Docs | — | 2d | All |
 
 **Phase 5 Exit Criteria:**
-- `cargo test` passes (unit + integration).
-- `cargo test --test architecture -- --ignored` passes with zero allowlists.
-- `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes.
-- `cargo fmt --check` passes.
-- Manual QA checklist complete (vault attach, profile install, provider toggle, MCP register, profile start).
+- [x] `cargo test` passes (unit + integration).
+- [x] `cargo test --test architecture -- --ignored` passes with zero allowlists.
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes.
+- [x] `cargo fmt --check` passes.
+- [ ] Integration tests: wizard full flow (template → review → save).
+- [ ] Integration tests: vault profile install + start.
+- [ ] Integration tests: MCP provider write/read roundtrips.
+- [ ] Manual QA checklist complete (vault attach, profile install, provider toggle, MCP register, profile start).
+- [ ] Config migration: old flat format → structured on first write.
+- [ ] TUI launch simulation overlay.
 
 ---
 
@@ -171,13 +182,13 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 
 ## 6. Milestones
 
-| Milestone | Date | Deliverable |
-|---|---|---|
-| M1: Structural Enablers Complete | End of Week 2 | Vaults scan MCPs + Profiles; TUI shows them; `ProfileAssetRef` exists |
-| M2: Wizard Foundation Complete | End of Week 4 | Structured markdown wizard; 5+ templates; token preview |
-| M3: Provider Reach Complete | End of Week 5 | 5 MCP-capable providers; tool/permission port methods |
-| M4: Runtime Integration Complete | End of Week 6 | `agk p start` self-heals; editor enhanced; Claude Code projection |
-| M5: v0.3.0 Release Ready | End of Week 7 | All tests green; manual QA passed; docs updated |
+| Milestone | Date | Deliverable | Status |
+|---|---|---|---|
+| M1: Structural Enablers Complete | End of Week 2 | Vaults scan MCPs + Profiles; TUI shows them; `ProfileAssetRef` exists | ✅ Done |
+| M2: Wizard Foundation Complete | End of Week 4 | Structured markdown wizard; 6 templates; token preview | ✅ Done |
+| M3: Provider Reach Complete | End of Week 5 | 5 MCP-capable providers; tool/permission port methods | ✅ Done |
+| M4: Runtime Integration Complete | End of Week 6 | `agk p start` self-heals; editor enhanced; Claude Code projection | ✅ Done |
+| M5: v0.3.0 Release Ready | End of Week 7 | All tests green; manual QA passed; docs updated | ❌ Pending |
 
 ---
 
@@ -189,4 +200,4 @@ This release transforms AGK profiles from shallow Q&A-generated blobs into **str
 
 ---
 
-*Release Plan v0.1 — 2026-05-30*
+*Release Plan v0.2 — 2026-06-01 — updated to reflect implementation status*

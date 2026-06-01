@@ -1,11 +1,11 @@
 # Vault Multi-Asset Scanning Feature – Product Requirements
 
-**Status:** Draft  
-**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)  
+**Status:** Implemented (v0.3)
+**Epic:** [v0.3 Team-Ready Profiles](../../../epics/v03-team-ready-profiles.md)
 **Related:**
 - [MCP Vault PRD](../mcp-vault/prd.md) (MCP-specific behavior)
 - [Profiles PRD](../profiles/prd.md) (profile-specific behavior)
-- Source Research: [Vault Multi-Asset Scanning Proposal](../../../proposals/vault-multi-asset-scanning.md)
+- Source Research: ~~Vault Multi-Asset Scanning Proposal~~ (implemented — removed from `docs/proposals/`)
 
 ---
 

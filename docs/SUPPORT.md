@@ -148,8 +148,8 @@ A **provider** is the AI platform where your skills and instructions land. Think
 |---|---|---|---|---|---|---|
 | Claude Code | `claude-code` | ✓ | ✓ | ✓ | ✓ | `.claude`, `.agents` |
 | OpenCode | `opencode` | ✓ | ✓ | ✓ | ✓ | `.opencode`, `.agents` |
-| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ | — | — |
-| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ | — | `.gemini`, `.ai` |
+| GitHub Copilot | `github-copilot` | ✓ | ✓ | ✓ (global only) | — | — |
+| Gemini CLI | `gemini-cli` | ✓ | ✓ | ✓ (global only) | — | `.gemini`, `.ai` |
 | AMP Code | `amp` | ✓ | ✓ | ✓ | — | — |
 | Firebender | `firebender` | ✓ | ✓ | — | — | — |
 | Letta | `letta` | ✓ | ✓ | — | — | — |
@@ -199,6 +199,18 @@ Profiles are created through the TUI wizard (press `F2` on the Profiles tab) or 
 | Documentation Writer | Technical writer | Read, Glob, Grep, Write, Edit | default |
 | Test Generator | QA engineer | Read, Glob, Grep, Bash, Write | default |
 | Custom | Blank slate | — | — |
+
+`[Personal]` `[Team]`
+
+**Permission modes:**
+
+| Mode | Behavior |
+|---|---|
+| `default` | Ask for confirmation on edits |
+| `acceptEdits` | Accept edits automatically |
+| `auto` | Auto-approve safe operations |
+| `dontAsk` | Never ask for confirmation |
+| `plan` | Plan mode — suggest only, do not execute |
 
 `[Personal]` `[Team]`
 
@@ -457,6 +469,8 @@ agk mcp test my-server
 ```
 
 > **Warning:** The MCP handshake test runs the server command on your machine. Only register MCP servers you trust.
+
+> **Note:** The CLI `agk mcp add` command does not support specifying an SSE URL directly. To register an SSE server, use the TUI wizard (MCP tab → `F2`) or edit `~/.config/agk/mcp.toml` directly and set `transport = "sse"` with the `url` field.
 
 `[Personal]` `[Team]`
 
@@ -717,6 +731,7 @@ When you switch contexts, AGK replaces the previous context's vaults and provide
 | Key | Action |
 |---|---|
 | `Space` | Activate / Deactivate provider |
+| `Enter` | Update selected provider |
 | `F4` | Refresh provider list |
 
 > **Warning:** Deactivating the last provider with installed assets shows a confirmation dialog. Confirming will remove installed skill files from that provider's directories.
@@ -726,6 +741,7 @@ When you switch contexts, AGK replaces the previous context's vaults and provide
 | Key | Action |
 |---|---|
 | `F2` | Create new profile (wizard) |
+| `F3` | Edit selected profile |
 | `Delete` | Delete selected profile (with confirmation) |
 
 ### 7.6 Vaults Tab
@@ -738,19 +754,24 @@ When you switch contexts, AGK replaces the previous context's vaults and provide
 
 ### 7.7 Profile Wizard Steps
 
-The profile wizard walks through these steps:
+The profile wizard walks through 16 steps. The order depends on the provider, but the general flow is:
 
-1. **Profile name** — alphanumeric + hyphens, must be unique
-2. **Scope selection** — Workspace or Global
-3. **Archetype template** — choose from predefined templates or Custom
-4. **Identity questions** — role, domain, audience, responsibilities
-5. **Style and format** — writing style, output format
-6. **Boundaries and triggers** — what is in/out of scope, when to activate
-7. **Skill checklist** — select skills from vaults (searchable, with vault badges)
-8. **MCP checklist** — select MCP servers (with vault/registered badges)
-9. **Tool selection** — provider-specific tool allowlist
-10. **Permission mode** — acceptEdits, auto, default, or plan
-11. **Review** — scrollable markdown preview with token count badge
+1. **Archetype template** — choose from predefined templates or Custom
+2. **Profile name** — any characters except `/`, `\`, `:`, and null; must be unique
+3. **Scope selection** — Workspace or Global
+4. **Role** — what role the agent plays (for example, "Senior code reviewer")
+5. **Domain / Specialty** — the agent's area of expertise
+6. **Collaboration Style** — how the agent communicates (for example, "Direct and critical")
+7. **Scope Boundaries** — what is in and out of scope for the agent
+8. **Activation Triggers** — when the agent should activate (for example, "After any code change")
+9. **Constraints** — rules the agent must follow (for example, "Always include a line reference")
+10. **Output Format** — preferred output format (for example, "Concise bullets, max 5 items")
+11. **Core Responsibilities** — the agent's main duties
+12. **Tool selection** — provider-specific tool allowlist
+13. **Permission mode** — default, acceptEdits, auto, dontAsk, or plan
+14. **Skill checklist** — select skills from vaults (searchable, with vault badges)
+15. **MCP checklist** — select MCP servers (with vault/registered badges)
+16. **Review** — scrollable markdown preview with token count badge
 
 `[Personal]` `[Team]`
 
@@ -812,6 +833,10 @@ Validate installed assets against source vaults.
 ```bash
 agk validate [--scope <scope>]
 ```
+
+| Flag | Description |
+|---|---|
+| `--scope <scope>` / `-s` | Target scope (`global` or `workspace`) |
 
 #### `agk pack <IDENTITY>`
 
@@ -943,6 +968,8 @@ agk mcp test my-server
 
 ### 8.5 Profile Commands
 
+> **Tip:** `agk profile` has a shorthand alias `agk p` — for example, `agk p start my-reviewer`.
+
 #### `agk profile start <NAME>`
 
 Start (launch) a profile session.
@@ -1030,6 +1057,9 @@ Dump current trace span tree (requires `observability` feature).
 ```toml
 version = 1
 
+# Active vault IDs (must match vault section keys below)
+vaults = ["my-vault", "team-skills"]
+
 # Active providers (toggle with TUI or CLI)
 providers = ["claude-code", "opencode"]
 
@@ -1084,6 +1114,7 @@ items = ["[web-browser:1.2.0:a13c9ef042]"]
 
 ```toml
 [servers.my-server]
+name = "my-server"
 command = "npx"
 args = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
 transport = "stdio"
@@ -1100,6 +1131,7 @@ workspace = true
 
 # SSE transport example
 [servers.remote-api]
+name = "remote-api"
 command = ""
 transport = "sse"
 url = "https://api.example.com/mcp"

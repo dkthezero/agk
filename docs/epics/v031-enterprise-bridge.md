@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3.1 — "Enterprise Bridge & Profile Portability"
 
-**Status:** Draft — pending epic approval
+**Status:** Ready for planning — v0.3 Phases 1–4 complete
 **Target Date:** 3–4 weeks from kickoff
 **Epic:** [`proposals/v031-enterprise-bridge.md`](proposals/v031-enterprise-bridge.md)
 **Parent Epic:** [`v03-team-ready-profiles.md`](v03-team-ready-profiles.md)
