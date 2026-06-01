@@ -152,6 +152,7 @@ pub fn handle_edit_profile_input(
         }
         KeyCode::Char(' ') => {
             toggle_current_item(&mut es);
+            recompute_tokens(&mut es);
         }
         KeyCode::Enter => {
             // Save changes.
@@ -194,6 +195,26 @@ fn toggle_current_item(es: &mut crate::tui::app::EditProfileState) {
             }
         }
     }
+}
+
+/// Recompute the estimated token count from the currently checked skills and MCPs.
+fn recompute_tokens(es: &mut crate::tui::app::EditProfileState) {
+    let checked_text: String = es
+        .skills
+        .iter()
+        .zip(es.skills_checked.iter())
+        .filter(|(_, &checked)| checked)
+        .map(|(name, _)| name.as_str())
+        .chain(
+            es.mcps
+                .iter()
+                .zip(es.mcps_checked.iter())
+                .filter(|(_, &checked)| checked)
+                .map(|(name, _)| name.as_str()),
+        )
+        .collect::<Vec<&str>>()
+        .join(" ");
+    es.estimated_tokens = estimate_tokens(&checked_text);
 }
 
 /// Persist the edited profile back to config and trigger a reload.
