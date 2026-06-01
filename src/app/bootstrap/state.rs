@@ -138,9 +138,9 @@ pub fn build_profile_entries(config: &ConfigFile) -> Vec<ProfileEntry> {
                     .as_ref()
                     .map(|bucket| {
                         bucket.items.iter().any(|id_str| {
-                            let trimmed = id_str.trim_start_matches('[').trim_end_matches(']');
-                            let name = trimmed.split(':').next().unwrap_or(trimmed);
-                            name == p.name
+                            crate::domain::config::parse_identity(id_str)
+                                .map(|id| id.name == p.name)
+                                .unwrap_or(false)
                         })
                     })
                     .unwrap_or(false)

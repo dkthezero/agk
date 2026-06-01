@@ -1,6 +1,7 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::ConfigStorePort;
+use crate::domain::config;
 use crate::domain::profile::ProfileAssetRef;
 use crate::domain::profile::ProfileId;
 use crate::domain::profile_diff::compute_diff;
@@ -35,9 +36,10 @@ pub fn run(
     for section in config.vault_defs.values() {
         if let Some(ref profiles_bucket) = section.profiles {
             for identity_str in &profiles_bucket.items {
-                let trimmed = identity_str.trim_start_matches('[').trim_end_matches(']');
-                let name = trimmed.split(':').next().unwrap_or(trimmed);
-                if name == id.as_str() {
+                if config::parse_identity(identity_str)
+                    .map(|parsed| parsed.name == id.as_str())
+                    .unwrap_or(false)
+                {
                     found_in_vault = true;
                     break;
                 }
