@@ -42,6 +42,10 @@ pub enum CoreEvent {
     ProfileImported {
         profile_name: String,
     },
+    ProfileDiffResult {
+        profile_name: String,
+        diff: crate::domain::profile_diff::ProfileDiff,
+    },
 
     // -----------------------------------------------------------------------
     // Vaults
