@@ -101,9 +101,9 @@ pub fn render(
             };
             let desc = dm.description.as_deref().unwrap_or("").trim();
             let label = if desc.is_empty() {
-                format!("[⊘] {}", dm.name)
+                dm.name.clone()
             } else {
-                format!("[⊘] {} — {}", dm.name, desc)
+                format!("{} — {}", dm.name, desc)
             };
             rows.push(
                 Row::new(vec![

@@ -69,7 +69,10 @@ pub fn handle_review_step(
             let workspace_root = ctx.workspace_root.clone();
             let provider_cmd = provider_command(&new_config.profiles.last().unwrap().provider_id);
             let profile_dir = workspace_root.join(".agk").join("profiles").join(&name);
-            let _ = std::fs::create_dir_all(&profile_dir);
+            if let Err(e) = std::fs::create_dir_all(&profile_dir) {
+                state.status_line = format!("Failed to create profile directory: {}", e);
+                return;
+            }
 
             tokio::task::spawn_blocking(move || {
                 let _ = tx.send(AppEvent::TaskStarted {

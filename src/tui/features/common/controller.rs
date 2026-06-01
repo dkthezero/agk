@@ -110,7 +110,7 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
                 && state.list_mode == ListMode::Normal
                 && !state.profile_entries.is_empty()
             {
-                crate::tui::features::profiles::edit::enter_edit_profile(state);
+                crate::tui::features::profiles::edit::enter_edit_profile(state, ctx);
             }
             Ok(())
         }

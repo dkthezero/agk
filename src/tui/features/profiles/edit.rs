@@ -6,7 +6,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
 /// Initialize the edit-profile modal from the currently selected profile entry.
-pub fn enter_edit_profile(state: &mut AppState) {
+pub fn enter_edit_profile(state: &mut AppState, ctx: &EventContext) {
     if state.selected_index >= state.profile_entries.len() {
         state.status_line = "No profile selected".to_string();
         return;
@@ -42,13 +42,28 @@ pub fn enter_edit_profile(state: &mut AppState) {
         .map(|name| entry.mcps.iter().any(|m| m.name == *name))
         .collect();
 
-    // Permission modes: look up the current profile's permission_mode in the
-    // active config, defaulting to "default".
-    let permission_modes = vec![
-        "default".to_string(),
-        "plan".to_string(),
-        "auto-accept".to_string(),
-    ];
+    // Permission modes: resolve from the profile's provider so values match
+    // what the provider actually accepts (e.g. "acceptEdits", "auto",
+    // "dontAsk", "plan"). Fall back to a sensible default list.
+    let permission_modes = ctx
+        .core
+        .registry
+        .get_provider(&entry.provider_id)
+        .map(|p| {
+            p.available_permission_modes()
+                .into_iter()
+                .map(|(mode, _label)| mode)
+                .collect()
+        })
+        .unwrap_or_else(|_| {
+            vec![
+                "default".into(),
+                "acceptEdits".into(),
+                "auto".into(),
+                "dontAsk".into(),
+                "plan".into(),
+            ]
+        });
     let current_pm = state
         .configs
         .get(&state.active_scope)
