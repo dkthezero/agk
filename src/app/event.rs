@@ -34,6 +34,14 @@ pub enum CoreEvent {
         id: crate::domain::profile::ProfileId,
         exit_status: Option<i32>,
     },
+    ProfileExported {
+        profile_name: String,
+        content: String,
+        output_path: Option<String>,
+    },
+    ProfileImported {
+        profile_name: String,
+    },
 
     // -----------------------------------------------------------------------
     // Vaults

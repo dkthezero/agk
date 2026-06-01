@@ -113,6 +113,7 @@ mod tests {
                 tested: false,
                 tested_at: None,
                 activation: std::collections::HashMap::new(),
+                security_flags: vec![],
             })
         }
 

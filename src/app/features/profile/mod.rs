@@ -6,6 +6,8 @@ pub mod create;
 pub mod delete;
 pub mod detach_mcp;
 pub mod detach_skill;
+pub mod export;
+pub mod import;
 pub mod start;
 pub mod template;
 pub mod token_estimate;
@@ -75,6 +77,32 @@ pub fn dispatch(
             profile_id,
             mcp_id,
             crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            sink,
+        )),
+        CoreCommand::ExportProfile {
+            profile_id,
+            scope,
+            file_path,
+            resolve_vaults,
+        } => Some(export::run(
+            profile_id,
+            *scope,
+            *resolve_vaults,
+            file_path.as_deref(),
+            &core.workspace_root,
+            core.store.as_ref(),
+            sink,
+        )),
+        CoreCommand::ImportProfile {
+            file_path,
+            target_name,
+            scope,
+        } => Some(import::run(
+            std::path::Path::new(file_path),
+            target_name.clone(),
+            *scope,
+            &core.workspace_root,
             core.store.as_ref(),
             sink,
         )),

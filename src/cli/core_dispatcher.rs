@@ -76,6 +76,26 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                     },
                 })
             }
+            ProfileCommands::Export {
+                name,
+                file,
+                resolve_vaults,
+                scope,
+            } => Ok(CoreCommand::ExportProfile {
+                profile_id: ProfileId::new(name.clone()),
+                scope: scope.into_domain_scope(),
+                file_path: Some(file.clone()),
+                resolve_vaults: *resolve_vaults,
+            }),
+            ProfileCommands::Import {
+                file_path,
+                name,
+                scope,
+            } => Ok(CoreCommand::ImportProfile {
+                file_path: file_path.clone(),
+                target_name: name.clone(),
+                scope: scope.into_domain_scope(),
+            }),
         },
         Commands::Mcp { command } => match command {
             McpCommands::Add {

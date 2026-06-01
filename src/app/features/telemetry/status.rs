@@ -7,6 +7,8 @@ pub fn run(path: &Path, sink: &mut dyn CoreEventSink) -> CoreResult {
     let status = crate::domain::telemetry::TelemetryStatus {
         enabled: config.settings.enabled,
         skills_tracked: config.skills.len(),
+        templates_tracked: config.templates.len(),
+        profiles_tracked: config.profiles.len(),
         last_scan: config.settings.last_scan.clone(),
     };
     sink.on_event(CoreEvent::TelemetryStatusReport(status));

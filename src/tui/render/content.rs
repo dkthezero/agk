@@ -69,7 +69,7 @@ pub fn draw_content(frame: &mut Frame, state: &AppState, list_area: Rect, detail
                 &active_providers,
                 &state.discovered_mcps,
             );
-            mcp::render::render_detail(
+            mcp::detail::render_detail(
                 frame,
                 detail_area,
                 &state.mcp_state,

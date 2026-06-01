@@ -46,6 +46,8 @@ pub fn register(
         _ => McpTransport::Stdio,
     };
 
+    let security_flags = crate::domain::mcp_security::assess_mcp_security(command, &args_vec);
+
     let server = McpServer {
         name: name.to_string(),
         command: command.to_string(),
@@ -56,6 +58,7 @@ pub fn register(
         tested: false,
         tested_at: None,
         activation: HashMap::new(),
+        security_flags,
     };
 
     registry.servers.insert(name.to_string(), server.clone());

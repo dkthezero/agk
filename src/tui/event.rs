@@ -130,6 +130,22 @@ pub fn handle(
             .map(|_| ControlFlow::Continue);
         }
 
+        // Export profile modal
+        if matches!(state.list_mode, ListMode::ExportProfile) {
+            return crate::tui::features::profiles::controller::handle_export_profile_input(
+                state, ctx, &key,
+            )
+            .map(|_| ControlFlow::Continue);
+        }
+
+        // Import profile modal
+        if matches!(state.list_mode, ListMode::ImportProfile) {
+            return crate::tui::features::profiles::controller::handle_import_profile_input(
+                state, ctx, &key,
+            )
+            .map(|_| ControlFlow::Continue);
+        }
+
         // Confirmation modals share Enter / Esc aliases
         let in_confirm = matches!(
             state.list_mode,
@@ -239,17 +255,28 @@ pub fn handle(
                     crate::tui::features::profiles::controller::handle_delete_profile(state, ctx)?;
                 }
             }
-            KeyCode::Char('o')
+            KeyCode::Char('o') | KeyCode::Char('t')
                 if key.modifiers.contains(KeyModifiers::CONTROL)
                     && state.list_mode == ListMode::Normal =>
             {
-                crate::tui::features::common::controller::handle_open_location(state, ctx, false)?;
+                crate::tui::features::common::controller::handle_open_location(
+                    state,
+                    ctx,
+                    matches!(key.code, KeyCode::Char('t')),
+                )?;
             }
-            KeyCode::Char('t')
+            KeyCode::Char('e') | KeyCode::Char('i')
                 if key.modifiers.contains(KeyModifiers::CONTROL)
                     && state.list_mode == ListMode::Normal =>
             {
-                crate::tui::features::common::controller::handle_open_location(state, ctx, true)?;
+                let active_kind = state.tab_kinds.get(state.active_tab).copied();
+                if active_kind == Some(crate::app::tab_kind::TabKind::Profile) {
+                    if matches!(key.code, KeyCode::Char('e')) {
+                        crate::tui::features::profiles::controller::enter_export_profile(state);
+                    } else {
+                        crate::tui::features::profiles::controller::enter_import_profile(state);
+                    }
+                }
             }
             KeyCode::Char(c) => {
                 let active_kind = state.tab_kinds.get(state.active_tab).copied();

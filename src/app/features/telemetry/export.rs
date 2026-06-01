@@ -24,18 +24,91 @@ pub fn run(
     Ok(crate::app::outcome::CoreOutcome::Ok)
 }
 
-fn telemetry_to_csv(config: &AnalyticsConfig) -> String {
-    let mut lines = vec!["skill,invocations,last_used,providers".to_string()];
+pub fn telemetry_to_csv(config: &AnalyticsConfig) -> String {
+    let mut lines = vec!["category,name,count,last_used,providers".to_string()];
+
+    // Skills
     for (name, analytics) in &config.skills {
         let last = analytics.last_used.as_deref().unwrap_or("never");
         let providers = analytics.providers().join("; ");
         lines.push(format!(
-            "\"{}\",{},\"{}\",\"{}\"",
+            "skill,\"{}\",{},\"{}\",\"{}\"",
             name.replace('"', "\"\""),
             analytics.total_invocations,
             last,
             providers.replace('"', "\"\""),
         ));
     }
+
+    // Templates
+    for (name, analytics) in &config.templates {
+        let last = analytics.last_selected.as_deref().unwrap_or("never");
+        lines.push(format!(
+            "template,\"{}\",{},\"{}\",N/A",
+            name.replace('"', "\"\""),
+            analytics.selections,
+            last,
+        ));
+    }
+
+    // Profiles
+    for (name, analytics) in &config.profiles {
+        let last = analytics.last_launched.as_deref().unwrap_or("never");
+        let provider = analytics.provider.as_deref().unwrap_or("unknown");
+        lines.push(format!(
+            "profile,\"{}\",{},\"{}\",\"{}\"",
+            name.replace('"', "\"\""),
+            analytics.launches,
+            last,
+            provider.replace('"', "\"\""),
+        ));
+    }
+
     lines.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn csv_output_format_correctness() {
+        let mut config = AnalyticsConfig::default();
+        config.increment_invocation("web-browser", "claude-code");
+        config.increment_template_selection("code-reviewer");
+        config.increment_profile_launch("dev", "opencode");
+
+        let csv = telemetry_to_csv(&config);
+        let lines: Vec<&str> = csv.lines().collect();
+
+        // Header
+        assert_eq!(lines[0], "category,name,count,last_used,providers");
+
+        // Skill row
+        let skill_row = lines.iter().find(|l| l.starts_with("skill,")).unwrap();
+        assert!(skill_row.contains("web-browser"));
+        assert!(skill_row.contains("1"));
+        assert!(skill_row.contains("claude-code"));
+
+        // Template row
+        let tmpl_row = lines.iter().find(|l| l.starts_with("template,")).unwrap();
+        assert!(tmpl_row.contains("code-reviewer"));
+        assert!(tmpl_row.contains("1"));
+        assert!(tmpl_row.contains("N/A"));
+
+        // Profile row
+        let prof_row = lines.iter().find(|l| l.starts_with("profile,")).unwrap();
+        assert!(prof_row.contains("dev"));
+        assert!(prof_row.contains("1"));
+        assert!(prof_row.contains("opencode"));
+    }
+
+    #[test]
+    fn csv_empty_config_only_header() {
+        let config = AnalyticsConfig::default();
+        let csv = telemetry_to_csv(&config);
+        let lines: Vec<&str> = csv.lines().collect();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "category,name,count,last_used,providers");
+    }
 }

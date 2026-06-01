@@ -44,6 +44,21 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::ProfileSessionFinished { id, exit_status } => {
             serde_json::json!({ "type": "ProfileSessionFinished", "id": id.as_str(), "exit_status": exit_status })
         }
+        CoreEvent::ProfileExported {
+            profile_name,
+            content,
+            output_path,
+        } => {
+            serde_json::json!({
+                "type": "ProfileExported",
+                "profile_name": profile_name,
+                "content": content,
+                "output_path": output_path,
+            })
+        }
+        CoreEvent::ProfileImported { profile_name } => {
+            serde_json::json!({ "type": "ProfileImported", "profile_name": profile_name })
+        }
         CoreEvent::VaultAttached(id) => {
             serde_json::json!({ "type": "VaultAttached", "id": id })
         }
@@ -81,6 +96,14 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
                         },
                         "tested": s.tested,
                         "tested_at": s.tested_at,
+                        "security_flags": s.security_flags.iter().map(|f| {
+                            serde_json::json!({
+                                "flag": f,
+                                "severity": f.severity(),
+                                "badge": f.badge(),
+                                "description": f.description(),
+                            })
+                        }).collect::<Vec<_>>(),
                     })
                 }).collect::<Vec<_>>()
             })
@@ -144,6 +167,8 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
                 "type": "TelemetryStatusReport",
                 "enabled": status.enabled,
                 "skills_tracked": status.skills_tracked,
+                "templates_tracked": status.templates_tracked,
+                "profiles_tracked": status.profiles_tracked,
                 "last_scan": status.last_scan
             })
         }

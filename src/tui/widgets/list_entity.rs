@@ -8,7 +8,7 @@ use crate::app::snapshot::{DiscoveredProfile, ProfileEntry, ProviderEntry, Vault
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
@@ -26,13 +26,22 @@ pub fn render_vaults(frame: &mut Frame, area: Rect, vaults: &[VaultEntry], selec
         .iter()
         .map(|v| {
             let check = if v.enabled { "[x]" } else { "[ ]" };
-            ListItem::new(Line::from(format!(
-                "{} {:<20} {:<8} {}",
-                check,
-                v.id,
-                v.kind,
-                v.counts_label()
-            )))
+            let ghes_badge = if v.is_ghes {
+                vec![Span::styled(
+                    " [GHES]",
+                    Style::default()
+                        .fg(Color::Magenta)
+                        .add_modifier(Modifier::BOLD),
+                )]
+            } else {
+                vec![]
+            };
+            let mut spans = vec![
+                Span::raw(format!("{} {:<20} {:<8} ", check, v.id, v.kind)),
+                Span::raw(v.counts_label()),
+            ];
+            spans.extend(ghes_badge);
+            ListItem::new(Line::from(spans))
         })
         .collect();
     let list = List::new(items)

@@ -19,7 +19,7 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
         None => vec![Line::from("  No vault selected")],
         Some(v) => {
             let label = |s: &str| Span::styled(s.to_string(), Style::default().fg(Color::Yellow));
-            vec![
+            let mut lines = vec![
                 Line::from(vec![label("Vault ID: "), Span::raw(v.id.clone())]),
                 Line::from(vec![label("Type:     "), Span::raw(v.kind.clone())]),
                 Line::from(vec![
@@ -28,22 +28,33 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
                 ]),
                 Line::from(Span::raw("")),
                 Line::from(vec![label("Source:   "), Span::raw(v.source_path.clone())]),
-                Line::from(Span::raw("")),
-                Line::from(vec![
-                    label("Skills:       "),
-                    Span::raw(format!(
-                        "{} installed / {} available",
-                        v.installed_skills, v.available_skills
-                    )),
-                ]),
-                Line::from(vec![
-                    label("Instructions: "),
-                    Span::raw(format!(
-                        "{} installed / {} available",
-                        v.installed_instructions, v.available_instructions
-                    )),
-                ]),
-            ]
+            ];
+            if v.is_ghes {
+                lines.push(Line::from(vec![
+                    label("Enterprise: "),
+                    Span::raw(v.enterprise_url.as_deref().unwrap_or("unknown")),
+                ]));
+                lines.push(Line::from(vec![
+                    label("Token Src:  "),
+                    Span::raw(token_source_label(v)),
+                ]));
+            }
+            lines.push(Line::from(Span::raw("")));
+            lines.push(Line::from(vec![
+                label("Skills:       "),
+                Span::raw(format!(
+                    "{} installed / {} available",
+                    v.installed_skills, v.available_skills
+                )),
+            ]));
+            lines.push(Line::from(vec![
+                label("Instructions: "),
+                Span::raw(format!(
+                    "{} installed / {} available",
+                    v.installed_instructions, v.available_instructions
+                )),
+            ]));
+            lines
         }
     };
     frame.render_widget(
@@ -52,6 +63,36 @@ pub fn render_vault_detail(frame: &mut Frame, area: Rect, vault: Option<&VaultEn
             .wrap(Wrap { trim: false }),
         area,
     );
+}
+
+/// Determine a human-readable label for the token source of a GHES vault.
+///
+/// This is a best-effort display label that checks available env vars first
+/// (deterministic, no subprocess) then infers gh auth from the enterprise_url.
+/// It does NOT perfectly mirror `infra::vault::token::resolve_token` which
+/// actually runs `gh auth token` first.
+fn token_source_label(vault: &VaultEntry) -> String {
+    // This is a display-only label. The actual resolution in resolve_token()
+    // tries gh auth first, then env vars. Since we can't run gh auth during
+    // rendering, we show the most likely source based on available info.
+    if let Some(eu) = &vault.enterprise_url {
+        let host = eu
+            .strip_prefix("https://")
+            .or_else(|| eu.strip_prefix("http://"))
+            .unwrap_or(eu)
+            .split('/')
+            .next()
+            .unwrap_or(eu);
+        return format!("gh auth ({})", host);
+    }
+    // No enterprise URL: check env vars as fallback indicators
+    if std::env::var("GITHUB_TOKEN").is_ok_and(|v| !v.is_empty()) {
+        return "GITHUB_TOKEN".to_string();
+    }
+    if std::env::var("GITHUB_ENTERPRISE_TOKEN").is_ok_and(|v| !v.is_empty()) {
+        return "GITHUB_ENTERPRISE_TOKEN".to_string();
+    }
+    "none configured".to_string()
 }
 
 pub fn render_provider_detail(

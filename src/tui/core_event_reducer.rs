@@ -166,13 +166,15 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::TelemetryStatusReport(status) => {
             state.analytics_config.settings.enabled = status.enabled;
             state.status_line = format!(
-                "Telemetry: {} | Skills: {} | Last scan: {}",
+                "Telemetry: {} | Skills: {} | Templates: {} | Profiles: {} | Last scan: {}",
                 if status.enabled {
                     "enabled"
                 } else {
                     "disabled"
                 },
                 status.skills_tracked,
+                status.templates_tracked,
+                status.profiles_tracked,
                 status.last_scan.as_deref().unwrap_or("never")
             );
         }
@@ -203,6 +205,19 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         }
         CoreEvent::WorkspaceLoaded(_) => {
             state.status_line = "Workspace loaded".to_string();
+        }
+        CoreEvent::ProfileExported {
+            profile_name,
+            output_path,
+            ..
+        } => {
+            state.status_line = match output_path {
+                Some(p) => format!("Profile '{}' exported to {}", profile_name, p),
+                None => format!("Profile '{}' exported", profile_name),
+            };
+        }
+        CoreEvent::ProfileImported { profile_name } => {
+            state.status_line = format!("Profile '{}' imported", profile_name);
         }
     }
 }

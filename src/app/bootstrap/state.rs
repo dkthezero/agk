@@ -32,7 +32,7 @@ pub fn build_vault_entries(
             .unwrap_or("local")
             .to_string();
 
-        let source_path = section
+        let (source_path, is_ghes, enterprise_url) = section
             .and_then(|s| s.vault.as_ref())
             .map(|v| match v {
                 crate::domain::config::VaultConfig::Local(local) => {
@@ -40,15 +40,30 @@ pub fn build_vault_entries(
                     if p.is_relative() {
                         p = workspace_root.join(p);
                     }
-                    p.to_string_lossy().into_owned()
+                    (p.to_string_lossy().into_owned(), false, None)
                 }
                 crate::domain::config::VaultConfig::Github(github) => {
-                    format!(
-                        "https://github.com/{}/tree/{}/{}",
-                        github.repo, github.r#ref, github.path
-                    )
+                    let ghes = github.enterprise_url.is_some();
+                    let url = github.enterprise_url.clone();
+                    let display_url = if let Some(ref eu) = github.enterprise_url {
+                        format!(
+                            "{}/{}/tree/{}/{}",
+                            eu.trim_end_matches('/'),
+                            github.repo,
+                            github.r#ref,
+                            github.path
+                        )
+                    } else {
+                        format!(
+                            "https://github.com/{}/tree/{}/{}",
+                            github.repo, github.r#ref, github.path
+                        )
+                    };
+                    (display_url, ghes, url)
                 }
-                crate::domain::config::VaultConfig::Clawhub(_) => "https://clawhub.ai".to_string(),
+                crate::domain::config::VaultConfig::Clawhub(_) => {
+                    ("https://clawhub.ai".to_string(), false, None)
+                }
             })
             .unwrap_or_default();
 
@@ -86,6 +101,8 @@ pub fn build_vault_entries(
             installed_mcps,
             available_mcps,
             source_path,
+            is_ghes,
+            enterprise_url,
         });
     }
     entries

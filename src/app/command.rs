@@ -51,6 +51,17 @@ pub enum CoreCommand {
         scope: crate::domain::scope::Scope,
         dry_run: bool,
     },
+    ExportProfile {
+        profile_id: crate::domain::profile::ProfileId,
+        scope: crate::domain::scope::Scope,
+        file_path: Option<String>,
+        resolve_vaults: bool,
+    },
+    ImportProfile {
+        file_path: String,
+        target_name: Option<String>,
+        scope: crate::domain::scope::Scope,
+    },
 
     // -----------------------------------------------------------------------
     // Vault commands

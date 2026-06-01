@@ -17,6 +17,10 @@ pub struct VaultEntry {
     pub available_mcps: usize,
     /// Source path or URL for this vault (PR #5)
     pub source_path: String,
+    /// Whether this vault connects to a GitHub Enterprise Server instance
+    pub is_ghes: bool,
+    /// The enterprise URL if this is a GHES vault
+    pub enterprise_url: Option<String>,
 }
 
 impl VaultEntry {

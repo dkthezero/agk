@@ -146,14 +146,37 @@ pub fn build_vaults(
                         ));
                     }
                     crate::domain::config::VaultConfig::Github(github) => {
-                        vaults.push(Box::new(
-                            crate::infra::vault::github::GithubVaultAdapter::new(
-                                vault_id,
-                                &github.repo,
-                                &github.r#ref,
-                                &github.path,
-                            ),
-                        ));
+                        let mut adapter = crate::infra::vault::github::GithubVaultAdapter::new(
+                            vault_id,
+                            &github.repo,
+                            &github.r#ref,
+                            &github.path,
+                        );
+
+                        if let Some(ref enterprise_url) = github.enterprise_url {
+                            // Derive the API base URL from the enterprise host.
+                            // Users specify the GHES host (e.g. "https://github.example.com"),
+                            // which is used directly as the git base URL.
+                            adapter = adapter.with_base_url(enterprise_url);
+
+                            // Resolve an auth token for the GHES instance.
+                            // Extract hostname from the URL for gh auth token --hostname.
+                            let hostname = enterprise_url
+                                .strip_prefix("https://")
+                                .or_else(|| enterprise_url.strip_prefix("http://"))
+                                .unwrap_or(enterprise_url)
+                                .split('/')
+                                .next()
+                                .unwrap_or(enterprise_url);
+
+                            if let Ok(token) =
+                                crate::infra::vault::token::resolve_token(Some(hostname))
+                            {
+                                adapter = adapter.with_auth_token(token);
+                            }
+                        }
+
+                        vaults.push(Box::new(adapter));
                     }
                     crate::domain::config::VaultConfig::Clawhub(_) => {
                         vaults.push(Box::new(

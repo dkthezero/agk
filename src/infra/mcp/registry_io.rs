@@ -57,6 +57,7 @@ mod tests {
                 tested: true,
                 tested_at: Some("2026-05-01T00:00:00Z".to_string()),
                 activation: HashMap::new(),
+                security_flags: vec![],
             },
         );
         registry.save(&path).unwrap();

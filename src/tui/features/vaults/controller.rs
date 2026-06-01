@@ -95,6 +95,7 @@ pub fn handle_attach_vault_input(
                                 repo: state.pending_vault_repo.clone(),
                                 r#ref: state.pending_vault_ref.clone(),
                                 path: state.pending_vault_path.clone(),
+                                enterprise_url: None,
                             },
                         );
                         execute_attach_vault(ctx, name, vault_config);

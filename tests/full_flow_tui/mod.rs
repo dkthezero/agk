@@ -9,11 +9,15 @@
 
 mod auto_install_deps;
 mod common;
+mod ghes_vault;
 mod mcp_register;
 mod mcp_roundtrip;
+mod mcp_security;
+mod profile_export_import;
 mod provider_toggle;
 mod skill_install;
 mod sync_update;
+mod telemetry_extensions;
 mod vault_attach;
 mod vault_profile_install_start;
 mod wizard_full_flow;
