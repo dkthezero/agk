@@ -256,5 +256,21 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 team_name, installed, required, personal
             );
         }
+        CoreEvent::TeamSyncComplete {
+            vaults_attached,
+            skills_installed,
+            skills_updated,
+            skills_removed_from_team,
+            errors,
+        } => {
+            state.status_line = format!(
+                "Team sync: {} vaults attached, {} installed, {} updated, {} removed, {} errors",
+                vaults_attached.len(),
+                skills_installed.len(),
+                skills_updated.len(),
+                skills_removed_from_team.len(),
+                errors.len()
+            );
+        }
     }
 }

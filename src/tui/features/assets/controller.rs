@@ -78,6 +78,7 @@ pub fn handle_f5_update_all(state: &mut AppState, ctx: &EventContext) -> Result<
         .send(AppEvent::ExecuteCommand(CoreCommand::SyncAssets {
             scope: state.active_scope,
             dry_run: false,
+            provider: None,
         }));
     state.checked_items.clear();
     Ok(())
@@ -244,6 +245,7 @@ mod tests {
                 vault: None,
                 skills: Some(crate::domain::config::AssetBucket {
                     items: vec!["[my-skill:--:hash]".into()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

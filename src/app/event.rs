@@ -169,6 +169,13 @@ pub enum CoreEvent {
         required: usize,
         personal: usize,
     },
+    TeamSyncComplete {
+        vaults_attached: Vec<String>,
+        skills_installed: Vec<String>,
+        skills_updated: Vec<String>,
+        skills_removed_from_team: Vec<String>,
+        errors: Vec<String>,
+    },
 
     // -----------------------------------------------------------------------
     // General info

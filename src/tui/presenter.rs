@@ -225,6 +225,7 @@ mod tests {
             Arc::new(StubTaskTracker),
             std::path::PathBuf::from("."),
             Arc::new(crate::app::test_support::FakeClawHub::new()),
+            Arc::new(crate::app::test_support::FakeTeamConfigStore::new()),
         )
     }
 

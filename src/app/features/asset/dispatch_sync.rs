@@ -17,6 +17,45 @@ pub(super) fn sync_assets_cmd(
         name: "Syncing assets".into(),
     });
 
+    // --- Team-aware sync: if team.toml is present, merge team vaults ---
+    let _team_sync_result = {
+        let team_config = core.team_config_store.load(scope).unwrap_or_default();
+        if !team_config.name.is_empty() || !team_config.vaults.is_empty() {
+            let mut config = match core.store.load(scope) {
+                Ok(c) => c,
+                Err(e) => {
+                    sink.on_event(CoreEvent::TaskFailed {
+                        id: 0,
+                        error: format!("Failed to load config for team sync: {}", e),
+                    });
+                    return Ok(CoreOutcome::Ok);
+                }
+            };
+            let result = super::sync_team::sync_team_config(&team_config, &mut config, dry_run);
+            if !dry_run {
+                if let Err(e) = core.store.save(scope, &config) {
+                    sink.on_event(CoreEvent::TaskFailed {
+                        id: 0,
+                        error: format!("Failed to save config after team sync: {}", e),
+                    });
+                    return Ok(CoreOutcome::Ok);
+                }
+            }
+            // Emit team sync result event
+            sink.on_event(CoreEvent::TeamSyncComplete {
+                vaults_attached: result.vaults_attached.clone(),
+                skills_installed: result.skills_installed.clone(),
+                skills_updated: result.skills_updated.clone(),
+                skills_removed_from_team: result.skills_removed_from_team.clone(),
+                errors: result.errors.clone(),
+            });
+            Some(result)
+        } else {
+            None
+        }
+    };
+
+    // --- Regular sync ---
     let config = match core.store.load(scope) {
         Ok(c) => c,
         Err(e) => {

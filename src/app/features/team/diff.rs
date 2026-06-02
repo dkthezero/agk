@@ -285,6 +285,7 @@ mod tests {
         let mut section = crate::domain::config::VaultSection::default();
         section.skills = Some(crate::domain::config::AssetBucket {
             items: vec!["react-conventions:1.0.0:abc123".to_string()],
+            source: None,
         });
         installed.vault_defs.insert("shared".to_string(), section);
 

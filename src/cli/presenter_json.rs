@@ -233,6 +233,22 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
                 "personal": personal
             })
         }
+        CoreEvent::TeamSyncComplete {
+            vaults_attached,
+            skills_installed,
+            skills_updated,
+            skills_removed_from_team,
+            errors,
+        } => {
+            serde_json::json!({
+                "type": "TeamSyncComplete",
+                "vaults_attached": vaults_attached,
+                "skills_installed": skills_installed,
+                "skills_updated": skills_updated,
+                "skills_removed_from_team": skills_removed_from_team,
+                "errors": errors
+            })
+        }
         CoreEvent::TaskPhaseChanged {
             id,
             phase,

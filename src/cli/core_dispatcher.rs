@@ -166,13 +166,14 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             McpCommands::List { provider: _ } => Ok(CoreCommand::ListMcp),
             McpCommands::Test { name } => Ok(CoreCommand::TestMcp { name: name.clone() }),
         },
-        Commands::Sync { global, dry_run } => Ok(CoreCommand::SyncAssets {
+        Commands::Sync { global, dry_run, provider } => Ok(CoreCommand::SyncAssets {
             scope: if *global {
                 Scope::Global
             } else {
                 Scope::Workspace
             },
             dry_run: *dry_run,
+            provider: provider.clone(),
         }),
         Commands::Install {
             identity,

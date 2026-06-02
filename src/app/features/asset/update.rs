@@ -130,6 +130,7 @@ mod tests {
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[my-skill:--:old_sha_old]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

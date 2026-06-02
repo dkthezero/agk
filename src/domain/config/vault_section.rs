@@ -26,6 +26,10 @@ pub struct VaultSection {
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct AssetBucket {
     pub items: Vec<String>, // "[name:version:sha10]" strings
+    /// Whether this bucket is team-mandated or personal.  Defaults to
+    /// `Personal` when absent for backward compatibility.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<AssetSource>,
 }
 
 impl super::ConfigFile {

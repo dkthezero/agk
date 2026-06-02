@@ -3,6 +3,7 @@ pub mod pack;
 pub mod remove;
 pub mod search_remote;
 pub mod sync;
+pub mod sync_team;
 pub mod update;
 pub mod validate;
 
@@ -81,8 +82,13 @@ pub fn dispatch(
             core,
             sink,
         )),
-        CoreCommand::SyncAssets { scope, dry_run } => {
+        CoreCommand::SyncAssets { scope, dry_run, provider: _ } => {
             Some(sync_assets_cmd(*scope, *dry_run, core, sink))
+        }
+        CoreCommand::SyncTeam { provider: _ } => {
+            // Delegated from SyncAssets when team.toml is present.
+            // The actual team-sync logic runs inside sync_assets_cmd.
+            Some(sync_assets_cmd(crate::domain::scope::Scope::Workspace, false, core, sink))
         }
         _ => None,
     }

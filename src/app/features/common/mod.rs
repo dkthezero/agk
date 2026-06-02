@@ -81,7 +81,7 @@ mod tests {
             "b".to_string(),
             VaultSection {
                 vault: None,
-                skills: Some(AssetBucket { items: vec![] }),
+                skills: Some(AssetBucket { items: vec![], source: None }),
                 instructions: None,
                 mcps: None,
                 profiles: None,
@@ -94,6 +94,7 @@ mod tests {
                 skills: None,
                 instructions: Some(AssetBucket {
                     items: vec!["[i:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 mcps: None,
                 profiles: None,

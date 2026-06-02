@@ -127,6 +127,7 @@ mod tests {
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,
@@ -169,6 +170,7 @@ mod tests {
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

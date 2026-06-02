@@ -272,6 +272,7 @@ type = "clawhub"
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

@@ -240,6 +240,43 @@ impl CoreEventSink for CliPresenter {
                     team_name, installed, required, personal
                 ));
             }
+            CoreEvent::TeamSyncComplete {
+                vaults_attached,
+                skills_installed,
+                skills_updated,
+                skills_removed_from_team,
+                errors,
+            } => {
+                if !vaults_attached.is_empty() {
+                    self.print(&format!(
+                        "Team vaults attached: {}",
+                        vaults_attached.join(", ")
+                    ));
+                }
+                if !skills_installed.is_empty() {
+                    self.print(&format!(
+                        "Team skills installed: {}",
+                        skills_installed.join(", ")
+                    ));
+                }
+                if !skills_updated.is_empty() {
+                    self.print(&format!(
+                        "Team skills updated: {}",
+                        skills_updated.join(", ")
+                    ));
+                }
+                if !skills_removed_from_team.is_empty() {
+                    self.print(&format!(
+                        "Team skills removed from requirements: {}",
+                        skills_removed_from_team.join(", ")
+                    ));
+                }
+                if !errors.is_empty() {
+                    for err in errors {
+                        self.eprint(&format!("Team sync error: {}", err));
+                    }
+                }
+            }
             CoreEvent::ProfileExported {
                 profile_name,
                 content,

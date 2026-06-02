@@ -88,6 +88,7 @@ mod tests {
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[x:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

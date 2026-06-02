@@ -11,6 +11,7 @@ fn sync_assets_updates_status_line() {
     let cmd = CoreCommand::SyncAssets {
         scope: Scope::Workspace,
         dry_run: false,
+        provider: None,
     };
 
     // Sync may return an error if no vaults are configured; we still assert

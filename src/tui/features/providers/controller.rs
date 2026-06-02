@@ -266,6 +266,7 @@ mod tests {
                 vault: None,
                 skills: Some(crate::domain::config::AssetBucket {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,
