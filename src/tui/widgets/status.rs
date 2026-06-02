@@ -14,6 +14,7 @@ pub fn render(
     keybinds: &str,
     scope_label: &str,
     progress: Option<&str>,
+    team_status: Option<&str>,
 ) {
     let status_text = if !status.is_empty() {
         status.to_string()
@@ -23,7 +24,7 @@ pub fn render(
         String::new()
     };
 
-    let line_spans: Vec<Span> = if keybinds.is_empty() {
+    let mut line_spans: Vec<Span> = if keybinds.is_empty() {
         vec![Span::styled(scope_label, Style::default().fg(Color::Green))]
     } else {
         std::iter::once(Span::styled(scope_label, Style::default().fg(Color::Green)))
@@ -31,6 +32,17 @@ pub fn render(
             .chain(color_keybinds(keybinds))
             .collect()
     };
+
+    // Append team status badge if available
+    if let Some(ts) = team_status {
+        if !ts.is_empty() {
+            line_spans.push(Span::raw("  "));
+            line_spans.push(Span::styled(
+                ts.to_string(),
+                Style::default().fg(Color::Cyan),
+            ));
+        }
+    }
 
     let line1 = Line::from(line_spans);
 

@@ -111,6 +111,11 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
                 && !state.profile_entries.is_empty()
             {
                 crate::tui::features::profiles::edit::enter_edit_profile(state, ctx);
+            } else if state.tab_kinds.get(state.active_tab)
+                == Some(&crate::app::tab_kind::TabKind::Asset)
+                && state.list_mode == ListMode::Normal
+            {
+                crate::tui::features::assets::controller::handle_f3_toggle_team(state, ctx)?;
             }
             Ok(())
         }

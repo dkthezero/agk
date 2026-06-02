@@ -49,7 +49,7 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
     } else {
         match active_kind {
             TabKind::Asset => {
-                "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F5] Update All  [F4] Refresh  [Ctrl+O] Open Folder  [Ctrl+T] Terminal  [type] Search  [Esc]x2 Quit"
+                "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F3] Team  [F5] Update All  [F4] Refresh  [Ctrl+O] Open Folder  [Ctrl+T] Terminal  [type] Search  [Esc]x2 Quit"
             }
             TabKind::Provider => {
                 "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F4] Refresh  [Esc]x2 Quit"

@@ -1,5 +1,6 @@
 use crate::app::tab_kind::TabKind;
 use crate::domain::asset::{AssetKind, ScannedPackage};
+use crate::domain::config::vault_section::AssetSource;
 use crate::domain::config::{AssetKey, ConfigFile};
 use crate::domain::scope::Scope;
 use crate::tui::list_mode::ListMode;
@@ -279,6 +280,46 @@ impl AppState {
 
     pub fn is_profile_wizard_mode(&self) -> bool {
         matches!(self.list_mode, ListMode::ProfileWizard)
+    }
+
+    /// Compute a team status summary for the active scope config.
+    ///
+    /// Returns `Some((installed, required, personal))` if any vault section
+    /// has a team source; `None` if no team-mandated assets exist.
+    pub fn team_status(&self) -> Option<(usize, usize, usize)> {
+        let config = self.active_config();
+        let mut team_installed = 0usize;
+        let mut team_required = 0usize;
+        let mut personal = 0usize;
+
+        for section in config.vault_defs.values() {
+            for bucket in [
+                section.skills.as_ref(),
+                section.instructions.as_ref(),
+                section.mcps.as_ref(),
+                section.profiles.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                let count = bucket.items.len();
+                match bucket.source.as_ref().unwrap_or(&AssetSource::Personal) {
+                    AssetSource::Team => {
+                        team_required += count;
+                        team_installed += count; // items in the bucket are installed
+                    }
+                    AssetSource::Personal => {
+                        personal += count;
+                    }
+                }
+            }
+        }
+
+        if team_required > 0 {
+            Some((team_installed, team_required, personal))
+        } else {
+            None
+        }
     }
 }
 
