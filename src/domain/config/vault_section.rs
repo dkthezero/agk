@@ -1,6 +1,18 @@
 use crate::domain::identity::AssetIdentity;
 use serde::{Deserialize, Serialize};
 
+/// Tag indicating whether an installed asset is team-mandated or personal.
+/// Stored as `source = "team"` or `source = "personal"` in config.toml.
+/// When absent, defaults to "personal" (backward compatible).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum AssetSource {
+    #[default]
+    #[serde(rename = "personal")]
+    Personal,
+    #[serde(rename = "team")]
+    Team,
+}
+
 /// Intermediate serde type for `[<id>.vault]` and `[<id>.skills]` / `[<id>.instructions]`
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct VaultSection {
@@ -189,5 +201,28 @@ impl super::ConfigFile {
         } else {
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asset_source_default_is_personal() {
+        let source: AssetSource = Default::default();
+        assert_eq!(source, AssetSource::Personal);
+    }
+
+    #[test]
+    fn asset_source_serializes_to_string() {
+        assert_eq!(
+            serde_json::to_string(&AssetSource::Team).unwrap(),
+            "\"team\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AssetSource::Personal).unwrap(),
+            "\"personal\""
+        );
     }
 }
