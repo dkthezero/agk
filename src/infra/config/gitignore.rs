@@ -97,8 +97,7 @@ mod tests {
         GitignoreManager::ensure_config_gitignore(dir.path()).unwrap();
         GitignoreManager::ensure_config_gitignore(dir.path()).unwrap();
 
-        let content =
-            std::fs::read_to_string(dir.path().join(".agk").join(".gitignore")).unwrap();
+        let content = std::fs::read_to_string(dir.path().join(".agk").join(".gitignore")).unwrap();
         let count = content.matches("config.toml").count();
         assert_eq!(count, 1);
     }

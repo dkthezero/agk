@@ -240,7 +240,8 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
             state.status_line = format!("Requirement '{}' added to team configuration", identity);
         }
         CoreEvent::TeamRequirementRemoved(identity) => {
-            state.status_line = format!("Requirement '{}' removed from team configuration", identity);
+            state.status_line =
+                format!("Requirement '{}' removed from team configuration", identity);
         }
         CoreEvent::TeamDiffResult { summary } => {
             state.status_line = summary.clone();

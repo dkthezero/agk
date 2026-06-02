@@ -12,6 +12,12 @@ pub struct FakeTeamConfigStore {
     global: Mutex<TeamConfig>,
 }
 
+impl Default for FakeTeamConfigStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeTeamConfigStore {
     pub fn new() -> Self {
         Self {

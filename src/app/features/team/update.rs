@@ -10,7 +10,8 @@ pub struct TeamUpdateResult {
 /// This is a stub — git-pull logic for team.toml updates will be implemented later.
 pub fn team_update(_workspace_root: &PathBuf) -> Result<TeamUpdateResult> {
     Ok(TeamUpdateResult {
-        message: "Team update is not yet implemented. Pull team.toml changes manually for now.".to_string(),
+        message: "Team update is not yet implemented. Pull team.toml changes manually for now."
+            .to_string(),
     })
 }
 

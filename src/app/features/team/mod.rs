@@ -44,13 +44,8 @@ pub fn dispatch(
             url,
             branch,
         } => {
-            let result = add::team_add_vault(
-                &core.workspace_root,
-                identity,
-                vault_type,
-                url,
-                branch,
-            );
+            let result =
+                add::team_add_vault(&core.workspace_root, identity, vault_type, url, branch);
             match result {
                 Ok(add_result) => {
                     sink.on_event(crate::app::event::CoreEvent::TeamVaultAdded(

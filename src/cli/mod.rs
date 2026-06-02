@@ -3,6 +3,7 @@ pub mod entry;
 pub mod entry_subcommands;
 pub mod presenter;
 pub mod presenter_json;
+pub mod presenter_sink;
 
 // ---------------------------------------------------------------------------
 // CLI exit codes

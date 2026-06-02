@@ -75,13 +75,19 @@ url = "https://github.com/acme/security-base"
         let manifest: VaultManifest = toml::from_str(toml_str).unwrap();
 
         assert_eq!(manifest.name, "enterprise-vault");
-        assert_eq!(manifest.description.as_deref(), Some("Internal enterprise skill vault"));
+        assert_eq!(
+            manifest.description.as_deref(),
+            Some("Internal enterprise skill vault")
+        );
         assert_eq!(manifest.version.as_deref(), Some("2.3.1"));
         assert_eq!(manifest.dependencies.len(), 2);
 
         assert_eq!(manifest.dependencies[0].identity, "core-lib");
         assert_eq!(manifest.dependencies[0].dep_type, "github");
-        assert_eq!(manifest.dependencies[0].url, "https://github.com/acme/core-lib");
+        assert_eq!(
+            manifest.dependencies[0].url,
+            "https://github.com/acme/core-lib"
+        );
 
         assert_eq!(manifest.dependencies[1].identity, "security-base");
         assert_eq!(manifest.dependencies[1].dep_type, "github");

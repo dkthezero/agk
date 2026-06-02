@@ -1,6 +1,6 @@
 use crate::domain::team::TeamConfig;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct TeamInitResult {
     pub name: String,
@@ -12,7 +12,7 @@ pub struct TeamInitResult {
 ///
 /// If the file already exists, returns idempotently with `created: false`.
 /// When `dry_run` is true, no files are written.
-pub fn team_init(workspace_root: &PathBuf, name: &str, dry_run: bool) -> Result<TeamInitResult> {
+pub fn team_init(workspace_root: &Path, name: &str, dry_run: bool) -> Result<TeamInitResult> {
     let agk_dir = workspace_root.join(".agk");
     let team_toml_path = agk_dir.join("team.toml");
 

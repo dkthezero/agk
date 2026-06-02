@@ -4,7 +4,7 @@ use crate::domain::scope::Scope;
 use crate::domain::team::{TeamConfig, TeamRequirement, TeamVault};
 use crate::infra::config::team_store::TeamTomlStore;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct TeamAddVaultResult {
     pub identity: String,
@@ -15,13 +15,13 @@ pub struct TeamAddVaultResult {
 ///
 /// Creates `team.toml` with defaults if it does not exist yet.
 pub fn team_add_vault(
-    workspace_root: &PathBuf,
+    workspace_root: &Path,
     identity: &str,
     vault_type: &str,
     url: &str,
     branch: &str,
 ) -> Result<TeamAddVaultResult> {
-    let store = TeamTomlStore::new(workspace_root.clone());
+    let store = TeamTomlStore::new(workspace_root.to_path_buf());
     let mut config = ensure_config(&store);
 
     // Check for duplicate
@@ -57,13 +57,13 @@ pub struct TeamAddRequirementResult {
 ///
 /// Creates `team.toml` with defaults if it does not exist yet.
 pub fn team_add_requirement(
-    workspace_root: &PathBuf,
+    workspace_root: &Path,
     identity: &str,
     vault: &str,
     kind: &str,
     version_constraint: Option<&str>,
 ) -> Result<TeamAddRequirementResult> {
-    let store = TeamTomlStore::new(workspace_root.clone());
+    let store = TeamTomlStore::new(workspace_root.to_path_buf());
     let mut config = ensure_config(&store);
 
     // Parse asset kind
@@ -125,7 +125,14 @@ mod tests {
         // Initialize team first
         crate::app::features::team::init::team_init(&workspace, "test-team", false).unwrap();
 
-        let result = team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        let result = team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
         assert!(result.message.contains("added"));
 
         // Reload and verify
@@ -141,9 +148,23 @@ mod tests {
         let workspace = dir.path().to_path_buf();
 
         crate::app::features::team::init::team_init(&workspace, "test-team", false).unwrap();
-        team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
 
-        let result = team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        let result = team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
         assert!(result.message.contains("already exists"));
     }
 
@@ -153,9 +174,17 @@ mod tests {
         let workspace = dir.path().to_path_buf();
 
         crate::app::features::team::init::team_init(&workspace, "test-team", false).unwrap();
-        team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
 
-        let result = team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
+        let result =
+            team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
         assert!(result.message.contains("added"));
 
         // Reload and verify
@@ -173,13 +202,30 @@ mod tests {
         let workspace = dir.path().to_path_buf();
 
         crate::app::features::team::init::team_init(&workspace, "test-team", false).unwrap();
-        team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
 
-        team_add_requirement(&workspace, "security-scan", "shared", "instruction", Some(">=2.0.0")).unwrap();
+        team_add_requirement(
+            &workspace,
+            "security-scan",
+            "shared",
+            "instruction",
+            Some(">=2.0.0"),
+        )
+        .unwrap();
 
         let store = TeamTomlStore::new(workspace);
         let config = store.load(Scope::Workspace).unwrap();
-        assert_eq!(config.requirements[0].version_constraint.as_deref(), Some(">=2.0.0"));
+        assert_eq!(
+            config.requirements[0].version_constraint.as_deref(),
+            Some(">=2.0.0")
+        );
     }
 
     #[test]
@@ -188,10 +234,18 @@ mod tests {
         let workspace = dir.path().to_path_buf();
 
         crate::app::features::team::init::team_init(&workspace, "test-team", false).unwrap();
-        team_add_vault(&workspace, "shared", "github", "https://github.com/org/skills", "main").unwrap();
+        team_add_vault(
+            &workspace,
+            "shared",
+            "github",
+            "https://github.com/org/skills",
+            "main",
+        )
+        .unwrap();
         team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
 
-        let result = team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
+        let result =
+            team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
         assert!(result.message.contains("already exists"));
     }
 }

@@ -17,7 +17,11 @@ pub fn team_badge(source: &AssetSource) -> Span<'static> {
 
 /// Render the team status bar line: `[Team] X/Y check | Z personal`
 pub fn team_status_line(installed: usize, required: usize, personal: usize) -> String {
-    let check = if installed == required { "\u{2713}" } else { "\u{2717}" };
+    let check = if installed == required {
+        "\u{2713}"
+    } else {
+        "\u{2717}"
+    };
     format!(
         "[Team] {}/{} {} | {} personal",
         installed, required, check, personal

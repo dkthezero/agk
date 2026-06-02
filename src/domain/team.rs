@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::domain::asset::AssetKind;
+use serde::{Deserialize, Serialize};
 
 fn default_branch() -> String {
     "main".to_string()
@@ -119,7 +119,10 @@ version_constraint = ">=2.0.0"
         let config: TeamConfig = toml::from_str(toml_str).unwrap();
 
         assert_eq!(config.name, "enterprise-team");
-        assert_eq!(config.source.as_deref(), Some("https://github.com/acme/team-config"));
+        assert_eq!(
+            config.source.as_deref(),
+            Some("https://github.com/acme/team-config")
+        );
         assert_eq!(config.vaults.len(), 2);
 
         assert_eq!(config.vaults[0].identity, "shared-lib");

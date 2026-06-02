@@ -4,7 +4,7 @@ use crate::domain::scope::Scope;
 use crate::infra::config::team_store::TeamTomlStore;
 use crate::infra::config::toml_store::TomlConfigStore;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct TeamStatusResult {
     pub team_name: String,
@@ -24,8 +24,8 @@ impl TeamStatusResult {
 
 /// Count how many team requirements are installed vs total, and how many
 /// personal (non-team) assets are present.
-pub fn team_status(workspace_root: &PathBuf) -> Result<TeamStatusResult> {
-    let team_store = TeamTomlStore::new(workspace_root.clone());
+pub fn team_status(workspace_root: &Path) -> Result<TeamStatusResult> {
+    let team_store = TeamTomlStore::new(workspace_root.to_path_buf());
     let team_config = team_store.load(Scope::Workspace)?;
 
     if team_config.name.is_empty() {
@@ -43,7 +43,11 @@ pub fn team_status(workspace_root: &PathBuf) -> Result<TeamStatusResult> {
     let config_store = TomlConfigStore::standard(workspace_root);
     let installed_config = config_store.load(Scope::Workspace).unwrap_or_default();
 
-    let team_vault_ids: Vec<String> = team_config.vaults.iter().map(|v| v.identity.clone()).collect();
+    let team_vault_ids: Vec<String> = team_config
+        .vaults
+        .iter()
+        .map(|v| v.identity.clone())
+        .collect();
 
     let mut installed_count = 0;
     for req in &team_config.requirements {
@@ -63,7 +67,11 @@ pub fn team_status(workspace_root: &PathBuf) -> Result<TeamStatusResult> {
     })
 }
 
-fn is_requirement_installed(config: &crate::domain::config::ConfigFile, identity: &str, vault_ids: &[String]) -> bool {
+fn is_requirement_installed(
+    config: &crate::domain::config::ConfigFile,
+    identity: &str,
+    vault_ids: &[String],
+) -> bool {
     for vault_id in vault_ids {
         if let Some(section) = config.vault_defs.get(vault_id) {
             if let Some(ref bucket) = section.skills {
@@ -91,7 +99,10 @@ fn is_requirement_installed(config: &crate::domain::config::ConfigFile, identity
     false
 }
 
-fn count_personal_assets(config: &crate::domain::config::ConfigFile, team_vault_ids: &[String]) -> usize {
+fn count_personal_assets(
+    config: &crate::domain::config::ConfigFile,
+    team_vault_ids: &[String],
+) -> usize {
     let mut count = 0;
     for (vault_id, section) in &config.vault_defs {
         if team_vault_ids.contains(vault_id) {

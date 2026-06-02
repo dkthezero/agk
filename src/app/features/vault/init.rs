@@ -1,6 +1,6 @@
 use crate::domain::vault_manifest::VaultManifest;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct VaultInitResult {
     pub name: String,
@@ -10,7 +10,7 @@ pub struct VaultInitResult {
 
 /// Initialize a vault repo with .agk/vault.toml and standard asset folders.
 pub fn vault_init(
-    workspace_root: &PathBuf,
+    workspace_root: &Path,
     name: Option<String>,
     dry_run: bool,
 ) -> Result<VaultInitResult> {
@@ -36,7 +36,10 @@ pub fn vault_init(
         return Ok(VaultInitResult {
             name: vault_name.clone(),
             created: false,
-            message: format!("Would initialize vault '{}' with standard folders.", vault_name),
+            message: format!(
+                "Would initialize vault '{}' with standard folders.",
+                vault_name
+            ),
         });
     }
 
@@ -69,6 +72,7 @@ pub fn vault_init(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn init_creates_vault_toml_and_folders() {

@@ -8,7 +8,7 @@
 //! - Flag previously-Team assets that are no longer in team requirements
 
 use crate::domain::asset::AssetKind;
-use crate::domain::config::{AssetBucket, AssetSource, ConfigFile, VaultConfig, VaultSection};
+use crate::domain::config::{AssetBucket, AssetSource, ConfigFile, VaultConfig};
 use crate::domain::team::TeamConfig;
 
 /// Statistics returned by `sync_team_config`.
@@ -59,14 +59,14 @@ pub fn sync_team_config(
             result.vaults_attached.push(vault.identity.clone());
             if !dry_run {
                 config.vaults.push(vault.identity.clone());
-                let section = config
-                    .vault_defs
-                    .entry(vault.identity.clone())
-                    .or_insert_with(VaultSection::default);
+                let section = config.vault_defs.entry(vault.identity.clone()).or_default();
                 if section.vault.is_none() {
                     section.vault = Some(VaultConfig::Github(
                         crate::domain::config::GithubVaultSource {
-                            repo: vault.url.trim_start_matches("https://github.com/").to_string(),
+                            repo: vault
+                                .url
+                                .trim_start_matches("https://github.com/")
+                                .to_string(),
                             r#ref: vault.branch.clone(),
                             path: vault.path.clone().unwrap_or_default(),
                             enterprise_url: None,
@@ -116,10 +116,7 @@ pub fn sync_team_config(
             continue;
         }
 
-        let section = config
-            .vault_defs
-            .entry(req.vault.clone())
-            .or_insert_with(VaultSection::default);
+        let section = config.vault_defs.entry(req.vault.clone()).or_default();
         let bucket = match req.kind {
             AssetKind::Skill => &mut section.skills,
             AssetKind::Instruction => &mut section.instructions,
@@ -171,10 +168,7 @@ pub fn sync_team_config(
 
     for (vault_id, section) in &config.vault_defs {
         // Only check team vaults
-        let is_team_vault = team_config
-            .vaults
-            .iter()
-            .any(|v| v.identity == *vault_id);
+        let is_team_vault = team_config.vaults.iter().any(|v| v.identity == *vault_id);
         if !is_team_vault {
             continue;
         }
@@ -205,7 +199,7 @@ pub fn sync_team_config(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::config::GithubVaultSource;
+    use crate::domain::config::{GithubVaultSource, VaultSection};
     use crate::domain::team::{TeamRequirement, TeamVault};
 
     fn make_team_vault(identity: &str, url: &str, branch: &str) -> TeamVault {
@@ -287,7 +281,11 @@ mod tests {
             name: "test-team".to_string(),
             source: None,
             branch: None,
-            vaults: vec![make_team_vault("shared", "https://github.com/org/skills", "main")],
+            vaults: vec![make_team_vault(
+                "shared",
+                "https://github.com/org/skills",
+                "main",
+            )],
             requirements: vec![],
         };
         let mut config = ConfigFile::default();
@@ -322,7 +320,11 @@ mod tests {
             name: "test-team".to_string(),
             source: None,
             branch: Some("main".to_string()),
-            vaults: vec![make_team_vault("shared", "https://github.com/org/skills", "main")],
+            vaults: vec![make_team_vault(
+                "shared",
+                "https://github.com/org/skills",
+                "main",
+            )],
             requirements: vec![
                 make_team_requirement("security-scan", "shared", AssetKind::Skill),
                 make_team_requirement("compliance", "shared", AssetKind::Instruction),
@@ -333,7 +335,9 @@ mod tests {
         let result = sync_team_config(&team, &mut config, false);
 
         assert_eq!(result.skills_installed.len(), 2);
-        assert!(result.skills_installed.contains(&"security-scan".to_string()));
+        assert!(result
+            .skills_installed
+            .contains(&"security-scan".to_string()));
         assert!(result.skills_installed.contains(&"compliance".to_string()));
 
         // Check the skills bucket is tagged as Team
@@ -354,7 +358,11 @@ mod tests {
             name: "test-team".to_string(),
             source: None,
             branch: Some("main".to_string()),
-            vaults: vec![make_team_vault("shared", "https://github.com/org/skills", "main")],
+            vaults: vec![make_team_vault(
+                "shared",
+                "https://github.com/org/skills",
+                "main",
+            )],
             requirements: vec![
                 // Only "security-scan" is required; "old-skill" is no longer listed
                 make_team_requirement("security-scan", "shared", AssetKind::Skill),
@@ -382,7 +390,9 @@ mod tests {
 
         let result = sync_team_config(&team, &mut config, false);
 
-        assert!(result.skills_removed_from_team.contains(&"old-skill".to_string()));
+        assert!(result
+            .skills_removed_from_team
+            .contains(&"old-skill".to_string()));
     }
 
     // -----------------------------------------------------------------------
@@ -394,7 +404,11 @@ mod tests {
             name: "test-team".to_string(),
             source: None,
             branch: Some("main".to_string()),
-            vaults: vec![make_team_vault("shared", "https://github.com/org/skills", "main")],
+            vaults: vec![make_team_vault(
+                "shared",
+                "https://github.com/org/skills",
+                "main",
+            )],
             requirements: vec![make_team_requirement(
                 "security-scan",
                 "shared",
@@ -423,7 +437,11 @@ mod tests {
             name: "test-team".to_string(),
             source: None,
             branch: Some("main".to_string()),
-            vaults: vec![make_team_vault("shared", "https://github.com/org/skills", "main")],
+            vaults: vec![make_team_vault(
+                "shared",
+                "https://github.com/org/skills",
+                "main",
+            )],
             requirements: vec![make_team_requirement(
                 "security-scan",
                 "shared",
@@ -453,6 +471,8 @@ mod tests {
         let result = sync_team_config(&team, &mut config, false);
 
         assert!(result.skills_updated.contains(&"security-scan".to_string()));
-        assert!(!result.skills_installed.contains(&"security-scan".to_string()));
+        assert!(!result
+            .skills_installed
+            .contains(&"security-scan".to_string()));
     }
 }

@@ -2,7 +2,7 @@ use crate::app::ports::TeamConfigStorePort;
 use crate::domain::scope::Scope;
 use crate::infra::config::team_store::TeamTomlStore;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct TeamRemoveResult {
     pub identity: String,
@@ -13,21 +13,22 @@ pub struct TeamRemoveResult {
 /// Remove a skill requirement from the team configuration by identity.
 ///
 /// If no matching requirement is found, returns `removed: false` with an informative message.
-pub fn team_remove_requirement(workspace_root: &PathBuf, identity: &str) -> Result<TeamRemoveResult> {
-    let store = TeamTomlStore::new(workspace_root.clone());
+pub fn team_remove_requirement(workspace_root: &Path, identity: &str) -> Result<TeamRemoveResult> {
+    let store = TeamTomlStore::new(workspace_root.to_path_buf());
     let mut config = store.load(Scope::Workspace)?;
 
     let before = config.requirements.len();
-    config
-        .requirements
-        .retain(|r| r.identity != identity);
+    config.requirements.retain(|r| r.identity != identity);
     let after = config.requirements.len();
 
     if before == after {
         return Ok(TeamRemoveResult {
             identity: identity.to_string(),
             removed: false,
-            message: format!("Requirement '{}' not found in team configuration.", identity),
+            message: format!(
+                "Requirement '{}' not found in team configuration.",
+                identity
+            ),
         });
     }
 
@@ -36,7 +37,10 @@ pub fn team_remove_requirement(workspace_root: &PathBuf, identity: &str) -> Resu
     Ok(TeamRemoveResult {
         identity: identity.to_string(),
         removed: true,
-        message: format!("Requirement '{}' removed from team configuration.", identity),
+        message: format!(
+            "Requirement '{}' removed from team configuration.",
+            identity
+        ),
     })
 }
 
@@ -46,8 +50,8 @@ mod tests {
     use crate::domain::asset::AssetKind;
     use crate::domain::team::{TeamConfig, TeamRequirement, TeamVault};
 
-    fn setup_team_with_requirements(workspace: &PathBuf) -> TeamTomlStore {
-        let store = TeamTomlStore::new(workspace.clone());
+    fn setup_team_with_requirements(workspace: &Path) -> TeamTomlStore {
+        let store = TeamTomlStore::new(workspace.to_path_buf());
         let config = TeamConfig {
             name: "test-team".to_string(),
             source: None,

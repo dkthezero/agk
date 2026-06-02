@@ -6,16 +6,25 @@ use ratatui::{
     Frame,
 };
 
-pub fn render(
-    frame: &mut Frame,
-    area: Rect,
-    status: &str,
-    search: &str,
-    keybinds: &str,
-    scope_label: &str,
-    progress: Option<&str>,
-    team_status: Option<&str>,
-) {
+/// Parameters for the status bar rendering.
+pub struct StatusParams<'a> {
+    pub status: &'a str,
+    pub search: &'a str,
+    pub keybinds: &'a str,
+    pub scope_label: &'a str,
+    pub progress: Option<&'a str>,
+    pub team_status: Option<&'a str>,
+}
+
+pub fn render(frame: &mut Frame, area: Rect, params: StatusParams<'_>) {
+    let StatusParams {
+        status,
+        search,
+        keybinds,
+        scope_label,
+        progress,
+        team_status,
+    } = params;
     let status_text = if !status.is_empty() {
         status.to_string()
     } else if !search.is_empty() {

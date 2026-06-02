@@ -1,10 +1,16 @@
 use crate::app::ports::VaultManifestStorePort;
 use crate::domain::vault_manifest::VaultManifest;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub struct VaultManifestTomlStore {
     lock: std::sync::Mutex<()>,
+}
+
+impl Default for VaultManifestTomlStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl VaultManifestTomlStore {
@@ -16,7 +22,7 @@ impl VaultManifestTomlStore {
 }
 
 impl VaultManifestStorePort for VaultManifestTomlStore {
-    fn load(&self, path: &PathBuf) -> Result<VaultManifest> {
+    fn load(&self, path: &Path) -> Result<VaultManifest> {
         let _guard = self
             .lock
             .lock()
@@ -32,7 +38,7 @@ impl VaultManifestStorePort for VaultManifestTomlStore {
         Ok(manifest)
     }
 
-    fn save(&self, path: &PathBuf, manifest: &VaultManifest) -> Result<()> {
+    fn save(&self, path: &Path, manifest: &VaultManifest) -> Result<()> {
         let _guard = self
             .lock
             .lock()

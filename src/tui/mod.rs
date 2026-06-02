@@ -1,5 +1,7 @@
 pub mod app;
+pub mod app_queries;
 pub mod core_event_reducer;
+pub mod edit_profile_state;
 pub mod entry;
 pub mod event;
 pub mod features;

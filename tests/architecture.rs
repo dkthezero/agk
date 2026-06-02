@@ -476,7 +476,10 @@ fn domain_must_not_use_io_or_async_crates() {
             let mut violations = Vec::new();
             for line in stripped.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("*") {
+                if trimmed.starts_with("//")
+                    || trimmed.starts_with("///")
+                    || trimmed.starts_with("*")
+                {
                     continue;
                 }
                 // Match `use std::io`, `use tokio`, `use reqwest`, and

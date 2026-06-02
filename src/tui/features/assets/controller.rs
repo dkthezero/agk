@@ -103,18 +103,12 @@ pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result
         let config = state.active_config();
         let section = config.vault_defs.get(&vault_id);
         let bucket = match pkg.kind {
-            crate::domain::asset::AssetKind::Skill => {
-                section.and_then(|s| s.skills.as_ref())
-            }
+            crate::domain::asset::AssetKind::Skill => section.and_then(|s| s.skills.as_ref()),
             crate::domain::asset::AssetKind::Instruction => {
                 section.and_then(|s| s.instructions.as_ref())
             }
-            crate::domain::asset::AssetKind::McpServer => {
-                section.and_then(|s| s.mcps.as_ref())
-            }
-            crate::domain::asset::AssetKind::Profile => {
-                section.and_then(|s| s.profiles.as_ref())
-            }
+            crate::domain::asset::AssetKind::McpServer => section.and_then(|s| s.mcps.as_ref()),
+            crate::domain::asset::AssetKind::Profile => section.and_then(|s| s.profiles.as_ref()),
         };
         bucket
             .and_then(|b| b.source.clone())
@@ -124,21 +118,23 @@ pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result
     match current_source {
         AssetSource::Personal => {
             // Toggle to Team: add as a team requirement
-            let _ = ctx.tx.send(AppEvent::ExecuteCommand(
-                CoreCommand::TeamAddRequirement {
+            let _ = ctx
+                .tx
+                .send(AppEvent::ExecuteCommand(CoreCommand::TeamAddRequirement {
                     identity: name.clone(),
                     vault: vault_id.clone(),
                     kind: kind_str.to_string(),
                     version_constraint: None,
-                },
-            ));
+                }));
             state.status_line = format!("Toggled '{}' to Team", name);
         }
         AssetSource::Team => {
             // Toggle to Personal: remove from team requirements
-            let _ = ctx.tx.send(AppEvent::ExecuteCommand(CoreCommand::TeamRemove {
-                identity: name.clone(),
-            }));
+            let _ = ctx
+                .tx
+                .send(AppEvent::ExecuteCommand(CoreCommand::TeamRemove {
+                    identity: name.clone(),
+                }));
             state.status_line = format!("Toggled '{}' to Personal", name);
         }
     }

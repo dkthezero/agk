@@ -6,7 +6,7 @@ use crate::domain::team::TeamConfig;
 use crate::infra::config::team_store::TeamTomlStore;
 use crate::infra::config::toml_store::TomlConfigStore;
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// A single diff entry comparing team requirements against installed state.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,13 +45,33 @@ impl TeamDiffResult {
         let mut lines = Vec::new();
         for entry in &self.entries {
             match entry {
-                DiffEntry::Missing { identity, vault, kind } => {
-                    lines.push(format!("  MISSING  {} (kind: {}, vault: {})", identity, kind, vault));
+                DiffEntry::Missing {
+                    identity,
+                    vault,
+                    kind,
+                } => {
+                    lines.push(format!(
+                        "  MISSING  {} (kind: {}, vault: {})",
+                        identity, kind, vault
+                    ));
                 }
-                DiffEntry::Extra { identity, vault, kind } => {
-                    lines.push(format!("  EXTRA    {} (kind: {}, vault: {})", identity, kind, vault));
+                DiffEntry::Extra {
+                    identity,
+                    vault,
+                    kind,
+                } => {
+                    lines.push(format!(
+                        "  EXTRA    {} (kind: {}, vault: {})",
+                        identity, kind, vault
+                    ));
                 }
-                DiffEntry::Outdated { identity, vault, kind, expected, actual } => {
+                DiffEntry::Outdated {
+                    identity,
+                    vault,
+                    kind,
+                    expected,
+                    actual,
+                } => {
                     lines.push(format!(
                         "  OUTDATED {} (kind: {}, vault: {}) expected: {}, actual: {}",
                         identity, kind, vault, expected, actual
@@ -59,7 +79,11 @@ impl TeamDiffResult {
                 }
             }
         }
-        format!("Team diff ({} differences):\n{}", self.entries.len(), lines.join("\n"))
+        format!(
+            "Team diff ({} differences):\n{}",
+            self.entries.len(),
+            lines.join("\n")
+        )
     }
 }
 
@@ -68,8 +92,8 @@ impl TeamDiffResult {
 /// - Missing: required by team but not installed
 /// - Extra: installed from a team vault but not in requirements
 /// - Outdated: installed but with a different version
-pub fn team_diff(workspace_root: &PathBuf) -> Result<TeamDiffResult> {
-    let team_store = TeamTomlStore::new(workspace_root.clone());
+pub fn team_diff(workspace_root: &Path) -> Result<TeamDiffResult> {
+    let team_store = TeamTomlStore::new(workspace_root.to_path_buf());
     let team_config = team_store.load(Scope::Workspace)?;
 
     // If team config is empty/default, there's nothing to diff
@@ -95,7 +119,9 @@ fn compute_diff(team: &TeamConfig, installed: &ConfigFile) -> Vec<DiffEntry> {
 
     // Check for missing requirements
     for req in &team.requirements {
-        let installed_entry = installed_from_team_vaults.iter().find(|(id, _)| *id == req.identity);
+        let installed_entry = installed_from_team_vaults
+            .iter()
+            .find(|(id, _)| *id == req.identity);
         if let Some((_, info)) = installed_entry {
             // Check version constraint mismatch
             if let (Some(expected), Some(actual)) = (&req.version_constraint, &info.version) {
@@ -119,7 +145,11 @@ fn compute_diff(team: &TeamConfig, installed: &ConfigFile) -> Vec<DiffEntry> {
     }
 
     // Check for extra installed assets from team vaults not in requirements
-    let required_identities: Vec<String> = team.requirements.iter().map(|r| r.identity.clone()).collect();
+    let required_identities: Vec<String> = team
+        .requirements
+        .iter()
+        .map(|r| r.identity.clone())
+        .collect();
     for (id, info) in &installed_from_team_vaults {
         if !required_identities.contains(id) {
             entries.push(DiffEntry::Extra {
@@ -273,7 +303,10 @@ mod tests {
         let result = compute_diff(&team, &installed);
         assert!(result.len() >= 2); // both requirements are missing
 
-        let missing: Vec<&DiffEntry> = result.iter().filter(|e| matches!(e, DiffEntry::Missing { .. })).collect();
+        let missing: Vec<&DiffEntry> = result
+            .iter()
+            .filter(|e| matches!(e, DiffEntry::Missing { .. }))
+            .collect();
         assert_eq!(missing.len(), 2);
     }
 
@@ -282,18 +315,25 @@ mod tests {
         let team = make_team_config();
         let mut installed = ConfigFile::default();
         // Add a matching installed skill
-        let mut section = crate::domain::config::VaultSection::default();
-        section.skills = Some(crate::domain::config::AssetBucket {
-            items: vec!["react-conventions:1.0.0:abc123".to_string()],
-            source: None,
-        });
+        let section = crate::domain::config::VaultSection {
+            skills: Some(crate::domain::config::AssetBucket {
+                items: vec!["react-conventions:1.0.0:abc123".to_string()],
+                source: None,
+            }),
+            ..crate::domain::config::VaultSection::default()
+        };
         installed.vault_defs.insert("shared".to_string(), section);
 
         let result = compute_diff(&team, &installed);
         // react-conventions is installed, security-scan is still missing
-        let missing: Vec<&DiffEntry> = result.iter().filter(|e| matches!(e, DiffEntry::Missing { .. })).collect();
+        let missing: Vec<&DiffEntry> = result
+            .iter()
+            .filter(|e| matches!(e, DiffEntry::Missing { .. }))
+            .collect();
         assert_eq!(missing.len(), 1);
-        assert!(matches!(&missing[0], DiffEntry::Missing { identity, .. } if identity == "security-scan"));
+        assert!(
+            matches!(&missing[0], DiffEntry::Missing { identity, .. } if identity == "security-scan")
+        );
     }
 
     #[test]
@@ -307,14 +347,26 @@ mod tests {
 
     #[test]
     fn parse_identity_from_item_works() {
-        assert_eq!(parse_identity_from_item("[my-skill:1.0.0:abc123]"), Some("my-skill".to_string()));
-        assert_eq!(parse_identity_from_item("[my-skill::abc123]"), Some("my-skill".to_string()));
-        assert_eq!(parse_identity_from_item("plain-name"), Some("plain-name".to_string()));
+        assert_eq!(
+            parse_identity_from_item("[my-skill:1.0.0:abc123]"),
+            Some("my-skill".to_string())
+        );
+        assert_eq!(
+            parse_identity_from_item("[my-skill::abc123]"),
+            Some("my-skill".to_string())
+        );
+        assert_eq!(
+            parse_identity_from_item("plain-name"),
+            Some("plain-name".to_string())
+        );
     }
 
     #[test]
     fn parse_version_from_item_works() {
-        assert_eq!(parse_version_from_item("[my-skill:1.0.0:abc123]"), Some("1.0.0".to_string()));
+        assert_eq!(
+            parse_version_from_item("[my-skill:1.0.0:abc123]"),
+            Some("1.0.0".to_string())
+        );
         assert_eq!(parse_version_from_item("[my-skill::abc123]"), None);
     }
 

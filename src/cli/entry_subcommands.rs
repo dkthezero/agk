@@ -260,10 +260,10 @@ pub enum TeamCommands {
         /// Vault identity
         identity: String,
         /// Vault type (github, local, clawhub)
-        #[arg(short, long, default_value = "github")]
+        #[arg(long, default_value = "github")]
         vault_type: String,
         /// Vault URL
-        #[arg(short, long)]
+        #[arg(long)]
         url: String,
         /// Branch
         #[arg(short, long, default_value = "main")]
@@ -274,13 +274,13 @@ pub enum TeamCommands {
         /// Skill identity (e.g., acme-org/react-conventions)
         identity: String,
         /// Vault to install from
-        #[arg(short, long)]
+        #[arg(long)]
         vault: String,
         /// Asset kind
-        #[arg(short, long, default_value = "skill")]
+        #[arg(long, default_value = "skill")]
         kind: String,
         /// Version constraint (e.g., >= 2.0.0)
-        #[arg(short, long)]
+        #[arg(long)]
         version_constraint: Option<String>,
     },
     /// Remove a skill requirement from the team

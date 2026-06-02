@@ -170,8 +170,9 @@ fn build_core(
     let task_tracker: Arc<dyn agk::app::ports::TaskTrackerPort> =
         Arc::new(agk::infra::task_tracker::InMemoryTaskTracker::new());
 
-    let team_config_store: Arc<dyn agk::app::ports::TeamConfigStorePort> =
-        Arc::new(agk::infra::config::team_store::TeamTomlStore::new(workspace.to_path_buf()));
+    let team_config_store: Arc<dyn agk::app::ports::TeamConfigStorePort> = Arc::new(
+        agk::infra::config::team_store::TeamTomlStore::new(workspace.to_path_buf()),
+    );
 
     let core = AgkCore::new(
         store_arc.clone(),
