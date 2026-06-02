@@ -456,6 +456,57 @@ fn domain_must_not_use_fs() {
     );
 }
 
+/// Domain purity (async / network): no `std::io`, `tokio`, or `reqwest`
+/// imports may appear in `src/domain/` outside `#[cfg(test)]` modules.
+/// Domain types must be pure data + validation — async runtime and HTTP
+/// client concerns belong in infra/ behind a port.
+///
+/// Covers new domain files: team.rs, vault_manifest.rs, and the AssetSource
+/// addition in config/vault_section.rs.
+#[test]
+#[ignore]
+fn domain_must_not_use_io_or_async_crates() {
+    let files = collect_rust_files("domain");
+    let forbidden = ["std::io", "tokio", "reqwest"];
+    let mut all_violations = Vec::new();
+    for path in &files {
+        let text = read_file(path);
+        let stripped = strip_cfg_test_modules(&text);
+        for needle in &forbidden {
+            let mut violations = Vec::new();
+            for line in stripped.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("*") {
+                    continue;
+                }
+                // Match `use std::io`, `use tokio`, `use reqwest`, and
+                // inline references like `tokio::spawn` or `reqwest::get`.
+                if trimmed.starts_with("use ") && trimmed.contains(needle) {
+                    violations.push(format!("  {}", trimmed));
+                } else if !trimmed.starts_with("use ") && trimmed.contains(needle) {
+                    // Also catch inline uses like `tokio::spawn(...)` or
+                    // `std::io::Read` in trait bounds.
+                    violations.push(format!("  {}", trimmed));
+                }
+            }
+            if !violations.is_empty() {
+                all_violations.push(format!(
+                    "{}: {}\n{}",
+                    path.strip_prefix("src/").unwrap_or(path).display(),
+                    needle,
+                    violations.join("\n")
+                ));
+            }
+        }
+    }
+    assert!(
+        all_violations.is_empty(),
+        "Domain purity violation: async / I/O crate references found in domain/ outside #[cfg(test)].\n\
+         Domain must be pure: async runtime and HTTP client concerns belong in infra/, behind a port.\n{}",
+        all_violations.join("\n")
+    );
+}
+
 /// Rule 7: File size lint — no non-test `.rs` source file should exceed
 /// ~300 lines of business logic.  This prevents "god files".
 ///

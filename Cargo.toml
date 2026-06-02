@@ -22,6 +22,10 @@ path = "src/main.rs"
 name = "full_flow_tui"
 path = "tests/full_flow_tui/mod.rs"
 
+[[test]]
+name = "integration_team_sync"
+path = "tests/integration/team_sync.rs"
+
 [features]
 default = ["tui", "vault-clawhub", "pack", "provider-opencode", "provider-claude", "provider-github", "provider-gemini", "provider-amp", "provider-firebender", "provider-letta", "provider-snowflake"]
 headless = []
