@@ -135,6 +135,12 @@ pub enum Commands {
         command: VaultCommands,
     },
 
+    /// Manage team configuration
+    Team {
+        #[command(subcommand)]
+        command: TeamCommands,
+    },
+
     /// Debug / observability commands (hidden in help)
     #[command(hide = true)]
     Debug {
@@ -148,8 +154,8 @@ pub enum Commands {
 // file-size compliance and are re-exported here so caller paths
 // (`crate::cli::entry::ProfileCommands`, …) continue to resolve.
 pub use crate::cli::entry_subcommands::{
-    ContextCommands, DebugCommands, McpCommands, ProfileCommands, TelemetryCommands,
-    VaultCommands,
+    ContextCommands, DebugCommands, McpCommands, ProfileCommands, TeamCommands,
+    TelemetryCommands, VaultCommands,
 };
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

@@ -230,5 +230,31 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 state.status_line = format!("Profile '{}' matches vault source", profile_name);
             }
         }
+        CoreEvent::TeamInitialized(name) => {
+            state.status_line = format!("Team '{}' initialized", name);
+        }
+        CoreEvent::TeamVaultAdded(identity) => {
+            state.status_line = format!("Vault '{}' added to team configuration", identity);
+        }
+        CoreEvent::TeamRequirementAdded(identity) => {
+            state.status_line = format!("Requirement '{}' added to team configuration", identity);
+        }
+        CoreEvent::TeamRequirementRemoved(identity) => {
+            state.status_line = format!("Requirement '{}' removed from team configuration", identity);
+        }
+        CoreEvent::TeamDiffResult { summary } => {
+            state.status_line = summary.clone();
+        }
+        CoreEvent::TeamStatusResult {
+            team_name,
+            installed,
+            required,
+            personal,
+        } => {
+            state.status_line = format!(
+                "Team '{}' status: {}/{} requirements installed, {} personal assets",
+                team_name, installed, required, personal
+            );
+        }
     }
 }

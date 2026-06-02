@@ -204,8 +204,34 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::Info(msg) => {
             serde_json::json!({ "type": "Info", "message": msg })
         }
-        CoreEvent::Error(msg) => {
-            serde_json::json!({ "type": "Error", "message": msg })
+        CoreEvent::TeamInitialized(name) => {
+            serde_json::json!({ "type": "TeamInitialized", "name": name })
+        }
+        CoreEvent::TeamVaultAdded(identity) => {
+            serde_json::json!({ "type": "TeamVaultAdded", "identity": identity })
+        }
+        CoreEvent::TeamRequirementAdded(identity) => {
+            serde_json::json!({ "type": "TeamRequirementAdded", "identity": identity })
+        }
+        CoreEvent::TeamRequirementRemoved(identity) => {
+            serde_json::json!({ "type": "TeamRequirementRemoved", "identity": identity })
+        }
+        CoreEvent::TeamDiffResult { summary } => {
+            serde_json::json!({ "type": "TeamDiffResult", "summary": summary })
+        }
+        CoreEvent::TeamStatusResult {
+            team_name,
+            installed,
+            required,
+            personal,
+        } => {
+            serde_json::json!({
+                "type": "TeamStatusResult",
+                "team_name": team_name,
+                "installed": installed,
+                "required": required,
+                "personal": personal
+            })
         }
         CoreEvent::TaskPhaseChanged {
             id,
@@ -223,6 +249,9 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         }
         CoreEvent::WorkspaceLoaded(_) => {
             serde_json::json!({ "type": "WorkspaceLoaded" })
+        }
+        CoreEvent::Error(msg) => {
+            serde_json::json!({ "type": "Error", "message": msg })
         }
     }
 }

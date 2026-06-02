@@ -1,7 +1,7 @@
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
-use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TelemetryCommands, VaultCommands};
+use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TeamCommands, TelemetryCommands, VaultCommands};
 use crate::cli::presenter::CliPresenter;
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
@@ -278,6 +278,40 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 name: name.clone(),
                 dry_run: *dry_run,
             }),
+        },
+        Commands::Team { command } => match command {
+            TeamCommands::Init { name, dry_run } => Ok(CoreCommand::TeamInit {
+                name: name.clone(),
+                dry_run: *dry_run,
+            }),
+            TeamCommands::AddVault {
+                identity,
+                vault_type,
+                url,
+                branch,
+            } => Ok(CoreCommand::TeamAddVault {
+                identity: identity.clone(),
+                vault_type: vault_type.clone(),
+                url: url.clone(),
+                branch: branch.clone(),
+            }),
+            TeamCommands::Add {
+                identity,
+                vault,
+                kind,
+                version_constraint,
+            } => Ok(CoreCommand::TeamAddRequirement {
+                identity: identity.clone(),
+                vault: vault.clone(),
+                kind: kind.clone(),
+                version_constraint: version_constraint.clone(),
+            }),
+            TeamCommands::Remove { identity } => Ok(CoreCommand::TeamRemove {
+                identity: identity.clone(),
+            }),
+            TeamCommands::Diff => Ok(CoreCommand::TeamDiff),
+            TeamCommands::Status => Ok(CoreCommand::TeamStatus),
+            TeamCommands::Update => Ok(CoreCommand::TeamUpdate),
         },
     }
 }

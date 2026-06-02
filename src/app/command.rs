@@ -204,6 +204,32 @@ pub enum CoreCommand {
     DebugDumpTrace,
 
     // -----------------------------------------------------------------------
+    // Team commands
+    // -----------------------------------------------------------------------
+    TeamInit {
+        name: String,
+        dry_run: bool,
+    },
+    TeamAddVault {
+        identity: String,
+        vault_type: String,
+        url: String,
+        branch: String,
+    },
+    TeamAddRequirement {
+        identity: String,
+        vault: String,
+        kind: String,
+        version_constraint: Option<String>,
+    },
+    TeamRemove {
+        identity: String,
+    },
+    TeamDiff,
+    TeamStatus,
+    TeamUpdate,
+
+    // -----------------------------------------------------------------------
     // Workspace commands
     // -----------------------------------------------------------------------
     CleanWorkspace {

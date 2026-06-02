@@ -75,6 +75,9 @@ impl AgkCore {
         if let Some(r) = crate::app::features::vault::dispatch(&command, self, sink) {
             return r;
         }
+        if let Some(r) = crate::app::features::team::dispatch(&command, self, sink) {
+            return r;
+        }
         if let Some(r) = crate::app::features::context::dispatch(&command, self, sink) {
             return r;
         }

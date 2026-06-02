@@ -214,6 +214,32 @@ impl CoreEventSink for CliPresenter {
             CoreEvent::Info(msg) => {
                 self.print(msg);
             }
+            CoreEvent::TeamInitialized(name) => {
+                self.print(&format!("Team '{}' initialized", name));
+            }
+            CoreEvent::TeamVaultAdded(identity) => {
+                self.print(&format!("Vault '{}' added to team configuration", identity));
+            }
+            CoreEvent::TeamRequirementAdded(identity) => {
+                self.print(&format!("Requirement '{}' added to team configuration", identity));
+            }
+            CoreEvent::TeamRequirementRemoved(identity) => {
+                self.print(&format!("Requirement '{}' removed from team configuration", identity));
+            }
+            CoreEvent::TeamDiffResult { summary } => {
+                self.print(summary);
+            }
+            CoreEvent::TeamStatusResult {
+                team_name,
+                installed,
+                required,
+                personal,
+            } => {
+                self.print(&format!(
+                    "Team '{}' status: {}/{} requirements installed, {} personal assets",
+                    team_name, installed, required, personal
+                ));
+            }
             CoreEvent::ProfileExported {
                 profile_name,
                 content,

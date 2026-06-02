@@ -154,6 +154,23 @@ pub enum CoreEvent {
     },
 
     // -----------------------------------------------------------------------
+    // Team
+    // -----------------------------------------------------------------------
+    TeamInitialized(String),
+    TeamVaultAdded(String),
+    TeamRequirementAdded(String),
+    TeamRequirementRemoved(String),
+    TeamDiffResult {
+        summary: String,
+    },
+    TeamStatusResult {
+        team_name: String,
+        installed: usize,
+        required: usize,
+        personal: usize,
+    },
+
+    // -----------------------------------------------------------------------
     // General info
     // -----------------------------------------------------------------------
     Info(String),
