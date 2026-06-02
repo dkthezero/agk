@@ -104,6 +104,9 @@ impl CoreEventSink for CliPresenter {
             CoreEvent::VaultDetached(id) => {
                 self.print(&format!("Vault '{}' detached", id));
             }
+            CoreEvent::VaultInitialized(name) => {
+                self.print(&format!("Vault '{}' initialized", name));
+            }
             CoreEvent::McpRegistered(name) => {
                 self.print(&format!("MCP server '{}' registered", name));
             }

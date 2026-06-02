@@ -1,6 +1,7 @@
 pub mod attach;
 pub mod command;
 pub mod detach;
+pub mod init;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -69,6 +70,27 @@ pub fn dispatch(
                 sink.on_error(format!("Vault refresh issues: {}", errs.join(", ")));
             }
             Some(Ok(CoreOutcome::Ok))
+        }
+        CoreCommand::VaultInit { name, dry_run } => {
+            let result = init::vault_init(&core.workspace_root, name.clone(), *dry_run);
+            match result {
+                Ok(init_result) => {
+                    if init_result.created {
+                        sink.on_event(crate::app::event::CoreEvent::VaultInitialized(
+                            init_result.name.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            init_result.message.clone(),
+                        ));
+                    }
+                    Some(Ok(CoreOutcome::Ok))
+                }
+                Err(e) => {
+                    sink.on_error(format!("Vault init failed: {}", e));
+                    Some(Ok(CoreOutcome::Ok))
+                }
+            }
         }
         _ => None,
     }

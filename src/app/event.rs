@@ -53,6 +53,7 @@ pub enum CoreEvent {
     VaultAttached(String),
     VaultDetached(String),
     VaultRefreshed(String),
+    VaultInitialized(String),
 
     // -----------------------------------------------------------------------
     // Providers

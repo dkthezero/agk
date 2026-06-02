@@ -77,6 +77,9 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::VaultRefreshed(id) => {
             state.status_line = format!("Vault '{}' refreshed", id);
         }
+        CoreEvent::VaultInitialized(name) => {
+            state.status_line = format!("Vault '{}' initialized", name);
+        }
         CoreEvent::ProviderActivated(id) => {
             state.status_line = format!("Provider '{}' activated", id);
         }

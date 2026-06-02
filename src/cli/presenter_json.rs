@@ -84,6 +84,9 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::VaultRefreshed(id) => {
             serde_json::json!({ "type": "VaultRefreshed", "id": id })
         }
+        CoreEvent::VaultInitialized(name) => {
+            serde_json::json!({ "type": "VaultInitialized", "name": name })
+        }
         CoreEvent::ProviderActivated(id) => {
             serde_json::json!({ "type": "ProviderActivated", "id": id })
         }

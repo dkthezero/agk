@@ -85,6 +85,10 @@ pub enum CoreCommand {
         vault_id: String,
     },
     RefreshAllVaults,
+    VaultInit {
+        name: Option<String>,
+        dry_run: bool,
+    },
 
     // -----------------------------------------------------------------------
     // Provider commands

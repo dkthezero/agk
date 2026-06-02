@@ -1,7 +1,7 @@
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
-use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TelemetryCommands};
+use crate::cli::entry::{Cli, Commands, McpCommands, ProfileCommands, TelemetryCommands, VaultCommands};
 use crate::cli::presenter::CliPresenter;
 use crate::domain::profile::ProfileId;
 use crate::domain::scope::Scope;
@@ -272,6 +272,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             crate::cli::entry::DebugCommands::Tasks => Ok(CoreCommand::DebugListTasks),
             crate::cli::entry::DebugCommands::Hangs => Ok(CoreCommand::DebugDetectHangs),
             crate::cli::entry::DebugCommands::Trace => Ok(CoreCommand::DebugDumpTrace),
+        },
+        Commands::Vault { command } => match command {
+            VaultCommands::Init { name, dry_run } => Ok(CoreCommand::VaultInit {
+                name: name.clone(),
+                dry_run: *dry_run,
+            }),
         },
     }
 }

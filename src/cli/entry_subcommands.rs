@@ -229,3 +229,17 @@ pub enum DebugCommands {
     /// Dump current trace span tree (requires observability feature)
     Trace,
 }
+
+#[derive(Subcommand, Debug)]
+pub enum VaultCommands {
+    /// Initialize a vault repo with .agk/vault.toml and standard asset folders
+    Init {
+        /// Vault name (defaults to folder name)
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Only show what would change, without modifying anything
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
