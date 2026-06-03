@@ -2,7 +2,7 @@ use crate::app::command::CoreCommand;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{
     ClawHubPort, ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort,
-    ProfileRuntimePort, TaskTrackerPort, VaultSearchPort,
+    ProfileRuntimePort, TaskTrackerPort, TeamConfigStorePort, VaultSearchPort,
 };
 use crate::app::registry::Registry;
 use std::collections::HashMap;
@@ -29,6 +29,7 @@ pub struct AgkCore {
     pub task_tracker: Arc<dyn TaskTrackerPort>,
     pub workspace_root: std::path::PathBuf,
     pub clawhub: Arc<dyn ClawHubPort>,
+    pub team_config_store: Arc<dyn TeamConfigStorePort>,
 }
 
 impl AgkCore {
@@ -44,6 +45,7 @@ impl AgkCore {
         task_tracker: Arc<dyn TaskTrackerPort>,
         workspace_root: std::path::PathBuf,
         clawhub: Arc<dyn ClawHubPort>,
+        team_config_store: Arc<dyn TeamConfigStorePort>,
     ) -> Self {
         Self {
             store,
@@ -56,6 +58,7 @@ impl AgkCore {
             task_tracker,
             workspace_root,
             clawhub,
+            team_config_store,
         }
     }
 
@@ -73,6 +76,9 @@ impl AgkCore {
             return r;
         }
         if let Some(r) = crate::app::features::vault::dispatch(&command, self, sink) {
+            return r;
+        }
+        if let Some(r) = crate::app::features::team::dispatch(&command, self, sink) {
             return r;
         }
         if let Some(r) = crate::app::features::context::dispatch(&command, self, sink) {
@@ -309,6 +315,7 @@ mod tests {
             Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
             Arc::new(crate::app::test_support::FakeClawHub::new()),
+            Arc::new(crate::app::test_support::FakeTeamConfigStore::new()),
         )
     }
 
@@ -327,6 +334,7 @@ mod tests {
             Arc::new(crate::infra::task_tracker::InMemoryTaskTracker::new()),
             std::path::PathBuf::from("."),
             Arc::new(crate::app::test_support::FakeClawHub::new()),
+            Arc::new(crate::app::test_support::FakeTeamConfigStore::new()),
         )
     }
 

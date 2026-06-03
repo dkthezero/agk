@@ -10,5 +10,7 @@ pub mod profile;
 pub mod profile_diff;
 pub mod profile_export;
 pub mod scope;
+pub mod team;
 pub mod telemetry;
 pub mod validation;
+pub mod vault_manifest;

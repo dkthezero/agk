@@ -1,6 +1,7 @@
 pub mod attach;
 pub mod command;
 pub mod detach;
+pub mod init;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -41,10 +42,7 @@ pub fn dispatch(
                     ));
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Failed to attach vault '{}': {}", vault_id, e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::RefreshAllVaults => {
@@ -52,8 +50,7 @@ pub fn dispatch(
             let rt = match tokio::runtime::Runtime::new() {
                 Ok(rt) => rt,
                 Err(e) => {
-                    sink.on_error(format!("Failed to create runtime for vault refresh: {}", e));
-                    return Some(Ok(CoreOutcome::Ok));
+                    return Some(Err(e.into()));
                 }
             };
             for vault in &core.registry.vaults {
@@ -65,10 +62,31 @@ pub fn dispatch(
                 sink.on_event(crate::app::event::CoreEvent::Info(
                     "All vaults refreshed".into(),
                 ));
+                Some(Ok(CoreOutcome::Ok))
             } else {
-                sink.on_error(format!("Vault refresh issues: {}", errs.join(", ")));
+                Some(Err(anyhow::anyhow!(
+                    "Vault refresh issues: {}",
+                    errs.join(", ")
+                )))
             }
-            Some(Ok(CoreOutcome::Ok))
+        }
+        CoreCommand::VaultInit { name, dry_run } => {
+            let result = init::vault_init(&core.workspace_root, name.clone(), *dry_run);
+            match result {
+                Ok(init_result) => {
+                    if init_result.created {
+                        sink.on_event(crate::app::event::CoreEvent::VaultInitialized(
+                            init_result.name.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            init_result.message.clone(),
+                        ));
+                    }
+                    Some(Ok(CoreOutcome::Ok))
+                }
+                Err(e) => Some(Err(e)),
+            }
         }
         _ => None,
     }

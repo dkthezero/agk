@@ -3,6 +3,30 @@ use crate::app::core::AgkCore;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::domain::config::ConfigFile;
 
+/// Parse "[name:version:sha10]" format -> extract name (identity).
+///
+/// This extracts just the identity portion, avoiding substring-match bugs
+/// where e.g. "sec" would falsely match "[security-scan:1.0.0:abc123]".
+pub fn parse_identity_from_item(item: &str) -> Option<String> {
+    let item = item.trim_start_matches('[').trim_end_matches(']');
+    let parts: Vec<&str> = item.split(':').collect();
+    if parts.is_empty() {
+        return None;
+    }
+    Some(parts[0].to_string())
+}
+
+/// Parse "[name:version:sha10]" format -> extract version.
+pub fn parse_version_from_item(item: &str) -> Option<String> {
+    let item = item.trim_start_matches('[').trim_end_matches(']');
+    let parts: Vec<&str> = item.split(':').collect();
+    if parts.len() >= 2 && !parts[1].is_empty() {
+        Some(parts[1].to_string())
+    } else {
+        None
+    }
+}
+
 /// Remove empty vault sections / asset buckets so the TOML stays clean.
 pub fn prune_empty_vault_defs(config: &mut ConfigFile) {
     config.vault_defs.retain(|_id, section| {
@@ -81,7 +105,10 @@ mod tests {
             "b".to_string(),
             VaultSection {
                 vault: None,
-                skills: Some(AssetBucket { items: vec![] }),
+                skills: Some(AssetBucket {
+                    items: vec![],
+                    source: None,
+                }),
                 instructions: None,
                 mcps: None,
                 profiles: None,
@@ -94,6 +121,7 @@ mod tests {
                 skills: None,
                 instructions: Some(AssetBucket {
                     items: vec!["[i:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 mcps: None,
                 profiles: None,
@@ -105,5 +133,39 @@ mod tests {
         assert!(config.vault_defs.contains_key("a"));
         assert!(!config.vault_defs.contains_key("b"));
         assert!(config.vault_defs.contains_key("c"));
+    }
+
+    #[test]
+    fn parse_identity_from_item_works() {
+        assert_eq!(
+            parse_identity_from_item("[my-skill:1.0.0:abc123]"),
+            Some("my-skill".to_string())
+        );
+        assert_eq!(
+            parse_identity_from_item("[my-skill::abc123]"),
+            Some("my-skill".to_string())
+        );
+        assert_eq!(
+            parse_identity_from_item("plain-name"),
+            Some("plain-name".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_identity_no_substring_match() {
+        // "sec" must NOT match "security-scan" - exact identity match only
+        let item = "[security-scan:1.0.0:abc123]";
+        let identity = parse_identity_from_item(item).unwrap();
+        assert_ne!(identity, "sec");
+        assert_eq!(identity, "security-scan");
+    }
+
+    #[test]
+    fn parse_version_from_item_works() {
+        assert_eq!(
+            parse_version_from_item("[my-skill:1.0.0:abc123]"),
+            Some("1.0.0".to_string())
+        );
+        assert_eq!(parse_version_from_item("[my-skill::abc123]"), None);
     }
 }

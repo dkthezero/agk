@@ -53,6 +53,7 @@ pub enum CoreEvent {
     VaultAttached(String),
     VaultDetached(String),
     VaultRefreshed(String),
+    VaultInitialized(String),
 
     // -----------------------------------------------------------------------
     // Providers
@@ -150,6 +151,30 @@ pub enum CoreEvent {
     TelemetryExported {
         content: String,
         output_path: Option<String>,
+    },
+
+    // -----------------------------------------------------------------------
+    // Team
+    // -----------------------------------------------------------------------
+    TeamInitialized(String),
+    TeamVaultAdded(String),
+    TeamRequirementAdded(String),
+    TeamRequirementRemoved(String),
+    TeamDiffResult {
+        summary: String,
+    },
+    TeamStatusResult {
+        team_name: String,
+        installed: usize,
+        required: usize,
+        personal: usize,
+    },
+    TeamSyncComplete {
+        vaults_attached: Vec<String>,
+        skills_installed: Vec<String>,
+        skills_updated: Vec<String>,
+        skills_removed_from_team: Vec<String>,
+        errors: Vec<String>,
     },
 
     // -----------------------------------------------------------------------

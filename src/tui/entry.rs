@@ -12,6 +12,7 @@ pub fn build_state(
     workspace_root: &std::path::Path,
     global_config: crate::domain::config::ConfigFile,
     workspace_config: crate::domain::config::ConfigFile,
+    team_config: Option<crate::domain::team::TeamConfig>,
 ) -> crate::tui::app::AppState {
     let tab_names: Vec<String> = registry
         .feature_sets
@@ -43,5 +44,6 @@ pub fn build_state(
     state.profile_entries = profile_entries;
     state.configs.insert(Scope::Global, global_config);
     state.configs.insert(Scope::Workspace, workspace_config);
+    state.team_config = team_config;
     state
 }

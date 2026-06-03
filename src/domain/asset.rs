@@ -1,7 +1,9 @@
 use crate::domain::identity::AssetIdentity;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AssetKind {
     Skill,
     Instruction,

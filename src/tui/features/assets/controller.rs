@@ -1,4 +1,5 @@
 use crate::app::command::CoreCommand;
+use crate::domain::config::vault_section::AssetSource;
 use crate::tui::app::AppState;
 use crate::tui::event::{AppEvent, EventContext};
 use anyhow::Result;
@@ -69,6 +70,78 @@ pub fn handle_enter_update(state: &mut AppState, ctx: &EventContext) -> Result<(
             }
         }
     }
+    Ok(())
+}
+
+/// Handle F3 press on an Asset tab: toggle the selected asset's source
+/// between Team and Personal.
+///
+/// If toggling to Team, add a requirement to team.toml.
+/// If toggling to Personal, remove the requirement from team.toml.
+/// In both cases, update the config's AssetBucket source and reload.
+pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result<()> {
+    let pkg_opt = {
+        let filtered = state.filtered_packages();
+        filtered.get(state.selected_index).copied().cloned()
+    };
+    let Some(pkg) = pkg_opt else {
+        state.status_line = "No item selected".to_string();
+        return Ok(());
+    };
+
+    let vault_id = pkg.vault_id.clone();
+    let name = pkg.identity.name.clone();
+    let kind_str = match pkg.kind {
+        crate::domain::asset::AssetKind::Skill => "skill",
+        crate::domain::asset::AssetKind::Instruction => "instruction",
+        crate::domain::asset::AssetKind::McpServer => "mcp",
+        crate::domain::asset::AssetKind::Profile => "profile",
+    };
+
+    // Look up the current source in the config
+    let current_source = {
+        let config = state.active_config();
+        let section = config.vault_defs.get(&vault_id);
+        let bucket = match pkg.kind {
+            crate::domain::asset::AssetKind::Skill => section.and_then(|s| s.skills.as_ref()),
+            crate::domain::asset::AssetKind::Instruction => {
+                section.and_then(|s| s.instructions.as_ref())
+            }
+            crate::domain::asset::AssetKind::McpServer => section.and_then(|s| s.mcps.as_ref()),
+            crate::domain::asset::AssetKind::Profile => section.and_then(|s| s.profiles.as_ref()),
+        };
+        bucket
+            .and_then(|b| b.source.clone())
+            .unwrap_or(AssetSource::Personal)
+    };
+
+    match current_source {
+        AssetSource::Personal => {
+            // Toggle to Team: add as a team requirement
+            let _ = ctx
+                .tx
+                .send(AppEvent::ExecuteCommand(CoreCommand::TeamAddRequirement {
+                    identity: name.clone(),
+                    vault: vault_id.clone(),
+                    kind: kind_str.to_string(),
+                    version_constraint: None,
+                }));
+            state.status_line = format!("Toggled '{}' to Team", name);
+        }
+        AssetSource::Team => {
+            // Toggle to Personal: remove from team requirements
+            let _ = ctx
+                .tx
+                .send(AppEvent::ExecuteCommand(CoreCommand::TeamRemove {
+                    identity: name.clone(),
+                }));
+            state.status_line = format!("Toggled '{}' to Personal", name);
+        }
+    }
+
+    // Trigger a config reload so the UI updates
+    let _ = ctx.tx.send(AppEvent::TriggerReload);
+
     Ok(())
 }
 
@@ -244,6 +317,7 @@ mod tests {
                 vault: None,
                 skills: Some(crate::domain::config::AssetBucket {
                     items: vec!["[my-skill:--:hash]".into()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

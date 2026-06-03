@@ -84,6 +84,9 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::VaultRefreshed(id) => {
             serde_json::json!({ "type": "VaultRefreshed", "id": id })
         }
+        CoreEvent::VaultInitialized(name) => {
+            serde_json::json!({ "type": "VaultInitialized", "name": name })
+        }
         CoreEvent::ProviderActivated(id) => {
             serde_json::json!({ "type": "ProviderActivated", "id": id })
         }
@@ -201,8 +204,50 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::Info(msg) => {
             serde_json::json!({ "type": "Info", "message": msg })
         }
-        CoreEvent::Error(msg) => {
-            serde_json::json!({ "type": "Error", "message": msg })
+        CoreEvent::TeamInitialized(name) => {
+            serde_json::json!({ "type": "TeamInitialized", "name": name })
+        }
+        CoreEvent::TeamVaultAdded(identity) => {
+            serde_json::json!({ "type": "TeamVaultAdded", "identity": identity })
+        }
+        CoreEvent::TeamRequirementAdded(identity) => {
+            serde_json::json!({ "type": "TeamRequirementAdded", "identity": identity })
+        }
+        CoreEvent::TeamRequirementRemoved(identity) => {
+            serde_json::json!({ "type": "TeamRequirementRemoved", "identity": identity })
+        }
+        CoreEvent::TeamDiffResult { summary } => {
+            serde_json::json!({ "type": "TeamDiffResult", "summary": summary })
+        }
+        CoreEvent::TeamStatusResult {
+            team_name,
+            installed,
+            required,
+            personal,
+        } => {
+            serde_json::json!({
+                "type": "TeamStatusResult",
+                "team_name": team_name,
+                "installed": installed,
+                "required": required,
+                "personal": personal
+            })
+        }
+        CoreEvent::TeamSyncComplete {
+            vaults_attached,
+            skills_installed,
+            skills_updated,
+            skills_removed_from_team,
+            errors,
+        } => {
+            serde_json::json!({
+                "type": "TeamSyncComplete",
+                "vaults_attached": vaults_attached,
+                "skills_installed": skills_installed,
+                "skills_updated": skills_updated,
+                "skills_removed_from_team": skills_removed_from_team,
+                "errors": errors
+            })
         }
         CoreEvent::TaskPhaseChanged {
             id,
@@ -220,6 +265,9 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         }
         CoreEvent::WorkspaceLoaded(_) => {
             serde_json::json!({ "type": "WorkspaceLoaded" })
+        }
+        CoreEvent::Error(msg) => {
+            serde_json::json!({ "type": "Error", "message": msg })
         }
     }
 }

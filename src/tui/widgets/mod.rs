@@ -11,3 +11,4 @@ pub(crate) mod modal_checklist;
 pub(crate) mod modal_long;
 pub(crate) mod status;
 pub(crate) mod tabs;
+pub(crate) mod team_badge;

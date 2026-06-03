@@ -1,5 +1,7 @@
 use crate::domain::asset::{AssetKind, ScannedPackage};
+use crate::domain::config::vault_section::AssetSource;
 use crate::domain::config::ConfigFile;
+use crate::tui::widgets::team_badge::team_badge;
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -151,8 +153,11 @@ pub fn render(
                 ));
             } else {
                 // Local packages: right-align version + vault using same max widths
+                let source = asset_source(config, vault_str, &pkg.kind);
+                let badge = team_badge(&source);
+                let badge_width = badge.content.len();
                 let right_len = (max_version + 2) + (max_vault + 2);
-                let name_budget = inner_width.saturating_sub(4 + right_len);
+                let name_budget = inner_width.saturating_sub(4 + right_len + badge_width);
                 let display_name = if is_selected {
                     scroll_name(&pkg.identity.name, name_budget, scroll_offset)
                 } else {
@@ -160,7 +165,10 @@ pub fn render(
                 };
                 let name_len = display_name.len();
                 spans.push(Span::raw(display_name));
-                let used = 4 + name_len + right_len;
+                if !badge.content.is_empty() {
+                    spans.push(badge);
+                }
+                let used = 4 + name_len + badge_width + right_len;
                 let pad = inner_width.saturating_sub(used);
                 if pad > 0 {
                     spans.push(Span::raw(" ".repeat(pad)));
@@ -189,6 +197,26 @@ pub fn render(
     }
 
     frame.render_stateful_widget(list, area, &mut state);
+}
+
+/// Look up the `AssetSource` for a given installed asset.
+///
+/// Returns `AssetSource::Team` if the asset's bucket is marked as team-sourced,
+/// otherwise defaults to `Personal`.
+fn asset_source(config: &ConfigFile, vault_id: &str, kind: &AssetKind) -> AssetSource {
+    let section = match config.vault_defs.get(vault_id) {
+        Some(s) => s,
+        None => return AssetSource::Personal,
+    };
+    let bucket = match kind {
+        AssetKind::Skill => section.skills.as_ref(),
+        AssetKind::Instruction => section.instructions.as_ref(),
+        AssetKind::McpServer => section.mcps.as_ref(),
+        AssetKind::Profile => section.profiles.as_ref(),
+    };
+    bucket
+        .and_then(|b| b.source.clone())
+        .unwrap_or(AssetSource::Personal)
 }
 
 fn install_status(

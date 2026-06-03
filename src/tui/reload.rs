@@ -18,6 +18,7 @@ pub struct ReloadSnapshot {
     pub packages: HashMap<usize, Vec<ScannedPackage>>,
     pub configs: HashMap<Scope, ConfigFile>,
     pub mcp_state: crate::tui::widgets::mcp::McpState,
+    pub team_config: Option<crate::domain::team::TeamConfig>,
 }
 
 pub fn apply_reload_snapshot(state: &mut crate::tui::app::AppState, snapshot: ReloadSnapshot) {
@@ -29,6 +30,7 @@ pub fn apply_reload_snapshot(state: &mut crate::tui::app::AppState, snapshot: Re
     state.packages = snapshot.packages;
     state.configs = snapshot.configs;
     state.mcp_state = snapshot.mcp_state;
+    state.team_config = snapshot.team_config;
 }
 
 pub fn compute_reload_snapshot(
@@ -115,6 +117,14 @@ pub fn compute_reload_snapshot(
     configs.insert(Scope::Global, global_config);
     configs.insert(Scope::Workspace, workspace_config);
 
+    // Reload team config for accurate status bar
+    let team_config = ctx
+        .core
+        .team_config_store
+        .load(Scope::Workspace)
+        .ok()
+        .filter(|c| !c.name.is_empty());
+
     ReloadSnapshot {
         vault_entries,
         provider_entries,
@@ -124,5 +134,6 @@ pub fn compute_reload_snapshot(
         packages,
         configs,
         mcp_state: mcp_state.clone(),
+        team_config,
     }
 }

@@ -10,6 +10,7 @@ pub mod fake_context_store;
 pub mod fake_mcp_registry;
 pub mod fake_process_runner;
 pub mod fake_store;
+pub mod fake_team_config_store;
 pub mod fake_vault;
 
 #[allow(unused_imports)]
@@ -24,5 +25,7 @@ pub use fake_mcp_registry::FakeMcpRegistry;
 pub use fake_process_runner::FakeProcessRunner;
 #[allow(unused_imports)]
 pub use fake_store::FakeStore;
+#[allow(unused_imports)]
+pub use fake_team_config_store::FakeTeamConfigStore;
 #[allow(unused_imports)]
 pub use fake_vault::FakeVault;

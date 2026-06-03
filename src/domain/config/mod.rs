@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Re-export vault_section types so external callers don't need to change imports
-pub use vault_section::{AssetBucket, VaultSection};
+pub use vault_section::{AssetBucket, AssetSource, VaultSection};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -272,6 +272,7 @@ type = "clawhub"
                 vault: None,
                 skills: Some(AssetBucket {
                     items: vec!["[my-skill:--:0000000000]".to_string()],
+                    source: None,
                 }),
                 instructions: None,
                 mcps: None,

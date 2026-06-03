@@ -6,15 +6,25 @@ use ratatui::{
     Frame,
 };
 
-pub fn render(
-    frame: &mut Frame,
-    area: Rect,
-    status: &str,
-    search: &str,
-    keybinds: &str,
-    scope_label: &str,
-    progress: Option<&str>,
-) {
+/// Parameters for the status bar rendering.
+pub struct StatusParams<'a> {
+    pub status: &'a str,
+    pub search: &'a str,
+    pub keybinds: &'a str,
+    pub scope_label: &'a str,
+    pub progress: Option<&'a str>,
+    pub team_status: Option<&'a str>,
+}
+
+pub fn render(frame: &mut Frame, area: Rect, params: StatusParams<'_>) {
+    let StatusParams {
+        status,
+        search,
+        keybinds,
+        scope_label,
+        progress,
+        team_status,
+    } = params;
     let status_text = if !status.is_empty() {
         status.to_string()
     } else if !search.is_empty() {
@@ -23,7 +33,7 @@ pub fn render(
         String::new()
     };
 
-    let line_spans: Vec<Span> = if keybinds.is_empty() {
+    let mut line_spans: Vec<Span> = if keybinds.is_empty() {
         vec![Span::styled(scope_label, Style::default().fg(Color::Green))]
     } else {
         std::iter::once(Span::styled(scope_label, Style::default().fg(Color::Green)))
@@ -31,6 +41,17 @@ pub fn render(
             .chain(color_keybinds(keybinds))
             .collect()
     };
+
+    // Append team status badge if available
+    if let Some(ts) = team_status {
+        if !ts.is_empty() {
+            line_spans.push(Span::raw("  "));
+            line_spans.push(Span::styled(
+                ts.to_string(),
+                Style::default().fg(Color::Cyan),
+            ));
+        }
+    }
 
     let line1 = Line::from(line_spans);
 

@@ -6,5 +6,6 @@ pub mod debug;
 pub mod mcp;
 pub mod profile;
 pub mod provider;
+pub mod team;
 pub mod telemetry;
 pub mod vault;
