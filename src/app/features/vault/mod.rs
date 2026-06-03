@@ -64,7 +64,10 @@ pub fn dispatch(
                 ));
                 Some(Ok(CoreOutcome::Ok))
             } else {
-                Some(Err(anyhow::anyhow!("Vault refresh issues: {}", errs.join(", "))))
+                Some(Err(anyhow::anyhow!(
+                    "Vault refresh issues: {}",
+                    errs.join(", ")
+                )))
             }
         }
         CoreCommand::VaultInit { name, dry_run } => {

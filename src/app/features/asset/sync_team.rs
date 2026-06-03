@@ -176,8 +176,7 @@ pub fn sync_team_config(
             if let Some(ref b) = bucket {
                 if b.source == Some(AssetSource::Team) {
                     for item in &b.items {
-                        let name = parse_identity_from_item(item)
-                            .unwrap_or_else(|| item.clone());
+                        let name = parse_identity_from_item(item).unwrap_or_else(|| item.clone());
                         if !required_ids.contains(&name) {
                             result.skills_removed_from_team.push(name);
                         }

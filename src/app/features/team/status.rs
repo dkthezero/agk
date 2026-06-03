@@ -83,9 +83,9 @@ fn is_requirement_installed(
     bucket
         .as_ref()
         .map(|b| {
-            b.items
-                .iter()
-                .any(|item| parse_identity_from_item(item).as_deref() == Some(req.identity.as_str()))
+            b.items.iter().any(|item| {
+                parse_identity_from_item(item).as_deref() == Some(req.identity.as_str())
+            })
         })
         .unwrap_or(false)
 }
@@ -225,7 +225,10 @@ mod tests {
         config_store.save(Scope::Workspace, &config).unwrap();
 
         let result = team_status(&team_store, &config_store).unwrap();
-        assert_eq!(result.installed, 0, "Skill should NOT satisfy Instruction requirement");
+        assert_eq!(
+            result.installed, 0,
+            "Skill should NOT satisfy Instruction requirement"
+        );
         assert_eq!(result.required, 1);
     }
 }

@@ -425,7 +425,10 @@ mod tests {
             .iter()
             .filter(|e| matches!(e, DiffEntry::Outdated { .. }))
             .collect();
-        assert!(outdated.is_empty(), "Constraint >=2.0.0 vs 2.3.1 should NOT be Outdated");
+        assert!(
+            outdated.is_empty(),
+            "Constraint >=2.0.0 vs 2.3.1 should NOT be Outdated"
+        );
     }
 
     #[test]
@@ -463,6 +466,10 @@ mod tests {
             .iter()
             .filter(|e| matches!(e, DiffEntry::Outdated { .. }))
             .collect();
-        assert_eq!(outdated.len(), 1, "Pinned 2.0.0 vs 2.3.1 should be Outdated");
+        assert_eq!(
+            outdated.len(),
+            1,
+            "Pinned 2.0.0 vs 2.3.1 should be Outdated"
+        );
     }
 }

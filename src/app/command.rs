@@ -150,7 +150,6 @@ pub enum CoreCommand {
     SyncAssets {
         scope: crate::domain::scope::Scope,
         dry_run: bool,
-
     },
     ValidateAssets {
         scope: crate::domain::scope::Scope,

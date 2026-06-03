@@ -77,9 +77,9 @@ impl AppState {
                 let found = bucket
                     .as_ref()
                     .map(|b| {
-                        b.items
-                            .iter()
-                            .any(|item| parse_identity_from_item(item).as_deref() == Some(req.identity.as_str()))
+                        b.items.iter().any(|item| {
+                            parse_identity_from_item(item).as_deref() == Some(req.identity.as_str())
+                        })
                     })
                     .unwrap_or(false);
                 if found {

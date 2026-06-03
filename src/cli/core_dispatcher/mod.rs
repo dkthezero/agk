@@ -39,10 +39,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
     match cmd {
         Commands::Profile { command } => profile::to_core_command(command),
         Commands::Mcp { command } => mcp::to_core_command(command),
-        Commands::Sync {
-            global,
-            dry_run,
-        } => Ok(CoreCommand::SyncAssets {
+        Commands::Sync { global, dry_run } => Ok(CoreCommand::SyncAssets {
             scope: if *global {
                 Scope::Global
             } else {

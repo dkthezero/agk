@@ -95,10 +95,7 @@ pub fn dispatch(
             }
         }
         CoreCommand::TeamDiff => {
-            let result = diff::team_diff(
-                core.team_config_store.as_ref(),
-                core.store.as_ref(),
-            );
+            let result = diff::team_diff(core.team_config_store.as_ref(), core.store.as_ref());
             match result {
                 Ok(diff_result) => {
                     sink.on_event(crate::app::event::CoreEvent::TeamDiffResult {
@@ -110,10 +107,7 @@ pub fn dispatch(
             }
         }
         CoreCommand::TeamStatus => {
-            let result = status::team_status(
-                core.team_config_store.as_ref(),
-                core.store.as_ref(),
-            );
+            let result = status::team_status(core.team_config_store.as_ref(), core.store.as_ref());
             match result {
                 Ok(status_result) => {
                     sink.on_event(crate::app::event::CoreEvent::TeamStatusResult {
