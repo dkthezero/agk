@@ -172,6 +172,11 @@ where
                         | crate::app::event::CoreEvent::AssetRemoved { .. }
                         | crate::app::event::CoreEvent::AssetUpdated { .. }
                         | crate::app::event::CoreEvent::SyncComplete { .. }
+                        | crate::app::event::CoreEvent::TeamInitialized(_)
+                        | crate::app::event::CoreEvent::TeamVaultAdded(_)
+                        | crate::app::event::CoreEvent::TeamRequirementAdded(_)
+                        | crate::app::event::CoreEvent::TeamRequirementRemoved(_)
+                        | crate::app::event::CoreEvent::TeamSyncComplete { .. }
                 ) {
                     let _ = ctx.tx.send(AppEvent::TriggerReload);
                 }

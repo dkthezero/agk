@@ -57,6 +57,8 @@ pub struct AppState {
     pub wizard_state: Option<crate::app::ports::WizardState>,
     // Profile editor state (F3 on Profile tab)
     pub edit_profile_state: Option<EditProfileState>,
+    // Cached team config for accurate status bar counts
+    pub team_config: Option<crate::domain::team::TeamConfig>,
     // Profile export state (Ctrl+E on Profile tab)
     pub pending_export_profile: Option<String>,
     pub export_file_path: String,
@@ -117,6 +119,7 @@ impl AppState {
             wizard_state: None,
             hung_warnings_shown: HashSet::new(),
             edit_profile_state: None,
+            team_config: None,
             pending_export_profile: None,
             export_file_path: String::new(),
             export_resolve_vaults: false,

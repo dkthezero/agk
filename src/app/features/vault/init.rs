@@ -28,7 +28,7 @@ pub fn vault_init(
         return Ok(VaultInitResult {
             name: vault_name.clone(),
             created: false,
-            message: "Vault already initialized. Use --force to overwrite.".to_string(),
+            message: "Vault already initialized.".to_string(),
         });
     }
 

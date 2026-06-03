@@ -1,4 +1,4 @@
-use crate::domain::config::vault_section::AssetSource;
+use crate::app::features::common::parse_identity_from_item;
 use crate::tui::app::AppState;
 use crate::tui::list_mode::ListMode;
 use crate::tui::progress::ProgressStatus;
@@ -51,39 +51,65 @@ impl AppState {
 
     /// Compute a team status summary for the active scope config.
     ///
-    /// Returns `Some((installed, required, personal))` if any vault section
-    /// has a team source; `None` if no team-mandated assets exist.
+    /// Returns `Some((installed, required, personal))` if a team config is
+    /// loaded; `None` if no team is active.
+    ///
+    /// `required` comes from the team config requirements list.
+    /// `installed` counts how many of those requirements are present in
+    /// the installed config (matching by identity in the correct vault
+    /// and kind bucket).
+    /// `personal` counts items in non-team buckets.
     pub fn team_status(&self) -> Option<(usize, usize, usize)> {
+        let team_config = self.team_config.as_ref()?;
         let config = self.active_config();
-        let mut team_installed = 0usize;
-        let mut team_required = 0usize;
-        let mut personal = 0usize;
 
-        for section in config.vault_defs.values() {
-            for bucket in [
-                section.skills.as_ref(),
-                section.instructions.as_ref(),
-                section.mcps.as_ref(),
-                section.profiles.as_ref(),
-            ]
-            .into_iter()
-            .flatten()
-            {
-                let count = bucket.items.len();
-                match bucket.source.as_ref().unwrap_or(&AssetSource::Personal) {
-                    AssetSource::Team => {
-                        team_required += count;
-                        team_installed += count; // items in the bucket are installed
-                    }
-                    AssetSource::Personal => {
-                        personal += count;
-                    }
+        let required = team_config.requirements.len();
+        let mut installed = 0usize;
+
+        for req in &team_config.requirements {
+            if let Some(section) = config.vault_defs.get(&req.vault) {
+                let bucket = match req.kind {
+                    crate::domain::asset::AssetKind::Skill => &section.skills,
+                    crate::domain::asset::AssetKind::Instruction => &section.instructions,
+                    crate::domain::asset::AssetKind::McpServer => &section.mcps,
+                    crate::domain::asset::AssetKind::Profile => &section.profiles,
+                };
+                let found = bucket
+                    .as_ref()
+                    .map(|b| {
+                        b.items
+                            .iter()
+                            .any(|item| parse_identity_from_item(item).as_deref() == Some(req.identity.as_str()))
+                    })
+                    .unwrap_or(false);
+                if found {
+                    installed += 1;
                 }
             }
         }
 
-        if team_required > 0 {
-            Some((team_installed, team_required, personal))
+        let mut personal = 0usize;
+        for (vault_id, section) in &config.vault_defs {
+            let is_team_vault = team_config.vaults.iter().any(|v| v.identity == *vault_id);
+            if is_team_vault {
+                continue;
+            }
+            if let Some(ref bucket) = section.skills {
+                personal += bucket.items.len();
+            }
+            if let Some(ref bucket) = section.instructions {
+                personal += bucket.items.len();
+            }
+            if let Some(ref bucket) = section.mcps {
+                personal += bucket.items.len();
+            }
+            if let Some(ref bucket) = section.profiles {
+                personal += bucket.items.len();
+            }
+        }
+
+        if required > 0 {
+            Some((installed, required, personal))
         } else {
             None
         }

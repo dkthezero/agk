@@ -232,16 +232,21 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         }
         CoreEvent::TeamInitialized(name) => {
             state.status_line = format!("Team '{}' initialized", name);
+            // Invalidate cached team config so next render picks up the new team
+            state.team_config = None;
         }
         CoreEvent::TeamVaultAdded(identity) => {
             state.status_line = format!("Vault '{}' added to team configuration", identity);
+            state.team_config = None;
         }
         CoreEvent::TeamRequirementAdded(identity) => {
             state.status_line = format!("Requirement '{}' added to team configuration", identity);
+            state.team_config = None;
         }
         CoreEvent::TeamRequirementRemoved(identity) => {
             state.status_line =
                 format!("Requirement '{}' removed from team configuration", identity);
+            state.team_config = None;
         }
         CoreEvent::TeamDiffResult { summary } => {
             state.status_line = summary.clone();
@@ -272,6 +277,7 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 skills_removed_from_team.len(),
                 errors.len()
             );
+            state.team_config = None;
         }
     }
 }

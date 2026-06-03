@@ -50,7 +50,7 @@ pub fn team_status(
 
     let mut installed_count = 0;
     for req in &team_config.requirements {
-        if is_requirement_installed(&installed_config, &req.identity, &team_vault_ids) {
+        if is_requirement_installed(&installed_config, req) {
             installed_count += 1;
         }
     }
@@ -68,50 +68,26 @@ pub fn team_status(
 
 fn is_requirement_installed(
     config: &crate::domain::config::ConfigFile,
-    identity: &str,
-    vault_ids: &[String],
+    req: &crate::domain::team::TeamRequirement,
 ) -> bool {
-    for vault_id in vault_ids {
-        if let Some(section) = config.vault_defs.get(vault_id) {
-            if let Some(ref bucket) = section.skills {
-                if bucket
-                    .items
-                    .iter()
-                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
-                {
-                    return true;
-                }
-            }
-            if let Some(ref bucket) = section.instructions {
-                if bucket
-                    .items
-                    .iter()
-                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
-                {
-                    return true;
-                }
-            }
-            if let Some(ref bucket) = section.mcps {
-                if bucket
-                    .items
-                    .iter()
-                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
-                {
-                    return true;
-                }
-            }
-            if let Some(ref bucket) = section.profiles {
-                if bucket
-                    .items
-                    .iter()
-                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
+    let section = match config.vault_defs.get(&req.vault) {
+        Some(s) => s,
+        None => return false,
+    };
+    let bucket = match req.kind {
+        crate::domain::asset::AssetKind::Skill => &section.skills,
+        crate::domain::asset::AssetKind::Instruction => &section.instructions,
+        crate::domain::asset::AssetKind::McpServer => &section.mcps,
+        crate::domain::asset::AssetKind::Profile => &section.profiles,
+    };
+    bucket
+        .as_ref()
+        .map(|b| {
+            b.items
+                .iter()
+                .any(|item| parse_identity_from_item(item).as_deref() == Some(req.identity.as_str()))
+        })
+        .unwrap_or(false)
 }
 
 fn count_personal_assets(
@@ -205,5 +181,51 @@ mod tests {
         };
         assert!(result.summary().contains("1/3 requirements installed"));
         assert!(result.summary().contains("5 personal assets"));
+    }
+
+    #[test]
+    fn status_matches_by_vault_and_kind() {
+        // "security-scan" is required as Instruction from vault "shared".
+        // Even if a Skill with the same identity exists in a different vault,
+        // it should NOT count as installed.
+        use crate::domain::config::{AssetBucket, VaultSection};
+
+        let team_store = FakeTeamConfigStore::new();
+        let team_config = TeamConfig {
+            name: "my-team".to_string(),
+            source: None,
+            branch: Some("main".to_string()),
+            vaults: vec![TeamVault {
+                identity: "shared".to_string(),
+                vault_type: "github".to_string(),
+                url: "https://github.com/org/skills".to_string(),
+                branch: "main".to_string(),
+                path: None,
+            }],
+            requirements: vec![TeamRequirement {
+                identity: "security-scan".to_string(),
+                vault: "shared".to_string(),
+                kind: AssetKind::Instruction, // requirement is for Instruction
+                version_constraint: None,
+            }],
+        };
+        team_store.save(Scope::Workspace, &team_config).unwrap();
+
+        // Install "security-scan" as a Skill (wrong kind) in "shared" vault
+        let config_store = FakeStore::new();
+        let mut config = config_store.load(Scope::Workspace).unwrap_or_default();
+        let section = VaultSection {
+            skills: Some(AssetBucket {
+                items: vec!["[security-scan:1.0.0:abc123]".to_string()],
+                source: None,
+            }),
+            ..VaultSection::default()
+        };
+        config.vault_defs.insert("shared".to_string(), section);
+        config_store.save(Scope::Workspace, &config).unwrap();
+
+        let result = team_status(&team_store, &config_store).unwrap();
+        assert_eq!(result.installed, 0, "Skill should NOT satisfy Instruction requirement");
+        assert_eq!(result.required, 1);
     }
 }

@@ -122,9 +122,13 @@ fn compute_diff(team: &TeamConfig, installed: &ConfigFile) -> Vec<DiffEntry> {
             .iter()
             .find(|(id, _)| *id == req.identity);
         if let Some((_, info)) = installed_entry {
-            // Check version constraint mismatch
+            // TODO(team-p2): Implement proper semver constraint satisfaction
+            //   (e.g. ">=2.0.0" should accept "2.3.1"). For now, only flag
+            //   Outdated when an exact pinned version (no operator prefix)
+            //   doesn't match the installed version. Constraint expressions
+            //   like ">=2.0.0" are skipped to avoid false positives.
             if let (Some(expected), Some(actual)) = (&req.version_constraint, &info.version) {
-                if expected != actual {
+                if !is_version_constraint(expected) && expected != actual {
                     entries.push(DiffEntry::Outdated {
                         identity: req.identity.clone(),
                         vault: req.vault.clone(),
@@ -236,6 +240,12 @@ fn collect_installed_from_vaults(
     }
 
     result
+}
+
+/// Returns true if `s` looks like a semver constraint expression (e.g. ">=2.0.0",
+/// "^1.0", "~2.3.1") rather than a plain pinned version (e.g. "2.3.1").
+fn is_version_constraint(s: &str) -> bool {
+    s.starts_with(|c: char| !c.is_ascii_digit())
 }
 
 #[cfg(test)]
@@ -365,5 +375,94 @@ mod tests {
         };
         assert!(result.summary().contains("MISSING"));
         assert!(result.summary().contains("1 differences"));
+    }
+
+    #[test]
+    fn is_version_constraint_detects_operators() {
+        assert!(is_version_constraint(">=2.0.0"));
+        assert!(is_version_constraint("^1.0"));
+        assert!(is_version_constraint("~2.3.1"));
+        assert!(is_version_constraint("=1.0.0"));
+        assert!(!is_version_constraint("2.3.1"));
+        assert!(!is_version_constraint("1.0.0"));
+    }
+
+    #[test]
+    fn diff_skips_constraint_outdated_check() {
+        // A constraint like ">=2.0.0" should NOT be compared directly
+        // against an installed version like "2.3.1" — that would always
+        // report Outdated incorrectly.
+        let team = TeamConfig {
+            name: "test-team".to_string(),
+            source: None,
+            branch: Some("main".to_string()),
+            vaults: vec![TeamVault {
+                identity: "shared".to_string(),
+                vault_type: "github".to_string(),
+                url: "https://github.com/org/skills".to_string(),
+                branch: "main".to_string(),
+                path: None,
+            }],
+            requirements: vec![TeamRequirement {
+                identity: "security-scan".to_string(),
+                vault: "shared".to_string(),
+                kind: AssetKind::Instruction,
+                version_constraint: Some(">=2.0.0".to_string()),
+            }],
+        };
+        let mut installed = ConfigFile::default();
+        let section = crate::domain::config::VaultSection {
+            instructions: Some(crate::domain::config::AssetBucket {
+                items: vec!["[security-scan:2.3.1:abc123]".to_string()],
+                source: None,
+            }),
+            ..crate::domain::config::VaultSection::default()
+        };
+        installed.vault_defs.insert("shared".to_string(), section);
+
+        let result = compute_diff(&team, &installed);
+        let outdated: Vec<&DiffEntry> = result
+            .iter()
+            .filter(|e| matches!(e, DiffEntry::Outdated { .. }))
+            .collect();
+        assert!(outdated.is_empty(), "Constraint >=2.0.0 vs 2.3.1 should NOT be Outdated");
+    }
+
+    #[test]
+    fn diff_detects_pinned_version_mismatch() {
+        let team = TeamConfig {
+            name: "test-team".to_string(),
+            source: None,
+            branch: Some("main".to_string()),
+            vaults: vec![TeamVault {
+                identity: "shared".to_string(),
+                vault_type: "github".to_string(),
+                url: "https://github.com/org/skills".to_string(),
+                branch: "main".to_string(),
+                path: None,
+            }],
+            requirements: vec![TeamRequirement {
+                identity: "security-scan".to_string(),
+                vault: "shared".to_string(),
+                kind: AssetKind::Instruction,
+                version_constraint: Some("2.0.0".to_string()), // pinned exact
+            }],
+        };
+        let mut installed = ConfigFile::default();
+        let section = crate::domain::config::VaultSection {
+            instructions: Some(crate::domain::config::AssetBucket {
+                items: vec!["[security-scan:2.3.1:abc123]".to_string()],
+                source: None,
+            }),
+            ..crate::domain::config::VaultSection::default()
+        };
+        installed.vault_defs.insert("shared".to_string(), section);
+
+        let result = compute_diff(&team, &installed);
+        let outdated: Vec<&DiffEntry> = result
+            .iter()
+            .filter(|e| matches!(e, DiffEntry::Outdated { .. }))
+            .collect();
+        assert_eq!(outdated.len(), 1, "Pinned 2.0.0 vs 2.3.1 should be Outdated");
     }
 }

@@ -19,27 +19,23 @@ pub(super) fn sync_assets_cmd(
 
     // --- Team-aware sync: if team.toml is present, merge team vaults ---
     let _team_sync_result = {
-        let team_config = core.team_config_store.load(scope).unwrap_or_default();
-        if !team_config.name.is_empty() || !team_config.vaults.is_empty() {
-            let mut config = match core.store.load(scope) {
-                Ok(c) => c,
-                Err(e) => {
-                    sink.on_event(CoreEvent::TaskFailed {
-                        id: 0,
-                        error: format!("Failed to load config for team sync: {}", e),
-                    });
-                    return Ok(CoreOutcome::Ok);
+        let team_config = match core.team_config_store.load(scope) {
+            Ok(c) => c,
+            Err(e) => {
+                // If team.toml exists but is malformed, surface the error instead
+                // of silently proceeding as if no team config is present.
+                if core.team_config_store.exists(scope) {
+                    return Err(e);
                 }
-            };
+                // File simply doesn't exist — proceed without team config.
+                Default::default()
+            }
+        };
+        if !team_config.name.is_empty() || !team_config.vaults.is_empty() {
+            let mut config = core.store.load(scope)?;
             let result = super::sync_team::sync_team_config(&team_config, &mut config, dry_run);
             if !dry_run {
-                if let Err(e) = core.store.save(scope, &config) {
-                    sink.on_event(CoreEvent::TaskFailed {
-                        id: 0,
-                        error: format!("Failed to save config after team sync: {}", e),
-                    });
-                    return Ok(CoreOutcome::Ok);
-                }
+                core.store.save(scope, &config)?;
             }
             // Emit team sync result event
             sink.on_event(CoreEvent::TeamSyncComplete {
@@ -56,16 +52,7 @@ pub(super) fn sync_assets_cmd(
     };
 
     // --- Regular sync ---
-    let config = match core.store.load(scope) {
-        Ok(c) => c,
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Failed to load config: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
-    };
+    let config = core.store.load(scope)?;
 
     let provider_ids: Vec<String> = core
         .registry

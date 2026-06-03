@@ -260,7 +260,7 @@ pub enum TeamCommands {
         /// Vault identity
         identity: String,
         /// Vault type (github, local, clawhub)
-        #[arg(long, default_value = "github")]
+        #[arg(long, name = "type", default_value = "github")]
         vault_type: String,
         /// Vault URL
         #[arg(long)]

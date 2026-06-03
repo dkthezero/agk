@@ -57,12 +57,20 @@ async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
         agk::app::bootstrap::build(workspace.clone())?;
     let core = build_core(&workspace, registry, store)?;
 
+    // Load team config for accurate TUI status bar
+    let team_config = core
+        .team_config_store
+        .load(agk::domain::scope::Scope::Workspace)
+        .ok()
+        .filter(|c| !c.name.is_empty());
+
     let mut state = agk::tui::entry::build_state(
         core.registry.as_ref(),
         scan,
         &workspace,
         global_config,
         workspace_config,
+        team_config,
     );
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
