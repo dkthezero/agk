@@ -1,12 +1,10 @@
+use crate::app::features::common::{parse_identity_from_item, parse_version_from_item};
 use crate::app::ports::ConfigStorePort;
 use crate::app::ports::TeamConfigStorePort;
 use crate::domain::config::ConfigFile;
 use crate::domain::scope::Scope;
 use crate::domain::team::TeamConfig;
-use crate::infra::config::team_store::TeamTomlStore;
-use crate::infra::config::toml_store::TomlConfigStore;
 use anyhow::Result;
-use std::path::Path;
 
 /// A single diff entry comparing team requirements against installed state.
 #[derive(Debug, Clone, PartialEq)]
@@ -92,8 +90,10 @@ impl TeamDiffResult {
 /// - Missing: required by team but not installed
 /// - Extra: installed from a team vault but not in requirements
 /// - Outdated: installed but with a different version
-pub fn team_diff(workspace_root: &Path) -> Result<TeamDiffResult> {
-    let team_store = TeamTomlStore::new(workspace_root.to_path_buf());
+pub fn team_diff(
+    team_store: &dyn TeamConfigStorePort,
+    config_store: &dyn ConfigStorePort,
+) -> Result<TeamDiffResult> {
     let team_config = team_store.load(Scope::Workspace)?;
 
     // If team config is empty/default, there's nothing to diff
@@ -102,7 +102,6 @@ pub fn team_diff(workspace_root: &Path) -> Result<TeamDiffResult> {
     }
 
     // Load the installed config
-    let config_store = TomlConfigStore::standard(workspace_root);
     let installed_config = config_store.load(Scope::Workspace).unwrap_or_default();
 
     let entries = compute_diff(&team_config, &installed_config);
@@ -237,27 +236,6 @@ fn collect_installed_from_vaults(
     }
 
     result
-}
-
-/// Parse "[name:version:sha10]" format → extract name (identity).
-fn parse_identity_from_item(item: &str) -> Option<String> {
-    let item = item.trim_start_matches('[').trim_end_matches(']');
-    let parts: Vec<&str> = item.split(':').collect();
-    if parts.is_empty() {
-        return None;
-    }
-    Some(parts[0].to_string())
-}
-
-/// Parse "[name:version:sha10]" format → extract version.
-fn parse_version_from_item(item: &str) -> Option<String> {
-    let item = item.trim_start_matches('[').trim_end_matches(']');
-    let parts: Vec<&str> = item.split(':').collect();
-    if parts.len() >= 2 && !parts[1].is_empty() {
-        Some(parts[1].to_string())
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]

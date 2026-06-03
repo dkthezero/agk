@@ -7,6 +7,7 @@
 //! - Tag team assets with `AssetSource::Team`
 //! - Flag previously-Team assets that are no longer in team requirements
 
+use crate::app::features::common::parse_identity_from_item;
 use crate::domain::asset::AssetKind;
 use crate::domain::config::{AssetBucket, AssetSource, ConfigFile, VaultConfig};
 use crate::domain::team::TeamConfig;
@@ -79,9 +80,12 @@ pub fn sync_team_config(
 
     // -----------------------------------------------------------------------
     // Step 2: Add team requirement identities to vault section buckets
+    // TODO(team-p2): Use resolved version/SHA from actual asset metadata
+    //   instead of placeholder `[identity:--:0000000000]` format. The actual
+    //   sync step should fill in real values.
     // -----------------------------------------------------------------------
     for req in &team_config.requirements {
-        let identity_str = format!("[{}::0]", req.identity); // placeholder identity
+        let identity_str = format!("[{}:--:0000000000]", req.identity); // placeholder identity
 
         if dry_run {
             // In dry_run, just check whether the identity already exists
@@ -97,11 +101,7 @@ pub fn sync_team_config(
                     .as_ref()
                     .map(|b| {
                         b.items.iter().any(|item| {
-                            item.trim_start_matches('[')
-                                .split(':')
-                                .next()
-                                .map(|name| name == req.identity)
-                                .unwrap_or(false)
+                            parse_identity_from_item(item).as_deref() == Some(req.identity.as_str())
                         })
                     })
                     .unwrap_or(false);
@@ -128,11 +128,7 @@ pub fn sync_team_config(
             Some(ref mut b) => {
                 // Check if already present
                 let already_present = b.items.iter().any(|item| {
-                    item.trim_start_matches('[')
-                        .split(':')
-                        .next()
-                        .map(|name| name == req.identity)
-                        .unwrap_or(false)
+                    parse_identity_from_item(item).as_deref() == Some(req.identity.as_str())
                 });
                 if !already_present {
                     b.items.push(identity_str.clone());
@@ -159,6 +155,9 @@ pub fn sync_team_config(
 
     // -----------------------------------------------------------------------
     // Step 3: Detect previously-Team assets no longer in requirements
+    // TODO(team-p2): AssetSource is bucket-level, not per-item. If a vault
+    //   has both personal and team items, all are tagged as Team. Consider
+    //   per-item source tracking in a future phase.
     // -----------------------------------------------------------------------
     let required_ids: Vec<String> = team_config
         .requirements
@@ -177,13 +176,10 @@ pub fn sync_team_config(
             if let Some(ref b) = bucket {
                 if b.source == Some(AssetSource::Team) {
                     for item in &b.items {
-                        let name = item
-                            .trim_start_matches('[')
-                            .split(':')
-                            .next()
-                            .unwrap_or(item.as_str());
-                        if !required_ids.contains(&name.to_string()) {
-                            result.skills_removed_from_team.push(name.to_string());
+                        let name = parse_identity_from_item(item)
+                            .unwrap_or_else(|| item.clone());
+                        if !required_ids.contains(&name) {
+                            result.skills_removed_from_team.push(name);
                         }
                     }
                 }

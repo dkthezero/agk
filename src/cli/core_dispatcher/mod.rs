@@ -42,7 +42,6 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
         Commands::Sync {
             global,
             dry_run,
-            provider,
         } => Ok(CoreCommand::SyncAssets {
             scope: if *global {
                 Scope::Global
@@ -50,7 +49,6 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 Scope::Workspace
             },
             dry_run: *dry_run,
-            provider: provider.clone(),
         }),
         Commands::Install {
             identity,

@@ -150,7 +150,7 @@ pub enum CoreCommand {
     SyncAssets {
         scope: crate::domain::scope::Scope,
         dry_run: bool,
-        provider: Option<String>,
+
     },
     ValidateAssets {
         scope: crate::domain::scope::Scope,
@@ -229,9 +229,7 @@ pub enum CoreCommand {
     TeamDiff,
     TeamStatus,
     TeamUpdate,
-    SyncTeam {
-        provider: Option<String>,
-    },
+    SyncTeam,
 
     // -----------------------------------------------------------------------
     // Workspace commands

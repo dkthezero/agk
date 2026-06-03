@@ -7,7 +7,8 @@ pub struct TeamUpdateResult {
 
 /// Update team.toml from the source repository.
 ///
-/// This is a stub — git-pull logic for team.toml updates will be implemented later.
+/// TODO(team-p2): Implement git-pull logic for team.toml updates.
+/// For now, users must update team.toml manually or via `team add/remove`.
 pub fn team_update(_workspace_root: &PathBuf) -> Result<TeamUpdateResult> {
     Ok(TeamUpdateResult {
         message: "Team update is not yet implemented. Pull team.toml changes manually for now."

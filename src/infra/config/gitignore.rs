@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Manages .agk/.gitignore to ensure config.toml is ignored by version control.
 pub struct GitignoreManager;
@@ -16,7 +16,7 @@ impl GitignoreManager {
     /// Ensures the given entry exists in the gitignore file.
     /// Creates the file and parent directories if they don't exist.
     /// Does not duplicate the entry if it already exists.
-    fn ensure_entry(gitignore_path: &PathBuf, entry: &str) -> Result<()> {
+    fn ensure_entry(gitignore_path: &Path, entry: &str) -> Result<()> {
         if let Some(parent) = gitignore_path.parent() {
             std::fs::create_dir_all(parent)?;
         }

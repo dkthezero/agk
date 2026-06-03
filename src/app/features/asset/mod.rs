@@ -82,12 +82,10 @@ pub fn dispatch(
             core,
             sink,
         )),
-        CoreCommand::SyncAssets {
-            scope,
-            dry_run,
-            provider: _,
-        } => Some(sync_assets_cmd(*scope, *dry_run, core, sink)),
-        CoreCommand::SyncTeam { provider: _ } => {
+        CoreCommand::SyncAssets { scope, dry_run } => {
+            Some(sync_assets_cmd(*scope, *dry_run, core, sink))
+        }
+        CoreCommand::SyncTeam => {
             // Delegated from SyncAssets when team.toml is present.
             // The actual team-sync logic runs inside sync_assets_cmd.
             Some(sync_assets_cmd(

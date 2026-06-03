@@ -65,10 +65,6 @@ pub enum Commands {
         /// Only show what would change, without modifying anything
         #[arg(short, long)]
         dry_run: bool,
-
-        /// Limit sync to a specific provider
-        #[arg(short, long)]
-        provider: Option<String>,
     },
 
     /// Install a specific asset by identity

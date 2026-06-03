@@ -32,10 +32,7 @@ pub fn dispatch(
                     }
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team init failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamAddVault {
@@ -53,10 +50,7 @@ pub fn dispatch(
                     ));
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team add-vault failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamAddRequirement {
@@ -79,10 +73,7 @@ pub fn dispatch(
                     ));
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team add failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamRemove { identity } => {
@@ -100,14 +91,14 @@ pub fn dispatch(
                     }
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team remove failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamDiff => {
-            let result = diff::team_diff(&core.workspace_root);
+            let result = diff::team_diff(
+                core.team_config_store.as_ref(),
+                core.store.as_ref(),
+            );
             match result {
                 Ok(diff_result) => {
                     sink.on_event(crate::app::event::CoreEvent::TeamDiffResult {
@@ -115,14 +106,14 @@ pub fn dispatch(
                     });
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team diff failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamStatus => {
-            let result = status::team_status(&core.workspace_root);
+            let result = status::team_status(
+                core.team_config_store.as_ref(),
+                core.store.as_ref(),
+            );
             match result {
                 Ok(status_result) => {
                     sink.on_event(crate::app::event::CoreEvent::TeamStatusResult {
@@ -133,10 +124,7 @@ pub fn dispatch(
                     });
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team status failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         CoreCommand::TeamUpdate => {
@@ -148,10 +136,7 @@ pub fn dispatch(
                     ));
                     Some(Ok(CoreOutcome::Ok))
                 }
-                Err(e) => {
-                    sink.on_error(format!("Team update failed: {}", e));
-                    Some(Ok(CoreOutcome::Ok))
-                }
+                Err(e) => Some(Err(e)),
             }
         }
         _ => None,

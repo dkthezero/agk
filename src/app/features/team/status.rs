@@ -1,10 +1,8 @@
+use crate::app::features::common::parse_identity_from_item;
 use crate::app::ports::ConfigStorePort;
 use crate::app::ports::TeamConfigStorePort;
 use crate::domain::scope::Scope;
-use crate::infra::config::team_store::TeamTomlStore;
-use crate::infra::config::toml_store::TomlConfigStore;
 use anyhow::Result;
-use std::path::Path;
 
 pub struct TeamStatusResult {
     pub team_name: String,
@@ -24,8 +22,10 @@ impl TeamStatusResult {
 
 /// Count how many team requirements are installed vs total, and how many
 /// personal (non-team) assets are present.
-pub fn team_status(workspace_root: &Path) -> Result<TeamStatusResult> {
-    let team_store = TeamTomlStore::new(workspace_root.to_path_buf());
+pub fn team_status(
+    team_store: &dyn TeamConfigStorePort,
+    config_store: &dyn ConfigStorePort,
+) -> Result<TeamStatusResult> {
     let team_config = team_store.load(Scope::Workspace)?;
 
     if team_config.name.is_empty() {
@@ -40,7 +40,6 @@ pub fn team_status(workspace_root: &Path) -> Result<TeamStatusResult> {
     let total_required = team_config.requirements.len();
 
     // Load installed config to count matching requirements
-    let config_store = TomlConfigStore::standard(workspace_root);
     let installed_config = config_store.load(Scope::Workspace).unwrap_or_default();
 
     let team_vault_ids: Vec<String> = team_config
@@ -75,22 +74,38 @@ fn is_requirement_installed(
     for vault_id in vault_ids {
         if let Some(section) = config.vault_defs.get(vault_id) {
             if let Some(ref bucket) = section.skills {
-                if bucket.items.iter().any(|item| item.contains(identity)) {
+                if bucket
+                    .items
+                    .iter()
+                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
+                {
                     return true;
                 }
             }
             if let Some(ref bucket) = section.instructions {
-                if bucket.items.iter().any(|item| item.contains(identity)) {
+                if bucket
+                    .items
+                    .iter()
+                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
+                {
                     return true;
                 }
             }
             if let Some(ref bucket) = section.mcps {
-                if bucket.items.iter().any(|item| item.contains(identity)) {
+                if bucket
+                    .items
+                    .iter()
+                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
+                {
                     return true;
                 }
             }
             if let Some(ref bucket) = section.profiles {
-                if bucket.items.iter().any(|item| item.contains(identity)) {
+                if bucket
+                    .items
+                    .iter()
+                    .any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
+                {
                     return true;
                 }
             }
@@ -127,15 +142,16 @@ fn count_personal_assets(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::test_support::{FakeStore, FakeTeamConfigStore};
     use crate::domain::asset::AssetKind;
     use crate::domain::team::{TeamConfig, TeamRequirement, TeamVault};
 
     #[test]
     fn status_no_team_config() {
-        let dir = tempfile::tempdir().unwrap();
-        let workspace = dir.path().to_path_buf();
+        let team_store = FakeTeamConfigStore::new();
+        let config_store = FakeStore::new();
 
-        let result = team_status(&workspace).unwrap();
+        let result = team_status(&team_store, &config_store).unwrap();
         assert_eq!(result.team_name, "(no team)");
         assert_eq!(result.installed, 0);
         assert_eq!(result.required, 0);
@@ -143,11 +159,7 @@ mod tests {
 
     #[test]
     fn status_with_team() {
-        let dir = tempfile::tempdir().unwrap();
-        let workspace = dir.path().to_path_buf();
-
-        // Create team config
-        let team_store = TeamTomlStore::new(workspace.clone());
+        let team_store = FakeTeamConfigStore::new();
         let config = TeamConfig {
             name: "my-team".to_string(),
             source: None,
@@ -176,7 +188,8 @@ mod tests {
         };
         team_store.save(Scope::Workspace, &config).unwrap();
 
-        let result = team_status(&workspace).unwrap();
+        let config_store = FakeStore::new();
+        let result = team_status(&team_store, &config_store).unwrap();
         assert_eq!(result.team_name, "my-team");
         assert_eq!(result.required, 2);
         assert_eq!(result.installed, 0); // nothing installed

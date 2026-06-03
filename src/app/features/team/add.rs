@@ -72,7 +72,12 @@ pub fn team_add_requirement(
         "instruction" => AssetKind::Instruction,
         "mcp" => AssetKind::McpServer,
         "profile" => AssetKind::Profile,
-        _ => AssetKind::Skill, // default fallback
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Unknown asset kind '{}'. Valid kinds: skill, instruction, mcp, profile",
+                kind
+            ));
+        }
     };
 
     // Check for duplicate
