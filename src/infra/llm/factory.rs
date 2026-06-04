@@ -38,19 +38,22 @@ impl LlmProviderFactoryPort for InfraLlmProviderFactory {
             #[cfg(feature = "llm-anthropic")]
             LlmProviderKind::Anthropic => Ok(Box::new(super::anthropic::AnthropicProvider::new(
                 cfg.endpoint.clone(),
+                cfg.api_key.clone(),
             ))),
             #[cfg(feature = "llm-openai")]
             LlmProviderKind::OpenAi => Ok(Box::new(super::openai::OpenAiProvider::new(
                 cfg.endpoint.clone(),
+                cfg.api_key.clone(),
             ))),
             // Fall back to a generic adapter that passes the endpoint through
             // when the feature is not active.  Health checks will return an
             // error because the `LlmHealthCheckPort` itself is feature-gated
             // to a real HTTP implementation; fakes work fine in tests.
             #[allow(unreachable_patterns)]
-            _ => Ok(Box::new(GenericLlmProvider::new(
+            _ => Ok(Box::new(GenericLlmProvider::new_with_key(
                 cfg.kind,
                 cfg.endpoint.clone(),
+                cfg.api_key.clone(),
             ))),
         }
     }
@@ -62,6 +65,7 @@ impl LlmProviderFactoryPort for InfraLlmProviderFactory {
 pub struct GenericLlmProvider {
     kind: LlmProviderKind,
     endpoint: String,
+    api_key: Option<String>,
 }
 
 impl GenericLlmProvider {
@@ -69,6 +73,21 @@ impl GenericLlmProvider {
         Self {
             kind,
             endpoint: endpoint.into(),
+            api_key: None,
+        }
+    }
+
+    /// Constructor that also plumbs an API key so the generic adapter can
+    /// emit auth headers the same way the real per-kind adapters do.
+    pub fn new_with_key(
+        kind: LlmProviderKind,
+        endpoint: impl Into<String>,
+        api_key: Option<String>,
+    ) -> Self {
+        Self {
+            kind,
+            endpoint: endpoint.into(),
+            api_key,
         }
     }
 }
@@ -85,6 +104,13 @@ impl LlmProviderAdapter for GenericLlmProvider {
                 format!("{trimmed}/v1/models")
             }
             LlmProviderKind::Anthropic => trimmed.to_string(),
+        }
+    }
+    fn auth_header(&self) -> Option<(&'static str, String)> {
+        match (self.kind, self.api_key.as_deref()) {
+            (LlmProviderKind::Anthropic, Some(k)) => Some(("x-api-key", k.to_string())),
+            (LlmProviderKind::OpenAi, Some(k)) => Some(("Authorization", format!("Bearer {k}"))),
+            _ => None,
         }
     }
 }

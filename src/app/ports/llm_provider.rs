@@ -38,6 +38,13 @@ pub trait LlmProviderAdapter: Send + Sync {
     fn default_model_hint(&self) -> Option<String> {
         None
     }
+    /// Optional `(name, value)` for an HTTP header that the health check
+    /// should send on every probe (e.g. `Authorization: Bearer …` for
+    /// OpenAI, `x-api-key: …` for Anthropic). Providers that do not
+    /// require auth (Ollama, LM Studio) return `None`.
+    fn auth_header(&self) -> Option<(&'static str, String)> {
+        None
+    }
 }
 
 #[async_trait]
