@@ -1,0 +1,17 @@
+{
+  "name": "full-agent",
+  "description": "Full agent exercising all 16 frontmatter fields",
+  "model": "opus",
+  "tools": ["Read", "Edit", "Bash", "Grep"],
+  "disallowed_tools": ["WebFetch"],
+  "permission_mode": "acceptEdits",
+  "max_turns": 25,
+  "skills": ["code-review", "test-author"],
+  "mcp_servers": ["github", "playwright"],
+  "hooks": ["PreToolUse"],
+  "memory": "user",
+  "background": true,
+  "effort": "high",
+  "isolation": "worktree",
+  "color": "blue"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "test-agent",
+  "description": "Does the thing",
+  "model": "sonnet",
+  "tools": ["Read", "Edit", "Bash"]
+}
