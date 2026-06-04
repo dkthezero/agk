@@ -14,6 +14,9 @@ pub mod template;
 pub mod token_estimate;
 pub mod wizard_description;
 
+#[cfg(feature = "profile-create")]
+pub mod wizard;
+
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::{CoreEventSink, CoreResult};
