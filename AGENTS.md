@@ -13,7 +13,7 @@ This file is the **Agent Harness** for AGK. It defines how both human contributo
 ### Core Promises
 - **Portable intent**: Take a local or remote manifest and materialize a reproducible AI coding environment.
 - **Headless-first**: Every interactive flow must have a complete headless/CLI equivalent (or `--dry-run` contract).
-- **Lightweight**: Heavy subsystems (TUI, remote vaults, YAML, enterprise features) must be optional via Cargo features. See the [Feature matrix](#feature-matrix-v04) below for the authoritative list.
+- **Lightweight**: Heavy subsystems (TUI, remote vaults, YAML, enterprise features) must be optional via Cargo features. See the [Feature matrix](#feature-matrix-v030) below for the authoritative list.
 - **Profiles as compositions**: Profiles reference (do not duplicate) skills, instructions, providers, vaults, and MCPs.
 - **Multi-provider**: Support Claude Code, OpenCode, Gemini, Copilot, and others without vendor lock-in.
 
@@ -22,7 +22,7 @@ This file is the **Agent Harness** for AGK. It defines how both human contributo
 
 ---
 
-## Feature matrix (v0.4+)
+## Feature matrix (v0.3.0+)
 
 The crate is feature-gated. The table below lists the cargo features defined in
 `Cargo.toml` and the behaviour each one enables. The default feature set

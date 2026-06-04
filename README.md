@@ -9,9 +9,9 @@ Manage vaults of reusable skills, instructions, MCP servers, and **profiles**. I
 ![GitHub release](https://img.shields.io/github/v/release/dkthezero/agk)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dkthezero/agk)
 
-## What's new in v0.4
+## What's new in v0.3.0
 
-**Claude Code agent profiles + multi-provider LLM support.** v0.4 extends the
+**Claude Code agent profiles + multi-provider LLM support.** v0.3.0 extends the
 profile system with a wizard that emits native Claude Code agent markdown, and
 adds a sibling port for LLM model servers (Ollama, LM Studio, Anthropic, OpenAI).
 
