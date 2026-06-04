@@ -137,6 +137,77 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                     );
                 }
                 WizardStep::Interactive { .. } => {}
+                // C3: render the v0.4 wizard steps. The new step kinds re-use
+                // the existing modal widgets — the per-step shape is the same
+                // (text input, single-select list, multi-select checklist,
+                // read-only summary), so the renderer is intentionally light.
+                WizardStep::ProviderSelect { title, providers } => {
+                    modal::render_select_modal(frame, title, providers, ws.selected);
+                }
+                WizardStep::LlmProviderSelect { title, providers } => {
+                    modal::render_select_modal(frame, title, providers, ws.selected);
+                }
+                WizardStep::ModelInput { title, placeholder } => {
+                    modal::render_input_modal(
+                        frame,
+                        title,
+                        placeholder,
+                        &ws.prompt_buffer,
+                        ws.cursor_pos,
+                    );
+                }
+                WizardStep::AgentDescription {
+                    title, placeholder, ..
+                } => {
+                    modal::render_input_modal(
+                        frame,
+                        title,
+                        placeholder,
+                        &ws.prompt_buffer,
+                        ws.cursor_pos,
+                    );
+                }
+                WizardStep::SkillsPick { title, options } => {
+                    // Re-use the filtered checklist renderer — SkillsPick uses
+                    // the same checked[] / filter_query state as Checklist.
+                    let filtered_indices = ws.filtered_indices();
+                    let filtered_options: Vec<String> = filtered_indices
+                        .iter()
+                        .map(|&i| options.get(i).cloned().unwrap_or_default())
+                        .collect();
+                    let filtered_checked: Vec<bool> = filtered_indices
+                        .iter()
+                        .map(|&i| ws.checked.get(i).copied().unwrap_or(false))
+                        .collect();
+                    let selected_filtered =
+                        ws.selected.min(filtered_options.len().saturating_sub(1));
+                    modal::render_checklist_modal(
+                        frame,
+                        title,
+                        &filtered_options,
+                        &filtered_checked,
+                        selected_filtered,
+                        &ws.filter_query,
+                    );
+                }
+                WizardStep::ReviewFinal { title } => {
+                    // Read-only summary: re-use the review modal with the
+                    // most relevant fields captured on the new steps.
+                    let tools = &ws.selected_tools;
+                    let permission = ws.selected_permission_mode.as_deref();
+                    modal::render_review_modal(
+                        frame,
+                        title,
+                        &ws.name,
+                        &ws.agent_description,
+                        &ws.skills,
+                        &ws.mcps,
+                        tools,
+                        permission,
+                        "[Enter] Confirm  [Esc] Back",
+                        ws.scroll_offset,
+                    );
+                }
             }
         }
     }

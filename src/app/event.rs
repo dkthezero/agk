@@ -4,6 +4,8 @@
 /// Both TUI and CLI observe the same events, but render them differently (UI state
 /// updates vs stdout/JSON).
 /// NOTE: Events are emitted incrementally as use-cases are wired into core.rs.
+#[allow(clippy::large_enum_variant)]
+// `ProfileLaunchPlan` carries a 448-byte `LaunchPlan`; boxing would add a heap allocation per emit and the plan is built once per session.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreEvent {
     // -----------------------------------------------------------------------
@@ -23,8 +25,7 @@ pub enum CoreEvent {
         message: String,
     },
     ProfileLaunchPlan {
-        id: crate::domain::profile::ProfileId,
-        plan: LaunchPlan,
+        plan: crate::domain::launch_plan::LaunchPlan,
     },
     ProfileSessionStarted {
         id: crate::domain::profile::ProfileId,
@@ -175,6 +176,17 @@ pub enum CoreEvent {
         skills_updated: Vec<String>,
         skills_removed_from_team: Vec<String>,
         errors: Vec<String>,
+    },
+
+    // -----------------------------------------------------------------------
+    // LLM providers
+    // -----------------------------------------------------------------------
+    LlmProviderListed(crate::domain::llm_provider::LlmProviderConfig),
+    LlmProviderUpserted(crate::domain::llm_provider::LlmProviderConfig),
+    LlmProviderRemoved(String),
+    LlmProviderHealth {
+        id: String,
+        status: crate::domain::llm_provider::LlmHealthStatus,
     },
 
     // -----------------------------------------------------------------------

@@ -133,13 +133,22 @@ pub async fn test_server(name: &str) -> Result<()> {
             }
         }
         McpTransport::Sse { url } => {
-            let client = reqwest::Client::builder()
-                .timeout(Duration::from_secs(10))
-                .build()?;
-            let _res =
-                client.get(url).send().await.with_context(|| {
+            #[cfg(feature = "vault-clawhub")]
+            {
+                let client = reqwest::Client::builder()
+                    .timeout(Duration::from_secs(10))
+                    .build()?;
+                let _res = client.get(url).send().await.with_context(|| {
                     format!("SSE MCP server '{}' did not respond at {}", name, url)
                 })?;
+            }
+            #[cfg(not(feature = "vault-clawhub"))]
+            {
+                let _ = (name, url);
+                bail!(
+                    "SSE MCP transport requires the 'vault-clawhub' feature (not enabled in this build)"
+                );
+            }
         }
     }
 

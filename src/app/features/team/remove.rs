@@ -12,16 +12,23 @@ pub struct TeamRemoveResult {
 
 /// Remove a skill requirement from the team configuration by identity.
 ///
-/// If no matching requirement is found, returns `removed: false` with an informative message.
+/// Requirements are keyed by `(identity, vault, kind)`. Removing by identity
+/// alone is only safe when the identity is unique across vaults. If no match is
+/// found, returns `removed: false` with an informative message; if the identity
+/// is ambiguous (present in more than one vault), the removal is refused so we
+/// don't delete unintended entries.
 pub fn team_remove_requirement(workspace_root: &Path, identity: &str) -> Result<TeamRemoveResult> {
     let store = TeamTomlStore::new(workspace_root.to_path_buf());
     let mut config = store.load(Scope::Workspace)?;
 
-    let before = config.requirements.len();
-    config.requirements.retain(|r| r.identity != identity);
-    let after = config.requirements.len();
+    let matching_vaults: Vec<String> = config
+        .requirements
+        .iter()
+        .filter(|r| r.identity == identity)
+        .map(|r| r.vault.clone())
+        .collect();
 
-    if before == after {
+    if matching_vaults.is_empty() {
         return Ok(TeamRemoveResult {
             identity: identity.to_string(),
             removed: false,
@@ -31,6 +38,22 @@ pub fn team_remove_requirement(workspace_root: &Path, identity: &str) -> Result<
             ),
         });
     }
+
+    if matching_vaults.len() > 1 {
+        return Ok(TeamRemoveResult {
+            identity: identity.to_string(),
+            removed: false,
+            message: format!(
+                "Requirement '{}' is ambiguous — it exists in {} vaults ({}). \
+                 Removing by identity alone is unsafe; disambiguate by vault before removing.",
+                identity,
+                matching_vaults.len(),
+                matching_vaults.join(", ")
+            ),
+        });
+    }
+
+    config.requirements.retain(|r| r.identity != identity);
 
     store.save(Scope::Workspace, &config)?;
 
@@ -108,6 +131,42 @@ mod tests {
         let result = team_remove_requirement(&workspace, "nonexistent").unwrap();
         assert!(!result.removed);
         assert!(result.message.contains("not found"));
+    }
+
+    #[test]
+    fn remove_refuses_ambiguous_identity_across_vaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = dir.path().to_path_buf();
+        let store = TeamTomlStore::new(workspace.clone());
+        let config = TeamConfig {
+            name: "test-team".to_string(),
+            source: None,
+            branch: Some("main".to_string()),
+            vaults: vec![],
+            requirements: vec![
+                TeamRequirement {
+                    identity: "shared-skill".to_string(),
+                    vault: "vault-a".to_string(),
+                    kind: AssetKind::Skill,
+                    version_constraint: None,
+                },
+                TeamRequirement {
+                    identity: "shared-skill".to_string(),
+                    vault: "vault-b".to_string(),
+                    kind: AssetKind::Skill,
+                    version_constraint: None,
+                },
+            ],
+        };
+        store.save(Scope::Workspace, &config).unwrap();
+
+        let result = team_remove_requirement(&workspace, "shared-skill").unwrap();
+        assert!(!result.removed);
+        assert!(result.message.contains("ambiguous"));
+
+        // Both requirements must still be present — nothing removed.
+        let reloaded = store.load(Scope::Workspace).unwrap();
+        assert_eq!(reloaded.requirements.len(), 2);
     }
 
     #[test]

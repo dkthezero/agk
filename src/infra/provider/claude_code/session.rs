@@ -207,6 +207,9 @@ mod tests {
             permission_mode: Some("auto".into()),
             prompt_overlay_path: None,
             launch_policy: LaunchPolicy::AutoRestore,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         }
     }
 
@@ -236,6 +239,9 @@ mod tests {
             permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: LaunchPolicy::AutoRestore,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
         let md = compose_agent_markdown(&profile);
         assert!(md.contains("name: minimal"));
@@ -307,6 +313,9 @@ mod tests {
             permission_mode: Some("auto-accept".into()),
             prompt_overlay_path: None,
             launch_policy: LaunchPolicy::AutoRestore,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
         let md = compose_agent_markdown(&profile);
         // Colon in id should be quoted

@@ -9,6 +9,18 @@ Manage vaults of reusable skills, instructions, MCP servers, and **profiles**. I
 ![GitHub release](https://img.shields.io/github/v/release/dkthezero/agk)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/dkthezero/agk)
 
+## What's new in v0.3.0
+
+**Claude Code agent profiles + multi-provider LLM support.** v0.3.0 extends the
+profile system with a wizard that emits native Claude Code agent markdown, and
+adds a sibling port for LLM model servers (Ollama, LM Studio, Anthropic, OpenAI).
+
+- **Claude Code agent profiles** — `agk profile create` now supports `claude-code` as a provider, generating `.claude/agents/<name>.md` agent markdown with full frontmatter (name, description, tools, model, permission_mode, skills, mcp_servers, hooks, etc.)
+- **Multi-provider LLM support** — configure Ollama, LM Studio, Anthropic, and OpenAI as model servers. `agk llm list/add/remove/health` manages providers. `LlmProviderPort` is a sibling to the existing `ProviderPort` (different role: model server vs agent harness)
+- **Hexagonal provider boundaries** — agent providers (claude-code, opencode) and LLM providers are isolated; architecture test enforces that concrete LLM adapters are only imported from the composition root
+- **Multi-stage Docker** — slim runtime image (~50MB) for production, full CI image for the test matrix
+- **Slim-build regression** — the binary still builds with `--no-default-features --features tui` only
+
 ## What's new in v0.3
 
 **Team-ready profiles** — the capstone feature. A profile is a portable, versioned environment blueprint that bundles an AI agent, its skills, MCP servers, and a structured prompt. Teams distribute profiles through vaults; new developers install one profile and are ready to code in 30 seconds.

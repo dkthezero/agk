@@ -8,6 +8,20 @@ pub struct CreateProfileInput {
     pub instruction_refs: Vec<crate::domain::profile::ProfileAssetRef>,
     pub description: String,
     pub scope: crate::domain::scope::Scope,
+    /// Free-form model name (e.g. `claude-sonnet-4-5`, `sonnet`). Used by the
+    /// `claude-code` provider branch when rendering the agent markdown.
+    pub model: Option<String>,
+    /// Optional LLM provider id the downstream exec should use.
+    pub llm_provider_id: Option<String>,
+    /// MCP server definitions resolved at create-time. Embedded into the
+    /// generated agent markdown for the `claude-code` provider branch.
+    pub agent_mcp_servers: Vec<crate::domain::agent_markdown::AgentMcpServer>,
+    /// Optional tool references (e.g. `Read`, `Grep`). Embedded into the
+    /// generated agent markdown for the `claude-code` provider branch.
+    pub tool_refs: Vec<String>,
+    /// Optional permission mode (e.g. `acceptEdits`). Embedded into the
+    /// generated agent markdown for the `claude-code` provider branch.
+    pub permission_mode: Option<String>,
 }
 
 impl CreateProfileInput {
@@ -24,6 +38,11 @@ impl CreateProfileInput {
             instruction_refs: Vec::new(),
             description: String::new(),
             scope,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: Vec::new(),
+            tool_refs: Vec::new(),
+            permission_mode: None,
         }
     }
 }

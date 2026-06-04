@@ -211,6 +211,9 @@ impl ProviderPort for ClaudeCodeProvider {
                 .as_ref()
                 .map(std::path::PathBuf::from),
             launch_policy: crate::domain::profile::LaunchPolicy::AutoRestore,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
         let plan = self.build_launch_plan(&domain_profile, None)?;
         let _ = (session_key, workspace_root);

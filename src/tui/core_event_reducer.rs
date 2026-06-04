@@ -59,8 +59,8 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 message
             );
         }
-        CoreEvent::ProfileLaunchPlan { id, .. } => {
-            state.status_line = format!("Launch plan ready for '{}'", id.as_str());
+        CoreEvent::ProfileLaunchPlan { plan } => {
+            state.status_line = format!("Launch plan ready for '{}'", plan.profile_id);
         }
         CoreEvent::ProfileSessionStarted { id, .. } => {
             state.status_line = format!("Session started for '{}'", id.as_str());
@@ -278,6 +278,12 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 errors.len()
             );
             state.team_config = None;
+        }
+        CoreEvent::LlmProviderListed(_)
+        | CoreEvent::LlmProviderUpserted(_)
+        | CoreEvent::LlmProviderRemoved(_)
+        | CoreEvent::LlmProviderHealth { .. } => {
+            state.status_line = crate::tui::reducer_llm::llm_status_line(event);
         }
     }
 }

@@ -3,6 +3,7 @@ pub mod asset;
 pub mod common;
 pub mod context;
 pub mod debug;
+pub mod llm;
 pub mod mcp;
 pub mod profile;
 pub mod provider;

@@ -76,9 +76,13 @@ pub fn handle_enter_update(state: &mut AppState, ctx: &EventContext) -> Result<(
 /// Handle F3 press on an Asset tab: toggle the selected asset's source
 /// between Team and Personal.
 ///
-/// If toggling to Team, add a requirement to team.toml.
-/// If toggling to Personal, remove the requirement from team.toml.
-/// In both cases, update the config's AssetBucket source and reload.
+/// If toggling to Team, add a requirement to `team.toml`.
+/// If toggling to Personal, remove the requirement from `team.toml`.
+///
+/// NOTE: this only writes `team.toml`. The Team/Personal badge in the list is
+/// driven by `config.toml`'s `AssetBucket.source`, which is reconciled by
+/// `agk sync` (or F5). The badge therefore won't flip until the next sync —
+/// the status message says so to avoid implying an immediate change.
 pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result<()> {
     let pkg_opt = {
         let filtered = state.filtered_packages();
@@ -126,7 +130,10 @@ pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result
                     kind: kind_str.to_string(),
                     version_constraint: None,
                 }));
-            state.status_line = format!("Toggled '{}' to Team", name);
+            state.status_line = format!(
+                "Added '{}' to team requirements — badge updates on next sync",
+                name
+            );
         }
         AssetSource::Team => {
             // Toggle to Personal: remove from team requirements
@@ -135,7 +142,10 @@ pub fn handle_f3_toggle_team(state: &mut AppState, ctx: &EventContext) -> Result
                 .send(AppEvent::ExecuteCommand(CoreCommand::TeamRemove {
                     identity: name.clone(),
                 }));
-            state.status_line = format!("Toggled '{}' to Personal", name);
+            state.status_line = format!(
+                "Removed '{}' from team requirements — badge updates on next sync",
+                name
+            );
         }
     }
 

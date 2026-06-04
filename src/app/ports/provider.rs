@@ -82,7 +82,7 @@ pub trait ProviderPort: Send + Sync {
 /// A single static description of a wizard step.  Mutable UI state lives in
 /// `WizardState`, not here, so the step list can be cloned/replaced freely.
 /// Archetype template for pre-filling wizard fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArchetypeTemplate {
     pub id: String,
     pub name: String,
@@ -92,7 +92,7 @@ pub struct ArchetypeTemplate {
     pub default_permission_mode: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WizardStep {
     TextInput {
         title: String,
@@ -142,6 +142,36 @@ pub enum WizardStep {
         title: String,
         command: String,
         args: Vec<String>,
+    },
+    /// Pick the agent provider (claude-code, opencode, ...).
+    ProviderSelect {
+        title: String,
+        providers: Vec<(String, String)>, // (id, display_name)
+    },
+    /// Pick the LLM provider (only for providers that use one).
+    LlmProviderSelect {
+        title: String,
+        providers: Vec<(String, String)>, // (id, display_name)
+    },
+    /// Free-form model string (256-char cap).
+    ModelInput {
+        title: String,
+        placeholder: String,
+    },
+    /// Multi-line agent description (stored in agent markdown frontmatter).
+    AgentDescription {
+        title: String,
+        placeholder: String,
+        rows: usize,
+    },
+    /// Skills pick checklist (re-uses filtered_indices in WizardState).
+    SkillsPick {
+        title: String,
+        options: Vec<String>,
+    },
+    /// Final review before commit.
+    ReviewFinal {
+        title: String,
     },
 }
 

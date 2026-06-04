@@ -9,6 +9,7 @@ pub mod layout;
 pub mod list_mode;
 pub mod presenter;
 pub mod progress;
+pub mod reducer_llm;
 pub mod reload;
 pub mod render;
 pub mod runtime_loop;

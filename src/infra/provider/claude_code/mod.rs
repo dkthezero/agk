@@ -7,6 +7,12 @@ pub mod install;
 pub mod mcp;
 pub mod session;
 
+#[cfg(feature = "claude-cli-probe")]
+pub mod cli_probe;
+
+#[cfg(feature = "profile-create")]
+pub mod agent_markdown;
+
 pub struct ClaudeCodeProvider {
     pub(crate) workspace_root: PathBuf,
 }

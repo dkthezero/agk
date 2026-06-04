@@ -1,6 +1,7 @@
 pub mod config;
 pub mod context;
 pub mod feature;
+pub mod llm;
 pub mod mcp;
 pub mod process;
 pub mod provider;

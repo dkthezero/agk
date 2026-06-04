@@ -1,8 +1,11 @@
+pub mod agent_markdown;
 pub mod asset;
 pub mod config;
 pub mod context;
 pub mod hashing;
 pub mod identity;
+pub mod launch_plan;
+pub mod llm_provider;
 pub mod mcp;
 pub mod mcp_security;
 pub mod paths;

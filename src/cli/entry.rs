@@ -97,6 +97,7 @@ pub enum Commands {
     },
 
     /// Pack a skill into a provider-specific distributable
+    #[cfg(feature = "pack")]
     Pack {
         /// Asset identity
         identity: String,
@@ -139,6 +140,12 @@ pub enum Commands {
     Team {
         #[command(subcommand)]
         command: TeamCommands,
+    },
+
+    /// Manage LLM providers
+    Llm {
+        #[command(subcommand)]
+        command: crate::cli::llm::LlmCommand,
     },
 
     /// Debug / observability commands (hidden in help)
@@ -198,6 +205,7 @@ impl From<EnvironmentArg> for crate::domain::context::Environment {
     }
 }
 
+#[cfg(feature = "pack")]
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum PackTarget {
     ClaudeDesktop,
