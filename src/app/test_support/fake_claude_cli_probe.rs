@@ -66,7 +66,7 @@ impl ClaudeCliProbePort for FakeClaudeCliProbe {
     fn supports_agent_flag(&self) -> bool {
         self.version
             .as_ref()
-            .map_or(false, |v| v >= &MIN_CLAUDE_CLI_VERSION)
+            .is_some_and(|v| v >= &MIN_CLAUDE_CLI_VERSION)
     }
 }
 

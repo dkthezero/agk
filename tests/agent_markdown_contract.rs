@@ -7,10 +7,10 @@
 //!
 //! Each fixture pair consists of:
 //!   * `<case>.json`        — the `AgentFrontmatter` serialized as JSON,
-//!                             deserialized into a `LaunchPlan` by the test.
+//!     deserialized into a `LaunchPlan` by the test.
 //!   * `<case>.expected.md` — the verbatim string the renderer must produce
-//!                             for that plan (compared via `assert_eq!` after
-//!                             trimming trailing whitespace from both sides).
+//!     for that plan (compared via `assert_eq!` after trimming trailing
+//!     whitespace from both sides).
 //!
 //! The `LaunchPlan` is built per-test from the deserialized frontmatter plus
 //! a `resolved_mcp_servers` list (full case) or empty (basic / minimal).

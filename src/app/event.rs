@@ -4,6 +4,7 @@
 /// Both TUI and CLI observe the same events, but render them differently (UI state
 /// updates vs stdout/JSON).
 /// NOTE: Events are emitted incrementally as use-cases are wired into core.rs.
+#[allow(clippy::large_enum_variant)] // `ProfileLaunchPlan` carries a 448-byte `LaunchPlan`; boxing would add a heap allocation per emit and the plan is built once per session.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CoreEvent {
     // -----------------------------------------------------------------------

@@ -61,15 +61,14 @@ impl ClaudeCliProbePort for SystemClaudeCliProbe {
         let s = String::from_utf8_lossy(&out.stdout);
         let token = s
             .split_whitespace()
-            .find(|t| t.chars().next().map_or(false, |c| c.is_ascii_digit()))
+            .find(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))
             .ok_or_else(|| anyhow::anyhow!("could not parse version from: {}", s.trim()))?;
         semver::Version::parse(token.trim_start_matches('v'))
             .with_context(|| format!("invalid semver: {token}"))
     }
 
     fn supports_agent_flag(&self) -> bool {
-        self.version()
-            .map_or(false, |v| v >= MIN_CLAUDE_CLI_VERSION)
+        self.version().is_ok_and(|v| v >= MIN_CLAUDE_CLI_VERSION)
     }
 }
 
