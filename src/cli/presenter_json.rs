@@ -267,36 +267,11 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::WorkspaceLoaded(_) => {
             serde_json::json!({ "type": "WorkspaceLoaded" })
         }
-        CoreEvent::LlmProviderListed(cfg) => {
-            serde_json::json!({
-                "type": "LlmProviderListed",
-                "id": cfg.id,
-                "kind": cfg.kind.as_str(),
-                "endpoint": cfg.endpoint,
-                "default_model": cfg.default_model,
-            })
-        }
-        CoreEvent::LlmProviderUpserted(cfg) => {
-            serde_json::json!({
-                "type": "LlmProviderUpserted",
-                "id": cfg.id,
-                "kind": cfg.kind.as_str(),
-                "endpoint": cfg.endpoint,
-                "default_model": cfg.default_model,
-            })
-        }
-        CoreEvent::LlmProviderRemoved(id) => {
-            serde_json::json!({ "type": "LlmProviderRemoved", "id": id })
-        }
-        CoreEvent::LlmProviderHealth { id, status } => {
-            serde_json::json!({
-                "type": "LlmProviderHealth",
-                "id": id,
-                "reachable": status.reachable,
-                "latency_ms": status.latency_ms,
-                "models": status.models,
-                "error": status.error,
-            })
+        CoreEvent::LlmProviderListed(_)
+        | CoreEvent::LlmProviderUpserted(_)
+        | CoreEvent::LlmProviderRemoved(_)
+        | CoreEvent::LlmProviderHealth { .. } => {
+            crate::cli::presenter_json_llm::llm_event_to_json(event)
         }
         CoreEvent::Error(msg) => {
             serde_json::json!({ "type": "Error", "message": msg })
