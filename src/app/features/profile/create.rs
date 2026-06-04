@@ -57,7 +57,9 @@ pub fn run(
         ));
     }
 
-    // 4. Build and save
+    // 4. Build and save (initial placeholder; provider-specific branches
+    //    below may rewrite `prompt_overlay_path` after rendering agent
+    //    markdown for the `claude-code` provider).
     let profile = Profile {
         name: id_str.to_string(),
         provider_id: provider_id.to_string(),
@@ -65,15 +67,56 @@ pub fn run(
         skills: input.skill_refs.clone(),
         mcps: input.mcp_refs.clone(),
         instructions: input.instruction_refs.clone(),
-        tool_refs: vec![],
-        permission_mode: None,
+        tool_refs: input.tool_refs.clone(),
+        permission_mode: input.permission_mode.clone(),
         prompt_overlay_path: None,
     };
     config.profiles.push(profile);
-    store.save(input.scope, &config)?;
 
-    // 5. Provider-specific setup (opencode)
-    if provider_id == "opencode" {
+    // 5. Provider-specific setup.
+    let prompt_overlay_path: Option<std::path::PathBuf> = if provider_id == "claude-code" {
+        // Build the agent frontmatter from the wizard answer.
+        let model = input.model.clone().unwrap_or_else(|| "sonnet".to_string());
+        let fm = crate::domain::agent_markdown::AgentFrontmatter {
+            name: id_str.to_string(),
+            description: input.description.clone(),
+            tools: input.tool_refs.clone(),
+            disallowed_tools: vec![],
+            model: model.clone(),
+            permission_mode: input.permission_mode.clone(),
+            max_turns: None,
+            skills: input.skill_refs.iter().map(|r| r.name.clone()).collect(),
+            mcp_servers: input.mcp_refs.iter().map(|r| r.name.clone()).collect(),
+            hooks: vec![],
+            memory: None,
+            background: false,
+            effort: None,
+            isolation: None,
+            color: None,
+        };
+        // Placeholder: a richer prompt body composition comes in v0.5.
+        let prompt_body = input.description.clone();
+        let plan = crate::domain::launch_plan::LaunchPlan {
+            profile_id: id_str.to_string(),
+            provider_id: provider_id.to_string(),
+            frontmatter: fm,
+            prompt_body,
+            resolved_mcp_servers: input.agent_mcp_servers.clone(),
+            llm_provider_id: input.llm_provider_id.clone(),
+        };
+        let md = crate::infra::provider::claude_code::agent_markdown::render_agent_markdown(&plan);
+        let agents_dir = workspace.join(".claude").join("agents");
+        std::fs::create_dir_all(&agents_dir)?;
+        let path = agents_dir.join(format!("{}.md", id_str));
+        std::fs::write(&path, md)?;
+        sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
+        sink.on_event(CoreEvent::Info(format!(
+            "Profile '{}' created. Agent markdown saved to {}",
+            id_str,
+            path.display()
+        )));
+        Some(path)
+    } else if provider_id == "opencode" {
         let profile_dir = workspace.join(".agk").join("profiles").join(id_str);
         std::fs::create_dir_all(&profile_dir)?;
 
@@ -121,14 +164,21 @@ pub fn run(
             sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
             sink.on_event(CoreEvent::Info(format!(
                 "Profile '{}' created. Agent markdown not found in {}. \
-                 You may need to run `opencode agent create` manually.",
+                     You may need to run `opencode agent create` manually.",
                 id_str,
                 agents_dir.display()
             )));
         }
+        None
     } else {
-        sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
-    }
+        anyhow::bail!("unsupported profile provider: {}", provider_id);
+    };
+
+    // 6. Persist the (possibly rewritten) `prompt_overlay_path` and save.
+    config.profiles.last_mut().unwrap().prompt_overlay_path = prompt_overlay_path
+        .as_ref()
+        .map(|p| p.display().to_string());
+    store.save(input.scope, &config)?;
 
     // 6. Emit workspace snapshot
     let snapshot = WorkspaceSnapshot {
@@ -155,13 +205,13 @@ fn to_domain_profile(input: &CreateProfileInput) -> crate::domain::profile::Prof
         skill_refs: input.skill_refs.clone(),
         mcp_refs: input.mcp_refs.clone(),
         instruction_refs: input.instruction_refs.clone(),
-        tool_refs: vec![],
-        permission_mode: None,
+        tool_refs: input.tool_refs.clone(),
+        permission_mode: input.permission_mode.clone(),
         prompt_overlay_path: None,
         launch_policy: crate::domain::profile::LaunchPolicy::default(),
-        model: None,
-        llm_provider_id: None,
-        agent_mcp_servers: vec![],
+        model: input.model.clone(),
+        llm_provider_id: input.llm_provider_id.clone(),
+        agent_mcp_servers: input.agent_mcp_servers.clone(),
     }
 }
 

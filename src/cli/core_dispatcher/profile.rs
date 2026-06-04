@@ -43,6 +43,11 @@ pub(super) fn to_core_command(command: &ProfileCommands) -> anyhow::Result<CoreC
                     instruction_refs: vec![],
                     description: desc,
                     scope: scope.into_domain_scope(),
+                    model: None,
+                    llm_provider_id: None,
+                    agent_mcp_servers: Vec::new(),
+                    tool_refs: Vec::new(),
+                    permission_mode: None,
                 },
             })
         }
