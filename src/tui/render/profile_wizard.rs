@@ -137,6 +137,13 @@ pub fn draw_profile_wizard(frame: &mut Frame, state: &AppState) {
                     );
                 }
                 WizardStep::Interactive { .. } => {}
+                // C3 will wire rendering for these new variants.
+                WizardStep::ProviderSelect { .. }
+                | WizardStep::LlmProviderSelect { .. }
+                | WizardStep::ModelInput { .. }
+                | WizardStep::AgentDescription { .. }
+                | WizardStep::SkillsPick { .. }
+                | WizardStep::ReviewFinal { .. } => {}
             }
         }
     }

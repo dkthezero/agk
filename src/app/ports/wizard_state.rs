@@ -42,6 +42,14 @@ pub struct WizardState {
     pub selected_tools: Vec<String>,
     /// Selected permission mode.
     pub selected_permission_mode: Option<String>,
+    /// Provider id picked on the ProviderSelect step.
+    pub provider_id_choice: String,
+    /// LLM provider id picked on the LlmProviderSelect step.
+    pub llm_provider_id: String,
+    /// Free-form model string captured on the ModelInput step.
+    pub model_string: String,
+    /// Multi-line agent description captured on the AgentDescription step.
+    pub agent_description: String,
 }
 
 impl WizardState {
@@ -112,6 +120,10 @@ impl WizardState {
             structured_answers: std::collections::HashMap::new(),
             selected_tools: Vec::new(),
             selected_permission_mode: None,
+            provider_id_choice: String::new(),
+            llm_provider_id: String::new(),
+            model_string: String::new(),
+            agent_description: String::new(),
         };
         ws.sync_checklist_state();
         ws
@@ -277,5 +289,36 @@ mod tests {
             .insert("role".into(), "Rust dev".into());
         let desc = ws.composed_description();
         assert!(desc.contains("Rust dev"));
+    }
+
+    #[test]
+    fn new_wizard_variants_construct() {
+        let _ = WizardStep::ProviderSelect {
+            title: "Pick agent provider".into(),
+            providers: vec![
+                ("claude-code".into(), "Claude Code".into()),
+                ("opencode".into(), "OpenCode".into()),
+            ],
+        };
+        let _ = WizardStep::LlmProviderSelect {
+            title: "Pick LLM provider".into(),
+            providers: vec![("local-ollama".into(), "Ollama (local)".into())],
+        };
+        let _ = WizardStep::ModelInput {
+            title: "Model string".into(),
+            placeholder: "e.g. claude-sonnet-4-5 or llama3.2".into(),
+        };
+        let _ = WizardStep::AgentDescription {
+            title: "Describe this agent".into(),
+            placeholder: "Used as the agent's `description` frontmatter".into(),
+            rows: 5,
+        };
+        let _ = WizardStep::SkillsPick {
+            title: "Pick skills".into(),
+            options: vec!["code-review".into()],
+        };
+        let _ = WizardStep::ReviewFinal {
+            title: "Review and confirm".into(),
+        };
     }
 }

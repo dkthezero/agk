@@ -272,6 +272,13 @@ pub fn handle_profile_wizard_input(
             crate::tui::features::profiles::wizard_review::handle_review_step(state, ctx, key);
         }
         WizardStep::Interactive { .. } => {}
+        // C3 will wire event handling for these new variants.
+        WizardStep::ProviderSelect { .. }
+        | WizardStep::LlmProviderSelect { .. }
+        | WizardStep::ModelInput { .. }
+        | WizardStep::AgentDescription { .. }
+        | WizardStep::SkillsPick { .. }
+        | WizardStep::ReviewFinal { .. } => {}
     }
     Ok(())
 }
