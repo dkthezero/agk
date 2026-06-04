@@ -5,12 +5,11 @@ mod profile;
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
-use crate::cli::entry::{
-    Cli, Commands, ContextCommands, DebugCommands, TeamCommands, TelemetryCommands,
-    VaultCommands,
-};
 #[cfg(feature = "pack")]
 use crate::cli::entry::PackTarget;
+use crate::cli::entry::{
+    Cli, Commands, ContextCommands, DebugCommands, TeamCommands, TelemetryCommands, VaultCommands,
+};
 use crate::cli::presenter::CliPresenter;
 use crate::domain::context::ContextId;
 use crate::domain::scope::Scope;

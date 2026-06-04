@@ -138,10 +138,9 @@ pub async fn test_server(name: &str) -> Result<()> {
                 let client = reqwest::Client::builder()
                     .timeout(Duration::from_secs(10))
                     .build()?;
-                let _res =
-                    client.get(url).send().await.with_context(|| {
-                        format!("SSE MCP server '{}' did not respond at {}", name, url)
-                    })?;
+                let _res = client.get(url).send().await.with_context(|| {
+                    format!("SSE MCP server '{}' did not respond at {}", name, url)
+                })?;
             }
             #[cfg(not(feature = "vault-clawhub"))]
             {
