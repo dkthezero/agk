@@ -34,7 +34,7 @@ AGK's profile wizard currently supports the `opencode` agent provider. This epic
 | 4 | **`Profile` gets exactly 2 new fields**: `model: Option<String>`, `llm_provider_id: Option<LlmProviderId>`. No other bloat. | Honors AGENTS.md charter: "Profiles as compositions / references only." Tool selection, permission mode, color, memory stay in provider-internal state and are serialized to frontmatter by `render_agent_markdown()`. |
 | 5 | **Two-axis Cargo feature matrix**: compile surface (cli/tui) × feature set (core, profile-create, llm-providers, ...). | Matches AGENTS.md charter: "Heavy subsystems must be optional via Cargo features." A user can build a Docker runtime with just `cli,core,claude-code-provider,opencode-provider`. |
 | 6 | **`profile-create` feature (default on)** gates the create/wizard path. | Docker runtime doesn't need to *create* profiles; only to *start* them. Gating makes the slim build possible. |
-| 7 | **`LlmProviderAdapter` and `LlmProviderStorePort` port traits always built.** Impls are feature-gated. | Domain models and port shapes are always available. Only concrete adapters and registries are gated. Matches the "data is always present, behavior is optional" pattern. |
+| 7 | **`LlmProviderAdapter` and `LlmProviderStorePort` port traits always built.** Impls are feature-gated. | Domain models and port shapes are always available. Only concrete adapters and registries are gated. Matches the "data is always present, behavior is optional" pattern. **Slim-build story:** when `llm-providers` is off, the traits are declared but no `LlmProviderStorePort` impl exists. The slim build's use cases have no code path that calls `LlmProviderStorePort::get` (gated on `llm-providers` in the use case body), so the unsatisfied trait never causes a compile error. CI's `cargo check --no-default-features --features 'cli,core' --tests` verifies this. |
 | 8 | **LLM health check returns `LlmHealth { reachable: false, error }`, NOT `Err`.** | A health check that "fails" is *expected* output. The user wants to *see* the failure (Ollama not running). Bubbling it as `Err` exits non-zero and prints a stack trace. |
 | 9 | **One release, three commits.** | Each commit is independently revertable. CI runs at every commit. No surprise at the end. |
 | 10 | **Multi-stage `Dockerfile` + `docker-compose.yml` for E2E.** | CI runs the full feature set end-to-end against a real AGK binary. The `runtime` stage produces the same artifact a hand-built slim cargo would produce. |
@@ -108,21 +108,51 @@ cargo build --release --features 'tui,core,profile-create,team-sync,policy,telem
 
 ### 3.5 CI matrix (`.github/workflows/build.yml`)
 
+**Coverage policy:** every claimed cell in the feature matrix must compile. The matrix below includes the "drop one feature at a time" pattern to catch any feature-gate typo. The slim build verification is **explicit** — `cargo check --no-default-features --features 'cli,core' --tests` is its own job.
+
 ```yaml
 strategy:
   matrix:
     build:
-      - name: "full (default)"
-        features: ""
-      - name: "docker-runtime-min"
+      - name: "full (default features)"
+        features: ""  # uses Cargo.toml [features].default
+        check_tests: true
+      - name: "slim-runtime"
         features: "cli,core,claude-code-provider,opencode-provider"
+        check_tests: true
+        # Critical: this is the Docker runtime target. Must compile AND pass tests.
+      - name: "slim-runtime-strict"
+        features: "cli,core"
+        check_tests: true
+        # Even stricter slim: no provider impls. Tests must pass with no ClaudeCodeProvider in scope.
       - name: "headless-ci"
         features: "cli,core,profile-create,team-sync,policy,llm-providers,claude-code-provider"
+        check_tests: true
       - name: "tui-min"
         features: "tui,core,claude-code-provider,opencode-provider"
+        check_tests: true
       - name: "tui-full"
         features: "tui,core,profile-create,team-sync,policy,telemetry-team,llm-providers,claude-code-provider,opencode-provider,ghes-vault,mcp-providers"
+        check_tests: true
+      - name: "headless-no-llm"
+        features: "cli,core,profile-create,team-sync,policy,claude-code-provider"
+        check_tests: true
+        # Catches: use case that accidentally references LlmProviderStorePort without cfg
+      - name: "headless-no-profile-create"
+        features: "cli,core,team-sync,policy,llm-providers,claude-code-provider"
+        check_tests: true
+        # Catches: start.rs accidentally references CreateProfileInput without cfg
 ```
+
+For each cell:
+1. `cargo build --no-default-features --features '<features>'` must succeed.
+2. If `check_tests: true`, `cargo test --no-default-features --features '<features>'` must also succeed.
+3. `cargo clippy --no-default-features --features '<features>' -- -D warnings` clean.
+
+This matrix catches:
+- **Feature-gate typos** (a use case referencing an unsatisfied port)
+- **Slim-build failures** (cargo check on the most minimal config)
+- **Test failures in non-default configurations** (a test that requires a feature not in the cell)
 
 ### 3.6 Feature-gating rules
 
@@ -229,11 +259,16 @@ services:
 
 ### 4.4 `fixtures/e2e/run-e2e.sh`
 
-Exercises the full happy path: vault init, team init, profile create with claude-code, llm add, dry-run start, sync, policy check, frontmatter verification.
+Exercises the full happy path: vault init, team init, profile create with claude-code, llm add, dry-run start, sync, policy check, frontmatter verification. The script is **idempotent** — it cleans state on entry so it can be re-run in CI without manual intervention.
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Idempotent: clean any prior state so re-runs don't fail with "already exists"
+rm -rf /workspace/.claude /workspace/.agk
+mkdir -p /workspace
+
 agk vault init --name "ci-vault"
 agk team init --name "ci-team"
 agk team add-vault clawhub-public --type clawhub --url https://clawhub.ai
@@ -255,6 +290,22 @@ grep -q "^model: claude-sonnet-4-6$" /workspace/.claude/agents/ci-reviewer.md
 grep -q "^permissionMode: plan$" /workspace/.claude/agents/ci-reviewer.md
 echo "✓ E2E passed"
 ```
+
+### 4.6 Podman compatibility
+
+The `Dockerfile` uses standard OCI syntax (no Docker-specific extensions). Podman users can build the same images with no changes:
+
+```bash
+# Podman equivalent of `docker build --target ci-full .`
+podman build --target ci-full -t agk:ci-full .
+
+# Podman equivalent of `docker compose up agk-e2e`
+podman-compose up agk-e2e
+# OR
+podman play kube docker-compose.yml    # experimental, requires podman >= 4.0
+```
+
+CI uses Docker (GitHub Actions runners ship Docker). The Podman path is documented for users who prefer it but is not CI-tested.
 
 ### 4.5 `.github/workflows/e2e.yml`
 
@@ -343,6 +394,26 @@ pub fn validate_endpoint(endpoint: &str) -> Result<()> {
     }
     Ok(())
 }
+
+/// Validates a human-readable provider name (display name, not ID).
+/// Rules: non-empty, ≤64 chars, no control characters, no leading/trailing whitespace.
+/// Distinct from `LlmProviderId` (filesystem-safe ID) — `name` is the user-facing label.
+pub fn validate_provider_name(name: &str) -> Result<()> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("provider name cannot be empty");
+    }
+    if name.len() > 64 {
+        anyhow::bail!("provider name cannot exceed 64 characters");
+    }
+    if name.chars().any(|c| c.is_control()) {
+        anyhow::bail!("provider name cannot contain control characters");
+    }
+    if name != trimmed {
+        anyhow::bail!("provider name cannot have leading or trailing whitespace");
+    }
+    Ok(())
+}
 ```
 
 ### 5.2 `src/domain/profile.rs` (extend)
@@ -393,14 +464,22 @@ pub trait LlmHealthCheckPort: Send + Sync {
 ```rust
 pub enum WizardStep {
     // ... existing variants ...
-    ModelInput { title: String, allowed_pattern: Option<String> },
+    /// Free-form model string. Provider-specific validation in the use case.
+    /// No pattern hint — if a provider needs pattern validation, it can
+    /// override the wizard step in `profile_wizard_steps()` with a custom
+    /// `TextInput` + post-commit validation that emits `ValidationFailed`.
+    ModelInput { title: String, placeholder: String },
     LlmProviderSelect { title: String, providers: Vec<(LlmProviderId, String)> },
     ColorSelect { title: String, options: Vec<String> },
     MemoryScopeSelect { title: String, options: Vec<(String, String)> },
     MaxTurnsInput { title: String, default: Option<u32> },
-    /// Select an agent provider from the registry. Always shown first when
-    /// the wizard is invoked without `--provider`. Injected by the dispatcher,
-    /// not by a specific provider impl.
+    /// Select an agent provider from the registry. **Always shown first** when
+    /// the wizard is invoked without `--provider`. Injected by the wizard
+    /// driver in `app/features/profile/wizard.rs::build_step_list()` —
+    /// NOT by any specific provider impl. The driver reads the registry and
+    /// emits one `ProviderSelect` step before the provider-specific steps.
+    /// When `--provider` is supplied, this step is skipped and the chosen
+    /// provider's `profile_wizard_steps()` is used directly.
     ProviderSelect { title: String, providers: Vec<(ProviderId, String)> },
 }
 ```
@@ -408,7 +487,8 @@ pub enum WizardStep {
 ### 5.5 Validation rules (domain-pure)
 
 - `Profile.model`: any UTF-8 string ≤256 chars
-- `LlmProviderConfig.endpoint`: must parse as http/https URL
+- `LlmProviderConfig.endpoint`: must parse as http/https URL (via `validate_endpoint`)
+- `LlmProviderConfig.name`: 1-64 chars, no control chars, no leading/trailing whitespace (via `validate_provider_name`)
 - `LlmProviderId`: `^[a-z][a-z0-9-]{1,32}$`
 
 ---
@@ -439,7 +519,7 @@ Wizard step order for `claude-code`:
 ```
 1. TextInput           { "Profile name?" }
 2. ProviderSelect      (registry)
-3. ModelInput          { "Model?" }
+3. ModelInput          { "Model?", placeholder="e.g. claude-sonnet-4-6" }
 4. ToolSelect
 5. PermissionSelect
 6. ColorSelect
@@ -449,6 +529,17 @@ Wizard step order for `claude-code`:
 ```
 
 For `opencode`, steps 3-7 are skipped.
+
+**Step list assembly (`wizard.rs::build_step_list`):**
+
+The wizard does **not** call `profile_wizard_steps()` directly. It calls a helper that:
+
+1. If `provider_id` is unknown (no `--provider` flag), prepend `WizardStep::ProviderSelect { providers: <registry entries> }` to the step list.
+2. Look up the provider in the registry.
+3. Append the provider's `profile_wizard_steps()` output.
+4. Always append `WizardStep::ScopeSelect` and `WizardStep::Review` at the end.
+
+This keeps the per-feature `dispatch()` (per AGENTS.md §"Feature Dispatch") pattern intact — each feature owns its `CoreCommand` arms, and the wizard driver is the only place that knows about multiple providers.
 
 ### 6.3 `src/app/features/profile/create.rs` (extend, gated on `profile-create`)
 
@@ -483,6 +574,11 @@ pub struct LaunchPlan {
     pub agent_memory: Option<String>,        // "user" | "project" | "local" | None
     pub agent_max_turns: Option<u32>,
     pub prompt_body: Option<String>,         // pre-loaded from prompt_overlay_path
+    /// Pre-resolved MCP server definitions, serialized into the agent's
+    /// `mcpServers` frontmatter. Each entry is `(name, json_value)`.
+    /// Resolved at plan-build time by `build_launch_plan()` calling
+    /// `McpRegistryPort::get()`, so `render_agent_markdown` stays pure.
+    pub agent_mcp_servers: Vec<(String, serde_json::Value)>,
 }
 ```
 
@@ -504,19 +600,31 @@ src/infra/llm/
 
 Health-check semantics:
 
-| Provider | Path | Success |
-|---|---|---|
-| Ollama | `GET /api/tags` | 200 |
-| LM Studio | `GET /v1/models` | 200 |
-| Anthropic | `POST /v1/messages` with min body | 400 (reachable, auth needed) |
-| OpenAI | `GET /v1/models` | 200 |
+| Provider | Method + Path | Success | Trade-off |
+|---|---|---|---|
+| Ollama | `GET /api/tags` | 200 | Free, no auth needed |
+| LM Studio | `GET /v1/models` | 200 | Free, no auth needed |
+| Anthropic | `OPTIONS /v1/messages` | 2xx (200, 204) | **Free** — `OPTIONS` does not count against API quota and does not require auth. If `OPTIONS` is blocked by a proxy, fall back to `GET /` (Anthropic returns 404 on root, but that's still proof of reachability). |
+| OpenAI | `GET /v1/models` | 200 | Free, but requires API key in `Authorization: Bearer` header for non-200-class responses; we treat 401 as "reachable, needs auth" rather than "unreachable" |
+
+**Anthropic fallback chain** (in `AnthropicAdapter::check`):
+
+```
+1. OPTIONS /v1/messages  → 2xx  → reachable
+2. OPTIONS fails (network) → propagate as unreachable
+3. If OPTIONS returns 4xx (proxy blocking) → GET /
+   → 4xx  → reachable (server is responding, just doesn't allow OPTIONS)
+   → 5xx  → unreachable
+```
+
+This avoids the original spec's `POST /v1/messages` approach, which would consume API quota and could trigger rate limits on idle accounts. Documented in `infra/llm/anthropic.rs::check` with a code comment.
 
 ### 6.6 `src/infra/provider/claude_code/agent_markdown.rs` (gated on `claude-code-provider`)
 
 ```rust
 /// Pure function: takes a profile + launch plan, returns the full
 /// `.claude/agents/<name>.md` content (frontmatter + body).
-/// No I/O. Tested with golden output in `tests/`.
+/// No I/O. No port calls. Tested with golden output in `tests/`.
 pub fn render_agent_markdown(
     profile: &Profile,
     launch_plan: &LaunchPlan,
@@ -541,15 +649,95 @@ pub fn render_agent_markdown(
     if let Some(t) = launch_plan.agent_max_turns {
         fm.insert("maxTurns".into(), t.into());
     }
-    // mcpServers: from profile.mcp_refs resolved via mcp_registry
-    // body: from profile.prompt_overlay_path if set, else empty
+    if !launch_plan.agent_mcp_servers.is_empty() {
+        let mut servers = serde_yaml::Sequence::new();
+        for (name, value) in &launch_plan.agent_mcp_servers {
+            // Each entry is either a string (reference to existing server)
+            // or an inline {name: {type, command, args, env}} definition.
+            // Detect which by checking if value is an object.
+            if value.is_object() && !value.as_object().unwrap().contains_key(name) {
+                // Inline definition: wrap with the name as the key
+                let mut wrapped = serde_yaml::Mapping::new();
+                wrapped.insert(name.clone().into(), value.clone());
+                servers.push(wrapped);
+            } else {
+                servers.push(name.clone().into());
+            }
+        }
+        fm.insert("mcpServers".into(), servers.into());
+    }
     let yaml = serde_yaml::to_string(&fm).unwrap_or_default();
     let body = launch_plan.prompt_body.clone().unwrap_or_default();
-    format!("---\n{yaml}---\n\n{body}")
+    if body.is_empty() {
+        format!("---\n{yaml}---")
+    } else {
+        format!("---\n{yaml}---\n\n{body}")
+    }
 }
 ```
 
-All decoration fields (`color`, `memory`, `max_turns`, `mcp_servers`, `prompt_body`) come from `LaunchPlan` (Section 6.4), not from `Profile`. The `Profile` struct stays lean per decision #4.
+All decoration fields (`color`, `memory`, `max_turns`, `mcp_servers`, `prompt_body`) come from `LaunchPlan` (Section 6.4), not from `Profile`. The `Profile` struct stays lean per decision #4. The renderer has **zero I/O and zero port calls** — `build_launch_plan()` does all the work of looking up MCP servers and loading the prompt body, and the renderer just serializes.
+
+### 6.7 Claude CLI binary probe (`src/app/ports/claude_cli.rs`, always built)
+
+The `claude` binary is external — its availability and version are unknown to AGK. Before invoking `claude --agent <name>`, `start.rs::run` must verify the binary exists, is executable, and supports the `--agent` flag (introduced in Claude Code v2.0.0). Without this, an old or missing `claude` produces a confusing exec failure.
+
+```rust
+/// Port for probing the local `claude` CLI binary.
+/// Implemented in `infra/provider/claude_code/cli_probe.rs` using
+/// `which::which("claude")` and `std::process::Command::new("claude").arg("--version")`.
+/// Always built (trait is shape data only) — impl is gated on `claude-code-provider`.
+pub trait ClaudeCliProbePort: Send + Sync {
+    /// Returns the path to `claude` if it exists on PATH and is executable.
+    fn locate(&self) -> Result<PathBuf>;
+
+    /// Returns the parsed version of `claude --version`.
+    /// None if version cannot be parsed (we still tolerate exec).
+    fn version(&self) -> Result<Option<semver::Version>>;
+
+    /// Returns Ok(()) if `claude` supports `--agent` (>= v2.0.0).
+    /// Returns a structured error otherwise with the actual installed version
+    /// so the user can update or downgrade.
+    fn supports_agent_flag(&self) -> Result<()> {
+        match self.version()? {
+            Some(v) if v >= semver::Version::new(2, 0, 0) => Ok(()),
+            Some(v) => anyhow::bail!(
+                "Claude Code v{} is installed but `--agent` requires v2.0.0 or later. \
+                 Update: https://docs.claude.com/en/docs/claude-code/getting-started",
+                v
+            ),
+            None => anyhow::bail!(
+                "Could not parse `claude --version` output. \
+                 Ensure Claude Code v2.0.0+ is installed."
+            ),
+        }
+    }
+}
+```
+
+**Call site (`start.rs::run`):**
+
+```rust
+// In ClaudeCodeProvider::start_profile_session, before exec:
+if let Err(e) = self.cli_probe.supports_agent_flag() {
+    return Err(e.context(
+        "Cannot start profile — Claude Code CLI is missing or outdated"
+    ));
+}
+```
+
+**Error UX (per AGENTS.md anti-patterns):**
+
+| Condition | Message |
+|---|---|
+| `claude` not on PATH | `"claude binary not found. Install Claude Code: https://docs.claude.com/en/docs/claude-code/getting-started"` |
+| `claude --version` returns unparseable output | `"Could not parse `claude --version`. Ensure Claude Code v2.0.0+ is installed."` |
+| `claude` v1.x installed | `"Claude Code v<X.Y.Z> is installed but `--agent` requires v2.0.0+. Update: <url>"` |
+| `claude` v2.0.0+ installed | (silent — proceed) |
+
+The probe runs once per `start_profile_session` call. Cost: one `which` + one `--version` exec (~50ms). Acceptable.
+
+**Slim-build behavior:** when `claude-code-provider` is OFF, the port trait is still defined (always built), but the impl in `infra/provider/claude_code/cli_probe.rs` is gated. The slim build's `start.rs` only routes to providers in the registry, so `ClaudeCodeProvider` is never constructed and the probe is never called. **No unsatisfied trait.**
 
 ---
 
@@ -748,12 +936,14 @@ profile_create_claude_code_saved.json       # NEW
 
 | Layer | New tests |
 |---|---|
-| Domain | `validate_endpoint_rejects_non_http`, `validate_model_string_rejects_too_long`, `LlmProviderId_validation`, `builtin_llm_providers_includes_ollama_and_lmstudio`, `Profile_with_model_and_llm_provider_round_trips_through_serde` |
-| Use case | `add_llm_provider_succeeds`, `add_llm_provider_duplicate_id_fails`, `test_llm_provider_unreachable_returns_unhealthy_not_error`, `create_profile_with_model_persists`, `create_profile_with_invalid_llm_provider_id_fails`, `wizard_full_flow_claude_code_builds_correct_create_input` |
+| Domain | `validate_endpoint_rejects_non_http`, `validate_provider_name_rejects_empty`, `validate_provider_name_rejects_too_long`, `validate_model_string_rejects_too_long`, `LlmProviderId_validation`, `builtin_llm_providers_includes_ollama_and_lmstudio`, `Profile_with_model_and_llm_provider_round_trips_through_serde` |
+| Use case | `add_llm_provider_succeeds`, `add_llm_provider_duplicate_id_fails`, `test_llm_provider_unreachable_returns_unhealthy_not_error`, `create_profile_with_model_persists`, `create_profile_with_invalid_llm_provider_id_fails`, `wizard_full_flow_claude_code_builds_correct_create_input`, `wizard_adversarial_input_rejected_with_validation_failed_event` (e.g., profile name with `/`, empty model string when `MaxTurns` is set, etc.) |
+| Wizard state machine | `wizard_state_machine_advance_on_valid_step`, `wizard_state_machine_stays_on_invalid_step`, `wizard_state_machine_esc_aborts_cleanly`, `wizard_provider_select_skipped_when_provider_flag_supplied` |
 | Contract | `profile_start_dry_run_claude_code_matches_fixture`, `llm_health_ollama_reachable_matches_fixture`, `cli_tui_parity_for_create_profile_claude_code` |
 | Snapshot (TUI) | `wizard_claude_code_step_1_renders_correctly`, `llm_list_with_three_providers` |
-| Binary integration (`assert_cmd`) | `agk profile create --provider claude-code --model X` writes correct frontmatter; `agk llm add ollama` writes `llm_providers.toml` |
-| Architecture | `claude_code_provider_module_only_compiles_with_feature`, `slim_build_cargo_check_succeeds` (run `cargo check --no-default-features --features 'cli,core' --tests` in CI) |
+| Binary integration (`assert_cmd`) | `agk profile create --provider claude-code --model X` writes correct frontmatter; `agk llm add ollama` writes `llm_providers.toml`; **`slim_binary_asserts_wizard_command_absent`** (runs the slim build's `agk --help` and asserts `profile wizard` is not listed); **`slim_binary_asserts_llm_command_absent`** (same for `llm` subcommand) |
+| Concurrency | `llm_health_check_100_parallel_calls_no_deadlock` (spawns 100 `CheckLlmHealth` calls in parallel against a `wiremock` server, asserts all complete within 5s and no reqwest::Client panic) |
+| Architecture | `claude_code_provider_module_only_compiles_with_feature`, **`slim_build_cargo_check_succeeds`** (CI runs `cargo check --no-default-features --features 'cli,core' --tests` and `cargo test --no-default-features --features 'cli,core' --test architecture` as a dedicated job) |
 
 ---
 
@@ -805,17 +995,20 @@ profile_create_claude_code_saved.json       # NEW
 
 ## 13. Out of Scope (deferred)
 
-| Feature | Why deferred |
-|---|---|
-| Auto-probe local LLM runtimes at startup | User said "free-form model string". AGK doesn't connect. |
-| Skill signing / GPG provenance | Same deferred decision as v0.4 Marketplace P2. |
-| Anthropic/OpenAI direct API execution | AGK is config manager, not runtime. Provider exec does the call. |
-| Model picker UI (catalog) | Free-form string. Catalog is YAGNI. |
-| Migrating opencode wizard to new `ModelInput` variant | opencode's wizard still works. Refactoring is YAGNI. |
-| Per-wizard-step pattern validation (`allowed_pattern` field unused) | Defer until a provider asks. |
-| TUI live Claude Code session rendering | AGK waits for process exit. |
-| Hot-reload of `llm_providers.toml` | Manual refresh. |
-| Multi-profile-batch creation | Single-profile is enough for v0.4.3. |
+Each deferred item is tracked as a separate issue in the repo. References to be filled in when the spec is approved.
+
+| Feature | Tracking | Why deferred |
+|---|---|---|
+| Auto-probe local LLM runtimes at startup | issue: `v0.5+ auto-probe llm` | User said "free-form model string". AGK doesn't connect. |
+| Skill signing / GPG provenance | issue: `v0.5+ skill-signing` | Same deferred decision as v0.4 Marketplace P2. |
+| Anthropic/OpenAI direct API execution | issue: `v0.5+ agk-runtime` | AGK is config manager, not runtime. Provider exec does the call. |
+| Model picker UI (catalog) | issue: `v0.5+ model-picker` | Free-form string. Catalog is YAGNI. |
+| Migrating opencode wizard to new `ModelInput` variant | issue: `v0.5+ opencode-wizard-refactor` | opencode's wizard still works. Refactoring is YAGNI. |
+| Per-wizard-step pattern validation | (not tracked — drop, see §5.4) | Spec removed `allowed_pattern` field. |
+| TUI live Claude Code session rendering | issue: `v0.5+ tui-session-overlay` | AGK waits for process exit. |
+| Hot-reload of `llm_providers.toml` | issue: `v0.5+ config-hot-reload` | Manual refresh. |
+| Multi-profile-batch creation | issue: `v0.5+ batch-profile-create` | Single-profile is enough for v0.4.3. |
+| Containerfile for Podman | (not tracked — use `podman build -f Dockerfile`) | Same syntax. Documented in §4.6. |
 
 ---
 
@@ -824,9 +1017,10 @@ profile_create_claude_code_saved.json       # NEW
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Claude Code frontmatter schema changes | Medium | Medium | `render_agent_markdown` in 1 file with 1 snapshot test. Bounded blast radius. |
-| `claude` binary version skew | Low | Low | Don't validate against version. Worst case: field silently ignored. |
+| `claude` binary version skew | Low | Low | `ClaudeCliProbePort` (§6.7) enforces ≥v2.0.0 only for the `--agent` flag itself. Older versions get a clear upgrade message. |
 | `reqwest` bloats slim runtime | Low | Medium | `reqwest` gated on `llm-providers`. Docker runtime skips. |
-| Port trait always builds but only has impls when feature on | Low | Low | CI runs slim build and confirms. |
+| Anthropic `OPTIONS /v1/messages` blocked by corporate proxy | Medium | Low | Fallback chain (§6.5): if `OPTIONS` returns 4xx, try `GET /`. 4xx on root is still proof of reachability. |
+| Port trait always builds but only has impls when feature on | Low | Low | CI runs slim build and confirms (§3.5). |
 | User confusion: `claude` on PATH but `claude --agent X` says "agent not found" | Medium | Medium | Wizard detects `claude` version, clear error. |
 | TUI wizard: pressing Enter on last step doesn't emit CreateProfile | Medium | High | Snapshot test for final state. Contract test. |
 | Profile schema migration: existing profiles fail to load | Low | High | Field is `Option` + `#[serde(default)]`. Tested with legacy fixture. |
@@ -847,7 +1041,11 @@ profile_create_claude_code_saved.json       # NEW
 | 2026-06-04 | One release, three commits. |
 | 2026-06-04 | `LlmProviderAdapter` and `LlmProviderStorePort` traits always built; impls gated. |
 | 2026-06-04 | LLM health check returns `LlmHealth { reachable: false }`, NOT `Err`. |
-| 2026-06-04 | `WizardStep` gets 6 new variants (additive). |
+| 2026-06-04 | `WizardStep` gets 6 new variants (additive). `allowed_pattern` field removed from `ModelInput` — YAGNI. |
+| 2026-06-04 | Anthropic health check uses `OPTIONS /v1/messages` (not `POST`) — avoids consuming API quota. Fallback to `GET /` if `OPTIONS` is blocked. |
+| 2026-06-04 | `ClaudeCliProbePort` added in `app/ports/claude_cli.rs` to detect missing/outdated `claude` binary before `start_profile_session` exec. |
+| 2026-06-04 | `McpRegistryPort::get` results pre-resolved into `LaunchPlan.agent_mcp_servers` at plan-build time, keeping `render_agent_markdown` a pure function (no port calls). |
+| 2026-06-04 | CI build matrix extended to 8 cells (including `headless-no-llm` and `headless-no-profile-create` to catch feature-gate typos). |
 
 ---
 
@@ -859,10 +1057,12 @@ profile_create_claude_code_saved.json       # NEW
 |---|---|---|
 | `src/domain/llm_provider.rs` | LLM provider domain models | none |
 | `src/app/ports/llm_provider.rs` | LLM provider port traits | none |
+| `src/app/ports/claude_cli.rs` | `ClaudeCliProbePort` trait | none |
 | `src/app/features/llm/{mod,command,list,add,remove,test,registry}.rs` | LLM use cases | `llm-providers` |
 | `src/app/features/profile/wizard.rs` | Wizard driver | `profile-create` |
 | `src/infra/llm/{mod,store,registry,health,ollama,lmstudio,anthropic,openai}.rs` | LLM infra | `llm-providers` |
 | `src/infra/provider/claude_code/agent_markdown.rs` | Frontmatter renderer | `claude-code-provider` |
+| `src/infra/provider/claude_code/cli_probe.rs` | `ClaudeCliProbePort` impl (`which` + `--version` probe) | `claude-code-provider` |
 | `src/cli/features/llm.rs` | CLI LLM mapper | `llm-providers` |
 | `src/tui/features/profile/wizard/{mod,controller,state,view}.rs` | TUI wizard | `profile-create` |
 | `src/tui/features/llm/{mod,controller,widget}.rs` | TUI LLM tab | `llm-providers` |
@@ -883,11 +1083,11 @@ profile_create_claude_code_saved.json       # NEW
 | File | Change | Feature gate |
 |---|---|---|
 | `src/domain/profile.rs` | +2 fields on `Profile` | none |
-| `src/app/ports/provider.rs` | +5 `WizardStep` variants | none |
+| `src/app/ports/provider.rs` | +6 `WizardStep` variants | none |
 | `src/app/command.rs` | +6 `CoreCommand` variants | gated |
 | `src/app/event.rs` | +5 `CoreEvent` variants | none |
 | `src/app/features/profile/create.rs` | +2 fields on input, validation | `profile-create` |
-| `src/app/features/profile/start.rs` | +3 fields on `LaunchPlan`, resolve endpoint | none (always) |
+| `src/app/features/profile/start.rs` | +7 fields on `LaunchPlan` (model, llm_provider_id, llm_endpoint, agent_color, agent_memory, agent_max_turns, prompt_body, agent_mcp_servers), call `ClaudeCliProbePort::supports_agent_flag` before exec | none (always) |
 | `src/infra/provider/claude_code/session.rs` | Use `render_agent_markdown` | `claude-code-provider` |
 | `src/infra/config/toml_store.rs` | Load/save `llm_providers.toml` | none |
 | `src/cli/features/profile.rs` | Add `create`/`wizard` branches | `profile-create` |
@@ -915,18 +1115,18 @@ profile_create_claude_code_saved.json       # NEW
 | Domain | 1 new + 1 extend | ~150 |
 | Ports | 1 new | ~80 |
 | Infra (LLM) | 7 new | ~600 |
-| Infra (Claude Code) | 1 new + 1 extend | ~250 |
+| Infra (Claude Code) | 2 new + 1 extend (agent_markdown + cli_probe + session extend) | ~350 |
 | Use cases (LLM) | 4 new | ~400 |
-| Use cases (profile) | 1 new + 2 extend | ~400 |
+| Use cases (profile) | 1 new + 2 extend | ~450 |
 | CLI | 2 extend + 1 new | ~350 |
 | TUI | 4 new + 2 extend | ~700 |
-| Tests | 10+ | ~1500 |
-| Dockerfile / compose / CI | 3 new | ~250 |
+| Tests | 12+ (incl. wizard state-machine, slim-binary regression, concurrency) | ~1900 |
+| Dockerfile / compose / CI | 3 new + 1 extend (build.yml matrix) | ~350 |
 | Docs | 3 | ~600 |
-| **Total** | ~35 new + ~10 extend | **~5,300 LOC** |
+| **Total** | ~37 new + ~11 extend | **~5,700 LOC** |
 
-Three PRs of ~1,500-2,000 LOC each. Each independently shippable.
+Three PRs of ~1,700-2,100 LOC each. Each independently shippable.
 
 ---
 
-*Design Spec v0.1 — 2026-06-04 — Pending User Review*
+*Design Spec v0.2 — 2026-06-04 — Post-review, ready for `writing-plans`*
