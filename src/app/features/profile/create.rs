@@ -159,6 +159,9 @@ fn to_domain_profile(input: &CreateProfileInput) -> crate::domain::profile::Prof
         permission_mode: None,
         prompt_overlay_path: None,
         launch_policy: crate::domain::profile::LaunchPolicy::default(),
+        model: None,
+        llm_provider_id: None,
+        agent_mcp_servers: vec![],
     }
 }
 

@@ -196,6 +196,19 @@ pub struct Profile {
     /// Launch behaviour (e.g. auto-restore, confirm-before-run).
     #[serde(default)]
     pub launch_policy: LaunchPolicy,
+    /// Free-form model string the user picked for this profile. Free-form,
+    /// 256-char cap enforced at the wizard layer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// LLM provider id (from `[[llm_providers]]` in config) the user wants
+    /// the downstream exec to use. AGK records the choice; it does not probe
+    /// the server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_provider_id: Option<String>,
+    /// MCP server definitions resolved at create-time and embedded into the
+    /// generated agent markdown. Empty for providers that do not use it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_mcp_servers: Vec<crate::domain::agent_markdown::AgentMcpServer>,
 }
 
 /// Behaviour rules for starting a profile session.
@@ -309,5 +322,26 @@ mod tests {
     fn profile_id_display() {
         let id = ProfileId::new("test");
         assert_eq!(id.as_str(), "test");
+    }
+
+    #[test]
+    fn profile_carries_model_and_llm_provider() {
+        let p = Profile {
+            id: ProfileId::new("reviewer"),
+            scope: crate::domain::scope::Scope::Workspace,
+            provider_id: ProviderId("claude-code".into()),
+            skill_refs: vec![],
+            mcp_refs: vec![],
+            instruction_refs: vec![],
+            tool_refs: vec!["Read".into()],
+            permission_mode: Some("acceptEdits".into()),
+            prompt_overlay_path: None,
+            launch_policy: Default::default(),
+            model: Some("claude-sonnet-4-5".into()),
+            llm_provider_id: Some("local-ollama".into()),
+            agent_mcp_servers: vec![],
+        };
+        assert_eq!(p.model.as_deref(), Some("claude-sonnet-4-5"));
+        assert_eq!(p.llm_provider_id.as_deref(), Some("local-ollama"));
     }
 }

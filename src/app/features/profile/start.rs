@@ -112,6 +112,9 @@ pub fn run(
         } else {
             crate::domain::profile::LaunchPolicy::AutoRestore
         },
+        model: None,
+        llm_provider_id: None,
+        agent_mcp_servers: vec![],
     };
 
     let plan = runtime.build_launch_plan(&app_profile, Some(&config))?;

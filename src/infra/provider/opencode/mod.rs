@@ -320,6 +320,9 @@ mod tests {
             permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
 
         let plan = provider.build_launch_plan(&profile, None).unwrap();
@@ -358,6 +361,9 @@ mod tests {
             permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
 
         let plan = provider.build_launch_plan(&profile, None).unwrap();
@@ -385,6 +391,9 @@ mod tests {
             permission_mode: None,
             prompt_overlay_path: None,
             launch_policy: crate::domain::profile::LaunchPolicy::DryRun,
+            model: None,
+            llm_provider_id: None,
+            agent_mcp_servers: vec![],
         };
 
         let result = provider.build_launch_plan(&profile, None);

@@ -105,6 +105,9 @@ pub struct ConfigFile {
     pub provider_roots: HashMap<String, String>,
     #[serde(default)]
     pub profiles: Vec<Profile>,
+    /// Configured LLM providers. Each entry is one provider.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub llm_providers: Vec<crate::domain::llm_provider::LlmProviderConfig>,
 }
 
 impl Default for ConfigFile {
@@ -116,6 +119,7 @@ impl Default for ConfigFile {
             vault_defs: HashMap::new(),
             provider_roots: HashMap::new(),
             profiles: Vec::new(),
+            llm_providers: Vec::new(),
         }
     }
 }
@@ -533,6 +537,26 @@ mcps = ["filesystem"]
         assert_eq!(
             config.profiles[0].skills[0].vault, "auto",
             "empty vault should be migrated to 'auto'"
+        );
+    }
+
+    #[test]
+    fn config_file_round_trip_with_llm_providers() {
+        let mut cfg = ConfigFile::default();
+        cfg.llm_providers
+            .push(crate::domain::llm_provider::LlmProviderConfig {
+                id: "local".into(),
+                kind: crate::domain::llm_provider::LlmProviderKind::Ollama,
+                endpoint: "http://127.0.0.1:11434".into(),
+                api_key: None,
+                default_model: Some("llama3.2".into()),
+            });
+        let toml = toml::to_string(&cfg).unwrap();
+        let back: ConfigFile = toml::from_str(&toml).unwrap();
+        assert_eq!(back.llm_providers.len(), 1);
+        assert_eq!(
+            back.llm_providers[0].kind,
+            crate::domain::llm_provider::LlmProviderKind::Ollama
         );
     }
 }
