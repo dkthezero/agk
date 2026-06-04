@@ -178,6 +178,17 @@ pub enum CoreEvent {
     },
 
     // -----------------------------------------------------------------------
+    // LLM providers
+    // -----------------------------------------------------------------------
+    LlmProviderListed(crate::domain::llm_provider::LlmProviderConfig),
+    LlmProviderUpserted(crate::domain::llm_provider::LlmProviderConfig),
+    LlmProviderRemoved(String),
+    LlmProviderHealth {
+        id: String,
+        status: crate::domain::llm_provider::LlmHealthStatus,
+    },
+
+    // -----------------------------------------------------------------------
     // General info
     // -----------------------------------------------------------------------
     Info(String),

@@ -279,5 +279,29 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
             );
             state.team_config = None;
         }
+        CoreEvent::LlmProviderListed(cfg) => {
+            state.status_line = format!("LLM provider '{}' listed ({})", cfg.id, cfg.kind.as_str());
+        }
+        CoreEvent::LlmProviderUpserted(cfg) => {
+            state.status_line = format!("LLM provider '{}' saved ({})", cfg.id, cfg.kind.as_str());
+        }
+        CoreEvent::LlmProviderRemoved(id) => {
+            state.status_line = format!("LLM provider '{}' removed", id);
+        }
+        CoreEvent::LlmProviderHealth { id, status } => {
+            let latency = status
+                .latency_ms
+                .map(|ms| format!(" ({} ms)", ms))
+                .unwrap_or_default();
+            let detail = if status.reachable {
+                format!("reachable{}", latency)
+            } else {
+                format!(
+                    "unreachable: {}",
+                    status.error.as_deref().unwrap_or("unknown")
+                )
+            };
+            state.status_line = format!("LLM provider '{}' health: {}", id, detail);
+        }
     }
 }
