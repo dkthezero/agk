@@ -27,15 +27,16 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
                 "message": message
             })
         }
-        CoreEvent::ProfileLaunchPlan { id, plan } => {
+        CoreEvent::ProfileLaunchPlan { plan } => {
             serde_json::json!({
                 "type": "ProfileLaunchPlan",
-                "id": id.as_str(),
-                "provider_id": plan.provider_id.as_str(),
-                "skills": plan.skills.iter().map(|s| &s.0).collect::<Vec<_>>(),
-                "mcps": plan.mcps.iter().map(|m| &m.0).collect::<Vec<_>>(),
-                "files_to_write": plan.files_to_write.iter().map(|p| p.to_string_lossy()).collect::<Vec<_>>(),
-                "restore_required": plan.restore_required,
+                "profile_id": plan.profile_id,
+                "provider_id": plan.provider_id,
+                "model": plan.frontmatter.model,
+                "skills": plan.frontmatter.skills,
+                "mcp_servers": plan.frontmatter.mcp_servers,
+                "resolved_mcp_servers": plan.resolved_mcp_servers.iter().map(|s| &s.name).collect::<Vec<_>>(),
+                "llm_provider_id": plan.llm_provider_id,
             })
         }
         CoreEvent::ProfileSessionStarted { id, session_key } => {

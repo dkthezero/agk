@@ -59,8 +59,8 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
                 message
             );
         }
-        CoreEvent::ProfileLaunchPlan { id, .. } => {
-            state.status_line = format!("Launch plan ready for '{}'", id.as_str());
+        CoreEvent::ProfileLaunchPlan { plan } => {
+            state.status_line = format!("Launch plan ready for '{}'", plan.profile_id);
         }
         CoreEvent::ProfileSessionStarted { id, .. } => {
             state.status_line = format!("Session started for '{}'", id.as_str());

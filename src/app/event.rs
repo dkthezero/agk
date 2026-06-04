@@ -23,8 +23,7 @@ pub enum CoreEvent {
         message: String,
     },
     ProfileLaunchPlan {
-        id: crate::domain::profile::ProfileId,
-        plan: LaunchPlan,
+        plan: crate::domain::launch_plan::LaunchPlan,
     },
     ProfileSessionStarted {
         id: crate::domain::profile::ProfileId,
