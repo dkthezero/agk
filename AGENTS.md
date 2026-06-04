@@ -13,7 +13,7 @@ This file is the **Agent Harness** for AGK. It defines how both human contributo
 ### Core Promises
 - **Portable intent**: Take a local or remote manifest and materialize a reproducible AI coding environment.
 - **Headless-first**: Every interactive flow must have a complete headless/CLI equivalent (or `--dry-run` contract).
-- **Lightweight**: Heavy subsystems (TUI, remote vaults, YAML, enterprise features) must be optional via Cargo features.
+- **Lightweight**: Heavy subsystems (TUI, remote vaults, YAML, enterprise features) must be optional via Cargo features. See the [Feature matrix](#feature-matrix-v04) below for the authoritative list.
 - **Profiles as compositions**: Profiles reference (do not duplicate) skills, instructions, providers, vaults, and MCPs.
 - **Multi-provider**: Support Claude Code, OpenCode, Gemini, Copilot, and others without vendor lock-in.
 
@@ -21,6 +21,47 @@ This file is the **Agent Harness** for AGK. It defines how both human contributo
 **Secondary users**: Platform teams standardizing AI workflows across repositories and organizations.
 
 ---
+
+## Feature matrix (v0.4+)
+
+The crate is feature-gated. The table below lists the cargo features defined in
+`Cargo.toml` and the behaviour each one enables. The default feature set
+includes `tui`, `pack`, every provider adapter, `profile-create`, and
+`claude-cli-probe`. Dropping defaults (`--no-default-features`) is how the
+**slim runtime** image keeps the binary small; add `--features <name>` to
+opt into optional subsystems.
+
+| Feature               | What it enables                                                                                    | Default?                       |
+| --------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `tui`                 | The interactive terminal UI binary `agk` (pulls in `ratatui` + `crossterm`)                        | yes (with default features)    |
+| `pack`                | `agk asset pack` — bundle skills into provider-specific distributables                             | yes                            |
+| `vault-clawhub`       | ClawHub remote vault adapter (pulls in `reqwest`)                                                  | yes                            |
+| `provider-opencode`   | OpenCode agent provider (writes to `~/.config/opencode/`)                                          | yes                            |
+| `provider-claude`     | Claude Code agent provider (writes to `.claude/agents/`, `.claude/mcp.json`)                       | yes                            |
+| `provider-github`     | GitHub Copilot provider                                                                            | yes                            |
+| `provider-gemini`     | Gemini CLI provider                                                                                | yes                            |
+| `provider-amp`        | AMP provider                                                                                       | yes                            |
+| `provider-firebender` | Firebender provider                                                                                | yes                            |
+| `provider-letta`      | Letta provider                                                                                     | yes                            |
+| `provider-snowflake`  | Snowflake Cortex provider                                                                          | yes                            |
+| `profile-create`      | Claude Code agent profile wizard + `render_agent_markdown` pure renderer                           | yes                            |
+| `claude-cli-probe`    | `claude --version` probe for CLI version compatibility (pulls in `which`)                          | yes                            |
+| `llm-ollama`          | Ollama LLM provider adapter                                                                        | no                             |
+| `llm-lmstudio`        | LM Studio LLM provider adapter                                                                     | no                             |
+| `llm-anthropic`       | Anthropic LLM provider adapter                                                                     | no                             |
+| `llm-openai`          | OpenAI LLM provider adapter                                                                        | no                             |
+| `yaml`                | YAML manifest codec (alternative to TOML)                                                         | no                             |
+| `observability`       | `tracing` + `tracing-subscriber` for structured logs                                               | no                             |
+| `headless`            | Marker feature — no behaviour, used in CI matrix to exercise the CLI-only path                     | no                             |
+
+**Slim runtime:** `cargo build --no-default-features --features tui` produces
+the binary baked into `docker/Dockerfile`'s `slim` stage. See
+[`docs/ops/docker.md`](docs/ops/docker.md) for the full operator guide.
+
+**Adding a new feature:** define it in `Cargo.toml`, gate the use-case modules
+with `#[cfg(feature = "...")]`, and update the table above. Default-on features
+are reserved for behaviour the binary cannot run without; everything else
+stays opt-in.
 
 ## Architecture (Hexagonal / Ports & Adapters)
 
