@@ -42,7 +42,7 @@ provider-firebender = []
 provider-letta = []
 provider-snowflake = []
 profile-create = []
-claude-cli-probe = []
+claude-cli-probe = ["dep:which"]
 llm-ollama = ["dep:reqwest"]
 llm-lmstudio = ["dep:reqwest"]
 llm-anthropic = ["dep:reqwest"]
@@ -75,6 +75,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 thiserror = "1"
 url = { version = "2", features = ["serde"] }
 semver = "1"
+which = { version = "6", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
