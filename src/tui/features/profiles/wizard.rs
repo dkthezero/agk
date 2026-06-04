@@ -272,13 +272,258 @@ pub fn handle_profile_wizard_input(
             crate::tui::features::profiles::wizard_review::handle_review_step(state, ctx, key);
         }
         WizardStep::Interactive { .. } => {}
-        // C3 will wire event handling for these new variants.
-        WizardStep::ProviderSelect { .. }
-        | WizardStep::LlmProviderSelect { .. }
-        | WizardStep::ModelInput { .. }
-        | WizardStep::AgentDescription { .. }
-        | WizardStep::SkillsPick { .. }
-        | WizardStep::ReviewFinal { .. } => {}
+        // C3: real (minimal) implementations for the v0.4 wizard steps.
+        WizardStep::ProviderSelect { ref providers, .. } => match code {
+            KeyCode::Up if ws.selected > 0 => {
+                ws.selected -= 1;
+            }
+            KeyCode::Down if ws.selected + 1 < providers.len() => {
+                ws.selected += 1;
+            }
+            KeyCode::Enter => {
+                if let Some((id, _)) = providers.get(ws.selected) {
+                    ws.provider_id_choice = id.clone();
+                }
+                ws.step_index += 1;
+                ws.selected = 0;
+                ws.sync_checklist_state();
+            }
+            KeyCode::Esc => {
+                state.wizard_state = None;
+                state.list_mode = ListMode::Normal;
+                state.status_line = "Cancelled profile creation".to_string();
+            }
+            _ => {}
+        },
+        WizardStep::LlmProviderSelect { ref providers, .. } => match code {
+            KeyCode::Up if ws.selected > 0 => {
+                ws.selected -= 1;
+            }
+            KeyCode::Down if ws.selected + 1 < providers.len() => {
+                ws.selected += 1;
+            }
+            KeyCode::Enter => {
+                if let Some((id, _)) = providers.get(ws.selected) {
+                    ws.llm_provider_id = id.clone();
+                }
+                ws.step_index += 1;
+                ws.selected = 0;
+                ws.sync_checklist_state();
+            }
+            KeyCode::Esc => {
+                state.wizard_state = None;
+                state.list_mode = ListMode::Normal;
+                state.status_line = "Cancelled profile creation".to_string();
+            }
+            _ => {}
+        },
+        WizardStep::ModelInput { .. } => {
+            // Same key handling as TextInput but writes to model_string.
+            match code {
+                KeyCode::Char(c) => {
+                    let byte_idx = ws
+                        .prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    ws.prompt_buffer.insert(byte_idx, *c);
+                    ws.cursor_pos += 1;
+                }
+                KeyCode::Backspace if ws.cursor_pos > 0 => {
+                    ws.cursor_pos -= 1;
+                    let byte_idx = ws
+                        .prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    let ch = ws.prompt_buffer[byte_idx..].chars().next().unwrap_or('\n');
+                    ws.prompt_buffer.drain(byte_idx..byte_idx + ch.len_utf8());
+                }
+                KeyCode::Backspace => {}
+                KeyCode::Enter => {
+                    let val = std::mem::take(&mut ws.prompt_buffer).trim().to_string();
+                    ws.cursor_pos = 0;
+                    ws.model_string = val;
+                    ws.step_index += 1;
+                    ws.sync_checklist_state();
+                }
+                KeyCode::Left if ws.cursor_pos > 0 => ws.cursor_pos -= 1,
+                KeyCode::Right if ws.cursor_pos < ws.prompt_buffer.chars().count() => {
+                    ws.cursor_pos += 1
+                }
+                KeyCode::Esc => {
+                    if ws.step_index == 0 {
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        state.status_line = "Cancelled profile creation".to_string();
+                        return Ok(());
+                    }
+                    ws.step_index -= 1;
+                    ws.cursor_pos = 0;
+                }
+                _ => {}
+            }
+        }
+        WizardStep::AgentDescription { .. } => {
+            // Multi-line free-form description — Enter inserts a newline, the
+            // wizard advances on Ctrl-D (or any other key — v0.4 keeps the
+            // simple "press Enter on an empty line to finish" convention).
+            match code {
+                KeyCode::Char(c) => {
+                    let byte_idx = ws
+                        .prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    ws.prompt_buffer.insert(byte_idx, *c);
+                    ws.cursor_pos += 1;
+                }
+                KeyCode::Backspace if ws.cursor_pos > 0 => {
+                    ws.cursor_pos -= 1;
+                    let byte_idx = ws
+                        .prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    let ch = ws.prompt_buffer[byte_idx..].chars().next().unwrap_or('\n');
+                    ws.prompt_buffer.drain(byte_idx..byte_idx + ch.len_utf8());
+                }
+                KeyCode::Backspace => {}
+                KeyCode::Enter => {
+                    // Empty Enter on the AgentDescription step finishes it.
+                    if ws.prompt_buffer.is_empty() {
+                        ws.agent_description = String::new();
+                        ws.step_index += 1;
+                        ws.sync_checklist_state();
+                        return Ok(());
+                    }
+                    let byte_idx = ws
+                        .prompt_buffer
+                        .char_indices()
+                        .nth(ws.cursor_pos)
+                        .map(|(i, _)| i)
+                        .unwrap_or(ws.prompt_buffer.len());
+                    ws.prompt_buffer.insert(byte_idx, '\n');
+                    ws.cursor_pos += 1;
+                }
+                KeyCode::Left if ws.cursor_pos > 0 => ws.cursor_pos -= 1,
+                KeyCode::Right if ws.cursor_pos < ws.prompt_buffer.chars().count() => {
+                    ws.cursor_pos += 1
+                }
+                KeyCode::Esc => {
+                    if ws.step_index == 0 {
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        state.status_line = "Cancelled profile creation".to_string();
+                        return Ok(());
+                    }
+                    ws.step_index -= 1;
+                    ws.cursor_pos = 0;
+                }
+                _ => {}
+            }
+        }
+        WizardStep::SkillsPick { ref options, .. } => {
+            // Re-uses the same checklist state as the legacy Skills checklist.
+            let filtered_indices: Vec<usize> = if ws.filter_query.is_empty() {
+                (0..options.len()).collect()
+            } else {
+                let q = ws.filter_query.to_lowercase();
+                options
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, o)| o.to_lowercase().contains(&q))
+                    .map(|(i, _)| i)
+                    .collect()
+            };
+            match code {
+                KeyCode::Up if ws.selected > 0 => {
+                    ws.selected -= 1;
+                }
+                KeyCode::Down if ws.selected + 1 < filtered_indices.len() => {
+                    ws.selected += 1;
+                }
+                KeyCode::Char(' ') => {
+                    if let Some(orig) = filtered_indices.get(ws.selected).copied() {
+                        if ws.checked.len() < options.len() {
+                            ws.checked.resize(options.len(), false);
+                        }
+                        if let Some(c) = ws.checked.get_mut(orig) {
+                            *c = !*c;
+                        }
+                    }
+                }
+                KeyCode::Char(c) if key.modifiers.is_empty() => {
+                    ws.filter_query.push(*c);
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Backspace if !ws.filter_query.is_empty() => {
+                    ws.filter_query.pop();
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Esc if !ws.filter_query.is_empty() => {
+                    ws.filter_query.clear();
+                    ws.selected = 0;
+                    ws.scroll_offset = 0;
+                }
+                KeyCode::Esc => {
+                    if ws.step_index == 0 {
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        state.status_line = "Cancelled profile creation".to_string();
+                        return Ok(());
+                    }
+                    ws.step_index -= 1;
+                    ws.filter_query.clear();
+                    ws.scroll_offset = 0;
+                    ws.sync_checklist_state();
+                }
+                KeyCode::Enter => {
+                    let selected: Vec<String> = options
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| ws.checked.get(*i) == Some(&true))
+                        .map(|(_, name)| name.clone())
+                        .collect();
+                    ws.skills = selected;
+                    ws.step_index += 1;
+                    ws.filter_query.clear();
+                    ws.scroll_offset = 0;
+                    ws.sync_checklist_state();
+                }
+                _ => {}
+            }
+        }
+        WizardStep::ReviewFinal { .. } => {
+            // Read-only summary: Enter commits, Esc steps back, any other
+            // key is ignored.
+            match code {
+                KeyCode::Enter => {
+                    // Advance past the wizard — the controller (out of scope
+                    // for C3) will turn the captured fields into a real
+                    // profile create call.
+                    ws.step_index += 1;
+                    state.status_line =
+                        "Final review confirmed (commit wiring lands in C4)".to_string();
+                }
+                KeyCode::Esc => {
+                    if ws.step_index == 0 {
+                        state.wizard_state = None;
+                        state.list_mode = ListMode::Normal;
+                        state.status_line = "Cancelled profile creation".to_string();
+                        return Ok(());
+                    }
+                    ws.step_index -= 1;
+                }
+                _ => {}
+            }
+        }
     }
     Ok(())
 }

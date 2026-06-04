@@ -82,7 +82,7 @@ pub trait ProviderPort: Send + Sync {
 /// A single static description of a wizard step.  Mutable UI state lives in
 /// `WizardState`, not here, so the step list can be cloned/replaced freely.
 /// Archetype template for pre-filling wizard fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ArchetypeTemplate {
     pub id: String,
     pub name: String,
@@ -92,7 +92,7 @@ pub struct ArchetypeTemplate {
     pub default_permission_mode: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WizardStep {
     TextInput {
         title: String,

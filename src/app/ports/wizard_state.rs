@@ -1,8 +1,13 @@
 use crate::app::ports::WizardStep;
 use crate::domain::scope::Scope;
+use serde::{Deserialize, Serialize};
 
 /// Accumulator + UI state for the active profile-creation wizard.
-#[derive(Clone, Debug, PartialEq)]
+///
+/// `Serialize`/`Deserialize` are derived so the wizard can be snapshotted
+/// to disk between steps and resumed mid-flow. New fields added in v0.4
+/// use `#[serde(default)]` so older snapshots still deserialize cleanly.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WizardState {
     pub steps: Vec<WizardStep>,
     pub step_index: usize,
@@ -43,12 +48,16 @@ pub struct WizardState {
     /// Selected permission mode.
     pub selected_permission_mode: Option<String>,
     /// Provider id picked on the ProviderSelect step.
+    #[serde(default)]
     pub provider_id_choice: String,
     /// LLM provider id picked on the LlmProviderSelect step.
+    #[serde(default)]
     pub llm_provider_id: String,
     /// Free-form model string captured on the ModelInput step.
+    #[serde(default)]
     pub model_string: String,
     /// Multi-line agent description captured on the AgentDescription step.
+    #[serde(default)]
     pub agent_description: String,
 }
 
@@ -59,6 +68,7 @@ impl WizardState {
             Some(WizardStep::Checklist { options, .. }) => Some(options.len()),
             Some(WizardStep::ToolSelect { tools, .. }) => Some(tools.len()),
             Some(WizardStep::PermissionSelect { modes, .. }) => Some(modes.len()),
+            Some(WizardStep::SkillsPick { options, .. }) => Some(options.len()),
             _ => None,
         };
         if let Some(count) = option_count {
@@ -74,6 +84,7 @@ impl WizardState {
                     Some(WizardStep::PermissionSelect { modes, .. }) => {
                         modes.iter().map(|(id, _)| id.clone()).collect()
                     }
+                    Some(WizardStep::SkillsPick { options, .. }) => options.clone(),
                     _ => vec![],
                 };
                 options
@@ -156,6 +167,17 @@ impl WizardState {
                     vec![]
                 };
                 (Some(modes.len()), Some(pre))
+            }
+            Some(WizardStep::SkillsPick { options, .. }) => {
+                // Pre-check items already present in `skills` so the user
+                // sees their previous selection when re-entering the step.
+                let pre: Vec<usize> = options
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, name)| self.skills.iter().any(|s| s == *name))
+                    .map(|(i, _)| i)
+                    .collect();
+                (Some(options.len()), Some(pre))
             }
             _ => (None, None),
         };
