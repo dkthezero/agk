@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3 — "Team-Ready Profiles"
 
-**Status:** Implemented — merged to master via #26
+**Status:** Released in v0.3.0 (2026-06-04) — merged to master via #26
 **Target Date:** 7 weeks from kickoff
 **Epic:** [`proposals/v03-team-ready-profiles.md`](proposals/v03-team-ready-profiles.md)
 

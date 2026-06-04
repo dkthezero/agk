@@ -1,6 +1,6 @@
 # Release Plan: AGK v0.3.2 — "Ship Polish"
 
-**Status:** Implemented — merged to master
+**Status:** Released in v0.3.0 (2026-06-04) — merged to master via #28
 **Target Date:** 1–2 weeks from kickoff
 **Epic:** Clean up remaining gaps from v0.3 + v0.3.1 before official release tag
 
