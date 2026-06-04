@@ -43,10 +43,12 @@ dependencies = [
  "sha2",
  "tar",
  "tempfile",
+ "thiserror 1.0.69",
  "tokio",
  "toml",
  "tracing",
  "tracing-subscriber",
+ "url",
  "walkdir",
  "zip",
 ]
@@ -3051,6 +3053,7 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]

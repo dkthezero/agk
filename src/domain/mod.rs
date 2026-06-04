@@ -3,6 +3,7 @@ pub mod config;
 pub mod context;
 pub mod hashing;
 pub mod identity;
+pub mod llm_provider;
 pub mod mcp;
 pub mod mcp_security;
 pub mod paths;
