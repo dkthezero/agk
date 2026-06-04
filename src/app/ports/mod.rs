@@ -23,8 +23,8 @@ pub mod vault;
 pub mod vault_manifest_store;
 pub mod wizard_state;
 
-pub use clawhub::ClawHubPort;
 pub use claude_cli_probe::ClaudeCliProbePort;
+pub use clawhub::ClawHubPort;
 pub use config_store::ConfigStorePort;
 pub use context_store::ContextStorePort;
 pub use feature_set::FeatureSetPort;

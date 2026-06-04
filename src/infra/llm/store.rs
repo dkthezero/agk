@@ -32,8 +32,8 @@ impl<'a> FileLlmProviderStore<'a> {
         if s.trim().is_empty() {
             return Ok(vec![]);
         }
-        let file: ProvidersFile = toml::from_str(&s)
-            .with_context(|| format!("parsing {}", self.path.display()))?;
+        let file: ProvidersFile =
+            toml::from_str(&s).with_context(|| format!("parsing {}", self.path.display()))?;
         Ok(file.providers)
     }
 
@@ -48,8 +48,7 @@ impl<'a> FileLlmProviderStore<'a> {
             providers: cfgs.to_vec(),
         };
         let s = toml::to_string_pretty(&file).context("serializing LlmProviderConfig list")?;
-        std::fs::write(self.path, s)
-            .with_context(|| format!("writing {}", self.path.display()))?;
+        std::fs::write(self.path, s).with_context(|| format!("writing {}", self.path.display()))?;
         Ok(())
     }
 }

@@ -96,10 +96,7 @@ impl CoreEventSink for CliPresenter {
                     self.print(&format!("Launch plan for '{}':", plan.profile_id));
                     self.print(&format!("  Provider: {}", plan.provider_id));
                     self.print(&format!("  Model: {}", plan.frontmatter.model));
-                    self.print(&format!(
-                        "  Skills: {:?}",
-                        plan.frontmatter.skills
-                    ));
+                    self.print(&format!("  Skills: {:?}", plan.frontmatter.skills));
                     self.print(&format!(
                         "  MCP servers: {:?}",
                         plan.frontmatter.mcp_servers
@@ -259,6 +256,31 @@ impl CoreEventSink for CliPresenter {
                     "[HUNG] Task {} '{}' has been running for {}s",
                     id, name, elapsed_sec
                 ));
+            }
+            CoreEvent::LlmProviderListed(cfg) => {
+                self.print(&format!(
+                    "{} {} -> {}",
+                    cfg.id,
+                    cfg.kind.as_str(),
+                    cfg.endpoint
+                ));
+            }
+            CoreEvent::LlmProviderUpserted(cfg) => {
+                self.print(&format!("saved provider '{}'", cfg.id));
+            }
+            CoreEvent::LlmProviderRemoved(id) => {
+                self.print(&format!("removed provider '{}'", id));
+            }
+            CoreEvent::LlmProviderHealth { id, status } => {
+                if status.reachable {
+                    self.print(&format!(
+                        "{} reachable ({} ms)",
+                        id,
+                        status.latency_ms.unwrap_or(0)
+                    ));
+                } else {
+                    self.eprint(&format!("{} unreachable: {:?}", id, status.error));
+                }
             }
             // Other events are silent in CLI mode
             _ => {}

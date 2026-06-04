@@ -38,9 +38,17 @@ mod tests {
 
     struct MissingCliProbe;
     impl ClaudeCliProbePort for MissingCliProbe {
-        fn is_available(&self) -> bool { false }
-        fn locate(&self) -> Result<PathBuf> { anyhow::bail!("claude not on PATH") }
-        fn version(&self) -> Result<semver::Version> { anyhow::bail!("claude not on PATH") }
-        fn supports_agent_flag(&self) -> bool { false }
+        fn is_available(&self) -> bool {
+            false
+        }
+        fn locate(&self) -> Result<PathBuf> {
+            anyhow::bail!("claude not on PATH")
+        }
+        fn version(&self) -> Result<semver::Version> {
+            anyhow::bail!("claude not on PATH")
+        }
+        fn supports_agent_flag(&self) -> bool {
+            false
+        }
     }
 }

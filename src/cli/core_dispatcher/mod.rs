@@ -1,3 +1,4 @@
+mod llm;
 mod mcp;
 mod profile;
 
@@ -18,6 +19,20 @@ use crate::domain::scope::Scope;
 pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyhow::Result<i32> {
     let mut presenter = CliPresenter::new(cli.json, cli.quiet);
 
+    // The `agk llm` subcommand does not (yet) flow through `AgkCore::execute`
+    // because the LLM ports (store/factory/health-check) are constructed on
+    // demand from the workspace.  Route it first so the rest of the dispatcher
+    // can stay a pure CoreCommand translator.
+    if let Some(Commands::Llm { command }) = &cli.command {
+        let args = crate::cli::llm::LlmArgs {
+            config_dir: std::path::PathBuf::from("."),
+            command: command.clone(),
+        };
+        let rc = llm::dispatch(&args, workspace, &mut presenter);
+        presenter.finalize();
+        return rc;
+    }
+
     if let Some(command) = &cli.command {
         let cmd = to_core_command(command, workspace)?;
         let result = core.execute(cmd, &mut presenter);
@@ -37,6 +52,9 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
 
 fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Result<CoreCommand> {
     match cmd {
+        Commands::Llm { .. } => Err(anyhow::anyhow!(
+            "`agk llm` is handled by core_dispatcher::llm::dispatch before this point"
+        )),
         Commands::Profile { command } => profile::to_core_command(command),
         Commands::Mcp { command } => mcp::to_core_command(command),
         Commands::Sync { global, dry_run } => Ok(CoreCommand::SyncAssets {

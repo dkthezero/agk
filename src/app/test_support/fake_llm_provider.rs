@@ -30,7 +30,9 @@ impl FakeLlmProviderStore {
     /// Build a store pre-populated with the given configs (keyed by `id`).
     pub fn seeded(cfgs: Vec<LlmProviderConfig>) -> Self {
         let m: HashMap<_, _> = cfgs.into_iter().map(|c| (c.id.clone(), c)).collect();
-        Self { items: Mutex::new(m) }
+        Self {
+            items: Mutex::new(m),
+        }
     }
 }
 

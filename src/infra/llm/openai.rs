@@ -7,9 +7,7 @@ pub struct OpenAiProvider {
 
 impl OpenAiProvider {
     pub fn new(e: impl Into<String>) -> Self {
-        Self {
-            endpoint: e.into(),
-        }
+        Self { endpoint: e.into() }
     }
 }
 

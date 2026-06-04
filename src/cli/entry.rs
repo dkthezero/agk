@@ -141,6 +141,12 @@ pub enum Commands {
         command: TeamCommands,
     },
 
+    /// Manage LLM providers
+    Llm {
+        #[command(subcommand)]
+        command: crate::cli::llm::LlmCommand,
+    },
+
     /// Debug / observability commands (hidden in help)
     #[command(hide = true)]
     Debug {
