@@ -38,6 +38,7 @@ dependencies = [
  "ratatui",
  "rayon",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
