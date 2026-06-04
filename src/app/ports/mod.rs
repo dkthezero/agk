@@ -9,6 +9,7 @@ pub mod config_store;
 pub mod context_store;
 pub mod feature_set;
 pub mod file_opener;
+pub mod llm_provider;
 pub mod manifest_codec;
 pub mod mcp_registry;
 pub mod process_runner;
@@ -26,6 +27,9 @@ pub use config_store::ConfigStorePort;
 pub use context_store::ContextStorePort;
 pub use feature_set::FeatureSetPort;
 pub use file_opener::FileOpenerPort;
+pub use llm_provider::{
+    LlmHealthCheckPort, LlmProviderAdapter, LlmProviderFactoryPort, LlmProviderStorePort,
+};
 pub use manifest_codec::ManifestCodecPort;
 pub use mcp_registry::{McpProvider, McpRegistryPort};
 pub use process_runner::ProcessRunnerPort;
