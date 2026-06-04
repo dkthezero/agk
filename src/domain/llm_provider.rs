@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use url::Url;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ModelInput(String);
 
@@ -41,22 +41,26 @@ pub enum LlmProviderKind {
 }
 
 impl LlmProviderKind {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "ollama" => Some(Self::Ollama),
-            "lm-studio" => Some(Self::LmStudio),
-            "anthropic" => Some(Self::Anthropic),
-            "openai" => Some(Self::OpenAi),
-            _ => None,
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Ollama => "ollama",
             Self::LmStudio => "lm-studio",
             Self::Anthropic => "anthropic",
             Self::OpenAi => "openai",
+        }
+    }
+}
+
+impl std::str::FromStr for LlmProviderKind {
+    type Err = LlmDomainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ollama" => Ok(Self::Ollama),
+            "lm-studio" => Ok(Self::LmStudio),
+            "anthropic" => Ok(Self::Anthropic),
+            "openai" => Ok(Self::OpenAi),
+            _ => Err(LlmDomainError::UnknownKind(s.to_string())),
         }
     }
 }
@@ -104,6 +108,8 @@ pub enum LlmDomainError {
     EmptyModel,
     #[error("model string exceeds 256 characters")]
     ModelTooLong,
+    #[error("unknown LLM provider kind: {0}")]
+    UnknownKind(String),
 }
 
 #[cfg(test)]
@@ -112,11 +118,26 @@ mod tests {
 
     #[test]
     fn llm_provider_kind_from_str_canonical() {
-        assert_eq!(LlmProviderKind::from_str("ollama"), Some(LlmProviderKind::Ollama));
-        assert_eq!(LlmProviderKind::from_str("lm-studio"), Some(LlmProviderKind::LmStudio));
-        assert_eq!(LlmProviderKind::from_str("anthropic"), Some(LlmProviderKind::Anthropic));
-        assert_eq!(LlmProviderKind::from_str("openai"), Some(LlmProviderKind::OpenAi));
-        assert_eq!(LlmProviderKind::from_str("unknown"), None);
+        use std::str::FromStr;
+        assert_eq!(
+            LlmProviderKind::from_str("ollama").ok(),
+            Some(LlmProviderKind::Ollama)
+        );
+        assert_eq!(
+            LlmProviderKind::from_str("lm-studio").ok(),
+            Some(LlmProviderKind::LmStudio)
+        );
+        assert_eq!(
+            LlmProviderKind::from_str("anthropic").ok(),
+            Some(LlmProviderKind::Anthropic)
+        );
+        assert_eq!(
+            LlmProviderKind::from_str("openai").ok(),
+            Some(LlmProviderKind::OpenAi)
+        );
+        // Unknown kinds return Err(UnknownKind) — callers can surface this
+        // as a validation error to the user.
+        assert!(LlmProviderKind::from_str("unknown").is_err());
     }
 
     #[test]
