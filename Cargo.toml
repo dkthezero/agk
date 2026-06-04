@@ -26,6 +26,10 @@ path = "tests/full_flow_tui/mod.rs"
 name = "integration_team_sync"
 path = "tests/integration/team_sync.rs"
 
+[[test]]
+name = "health_check_parallel"
+path = "tests/concurrency/health_check_parallel.rs"
+
 [features]
 default = ["tui", "vault-clawhub", "pack", "provider-opencode", "provider-claude", "provider-github", "provider-gemini", "provider-amp", "provider-firebender", "provider-letta", "provider-snowflake", "profile-create", "claude-cli-probe"]
 headless = []

@@ -111,6 +111,10 @@ pub struct FakeLlmHealthCheck {
     pub latency_ms: u64,
     pub models: Vec<String>,
     pub error: Option<String>,
+    /// Optional real wall-clock delay applied before returning. Used by
+    /// concurrency tests to verify that calls run in parallel rather than
+    /// serial. Capped by the caller's `timeout`.
+    pub delay: Option<Duration>,
 }
 
 impl Default for FakeLlmHealthCheck {
@@ -120,6 +124,19 @@ impl Default for FakeLlmHealthCheck {
             latency_ms: 12,
             models: vec!["llama3.2".into()],
             error: None,
+            delay: None,
+        }
+    }
+}
+
+impl FakeLlmHealthCheck {
+    /// Build a fake health check that sleeps for `delay` before returning.
+    /// Concurrency tests use this to confirm parallel dispatch by comparing
+    /// elapsed wall-clock time against the serial baseline.
+    pub fn with_delay(delay: Duration) -> Self {
+        Self {
+            delay: Some(delay),
+            ..Self::default()
         }
     }
 }
@@ -131,6 +148,9 @@ impl LlmHealthCheckPort for FakeLlmHealthCheck {
         _adapter: &dyn LlmProviderAdapter,
         _timeout: Duration,
     ) -> Result<LlmHealthStatus> {
+        if let Some(d) = self.delay {
+            tokio::time::sleep(d).await;
+        }
         Ok(LlmHealthStatus {
             reachable: self.reachable,
             latency_ms: if self.reachable {
