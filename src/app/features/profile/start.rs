@@ -163,12 +163,15 @@ pub fn run(
         };
         sink.on_event(CoreEvent::ProfileLaunchPlan { plan });
         if dry_run {
+            // Dry-run is fully served by the emitted plan event above.
             return Ok(CoreOutcome::Ok);
         }
-        // Live path: the exec layer (added in C3) will pick up the event and
-        // start the session. For now, return Ok so callers see a successful
-        // hand-off.
-        return Ok(CoreOutcome::Ok);
+        // Live run: the dedicated exec layer that consumes ProfileLaunchPlan is
+        // not wired up yet, so fall through to the existing claude-code
+        // `ProfileRuntimePort` (src/infra/provider/claude_code/session.rs) to
+        // actually start the session. If no runtime is registered for the
+        // provider, the lookup below returns a hard error rather than silently
+        // reporting success.
     }
 
     let runtime = runtime_ports

@@ -124,9 +124,7 @@ impl LlmHealthCheckPort for HttpLlmHealthCheck {
         // The fallback is gated on Anthropic only — other providers get a
         // single probe.
         if matches!(adapter.kind(), LlmProviderKind::Anthropic) {
-            let preflight = self
-                .probe(Method::OPTIONS, &url, &headers, timeout)
-                .await;
+            let preflight = self.probe(Method::OPTIONS, &url, &headers, timeout).await;
             match &preflight {
                 LlmHealthStatus {
                     reachable: true, ..
@@ -140,9 +138,7 @@ impl LlmHealthCheckPort for HttpLlmHealthCheck {
                     // Per spec 8.4: any 4xx on the fallback is "reachable,
                     // server is responding, just doesn't allow OPTIONS";
                     // only 5xx is "unreachable".
-                    let mut fallback = self
-                        .probe(Method::GET, &url, &headers, timeout)
-                        .await;
+                    let mut fallback = self.probe(Method::GET, &url, &headers, timeout).await;
                     if let Some(err) = &fallback.error {
                         if err.starts_with("HTTP 4") {
                             fallback.reachable = true;
@@ -225,16 +221,14 @@ mod tests {
 
     #[test]
     fn build_headers_for_anthropic_with_key_includes_api_key_and_version() {
-        let headers =
-            HttpLlmHealthCheck::build_headers(&AnthropicAdapterWithKey).unwrap();
+        let headers = HttpLlmHealthCheck::build_headers(&AnthropicAdapterWithKey).unwrap();
         assert_eq!(headers.get("x-api-key").unwrap(), "sk-test");
         assert_eq!(headers.get("anthropic-version").unwrap(), "2023-06-01");
     }
 
     #[test]
     fn build_headers_for_anthropic_without_key_still_has_version() {
-        let headers =
-            HttpLlmHealthCheck::build_headers(&AnthropicAdapterNoKey).unwrap();
+        let headers = HttpLlmHealthCheck::build_headers(&AnthropicAdapterNoKey).unwrap();
         assert!(headers.get("x-api-key").is_none());
         assert_eq!(headers.get("anthropic-version").unwrap(), "2023-06-01");
     }

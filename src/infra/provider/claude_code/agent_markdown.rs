@@ -86,17 +86,47 @@ pub fn render_agent_markdown(plan: &LaunchPlan) -> String {
 }
 
 fn yaml_scalar(s: &str) -> String {
-    if s.contains(':')
-        || s.contains('#')
-        || s.contains('"')
-        || s.contains('\n')
-        || s.starts_with(' ')
-        || s.ends_with(' ')
-    {
+    if needs_quoting(s) {
         format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
     } else {
         s.to_string()
     }
+}
+
+/// Returns true when `s` cannot be safely emitted as a bare (plain) YAML
+/// scalar. Beyond the obvious special characters, this also catches values
+/// that YAML would otherwise parse as a non-string: booleans/null keywords
+/// (`true`, `false`, `null`, `yes`, `no`, `on`, `off`, `~`), numeric-looking
+/// values (`123`, `1.5`, `inf`), and strings beginning with a flow/indicator
+/// character (`[`, `{`, `-`, `*`, `&`, etc.). Leaving any of these bare would
+/// silently change the type/meaning of a frontmatter field.
+fn needs_quoting(s: &str) -> bool {
+    if s.is_empty() {
+        return true;
+    }
+    const RESERVED: &[&str] = &[
+        "true", "false", "null", "yes", "no", "on", "off", "y", "n", "~",
+    ];
+    if RESERVED.iter().any(|w| w.eq_ignore_ascii_case(s)) {
+        return true;
+    }
+    // Numeric-looking scalars (int, float, inf/nan) would be parsed as numbers.
+    if s.parse::<i64>().is_ok() || s.parse::<f64>().is_ok() {
+        return true;
+    }
+    if s.starts_with(' ') || s.ends_with(' ') {
+        return true;
+    }
+    // A leading indicator character starts a non-scalar YAML node.
+    const INDICATORS: &[char] = &[
+        '!', '&', '*', '[', ']', '{', '}', ',', '#', '|', '>', '@', '`', '"', '\'', '%', '?', ':',
+        '-',
+    ];
+    if s.starts_with(INDICATORS) {
+        return true;
+    }
+    // Characters that break a plain scalar mid-string.
+    s.contains(':') || s.contains('#') || s.contains('\n') || s.contains('"')
 }
 
 #[cfg(test)]

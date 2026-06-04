@@ -19,15 +19,15 @@ mcpServers:
     command: docker
     args:
       - run
-      - -i
+      - "-i"
       - mcp/github
     env:
       GITHUB_TOKEN=ghp_example
   playwright:
     command: npx
     args:
-      - -y
-      - @playwright/mcp
+      - "-y"
+      - "@playwright/mcp"
 hooks:
   - PreToolUse
 memory: user

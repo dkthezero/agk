@@ -1,6 +1,5 @@
 ---
 name: minimal-agent
-description: 
+description: ""
 model: sonnet
 ---
-

@@ -16,6 +16,11 @@
 //! a `resolved_mcp_servers` list (full case) or empty (basic / minimal).
 //! `prompt_body` is taken from the fixture where the case includes a body
 //! (full) and is empty for the basic / minimal cases.
+//!
+//! `render_agent_markdown` lives behind the `profile-create` feature, so this
+//! whole test target is gated on it — otherwise `cargo test
+//! --no-default-features` fails to compile the import below.
+#![cfg(feature = "profile-create")]
 
 use std::path::PathBuf;
 
