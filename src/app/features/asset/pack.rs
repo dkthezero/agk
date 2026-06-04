@@ -1,3 +1,5 @@
+#![cfg(feature = "pack")]
+
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::registry::Registry;

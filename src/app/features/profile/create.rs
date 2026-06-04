@@ -74,6 +74,7 @@ pub fn run(
     config.profiles.push(profile);
 
     // 5. Provider-specific setup.
+    #[cfg(feature = "profile-create")]
     let prompt_overlay_path: Option<std::path::PathBuf> = if provider_id == "claude-code" {
         // Build the agent frontmatter from the wizard answer.
         let model = input.model.clone().unwrap_or_else(|| "sonnet".to_string());
@@ -117,61 +118,24 @@ pub fn run(
         )));
         Some(path)
     } else if provider_id == "opencode" {
-        let profile_dir = workspace.join(".agk").join("profiles").join(id_str);
-        std::fs::create_dir_all(&profile_dir)?;
-
-        let profile_dir_str = profile_dir.display().to_string();
-        let mut args = vec![
-            "agent",
-            "create",
-            "--path",
-            &profile_dir_str,
-            "--mode",
-            "primary",
-            "--name",
-            id_str,
-        ];
-        let desc = input.description.trim();
-        let desc_arg;
-        if !desc.is_empty() {
-            desc_arg = desc.to_string();
-            args.push("--description");
-            args.push(&desc_arg);
-        }
-
-        let _output = process_runner.run("opencode", &args, Some(workspace), None)?;
-
-        // OpenCode `agent create --path <profile_dir>` writes the agent
-        // markdown into <profile_dir>/agents/<agent_name>.md.
-        let agents_dir = profile_dir.join("agents");
-        let source = std::fs::read_dir(&agents_dir).ok().and_then(|entries| {
-            entries
-                .flatten()
-                .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
-                .map(|e| e.path())
-        });
-
-        let target = profile_dir.join("agent.md");
-        if let Some(ref src) = source {
-            std::fs::copy(src, &target)?;
-            sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
-            sink.on_event(CoreEvent::Info(format!(
-                "Profile '{}' created. Agent markdown saved to {}",
-                id_str,
-                target.display()
-            )));
-        } else {
-            sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
-            sink.on_event(CoreEvent::Info(format!(
-                "Profile '{}' created. Agent markdown not found in {}. \
-                     You may need to run `opencode agent create` manually.",
-                id_str,
-                agents_dir.display()
-            )));
-        }
+        run_opencode_branch(input, id_str, workspace, sink, process_runner)?;
         None
     } else {
         anyhow::bail!("unsupported profile provider: {}", provider_id);
+    };
+    #[cfg(not(feature = "profile-create"))]
+    let prompt_overlay_path: Option<std::path::PathBuf> = {
+        if provider_id == "claude-code" {
+            anyhow::bail!(
+                "Provider 'claude-code' requires the 'profile-create' feature \
+                 (not enabled in this build)"
+            );
+        } else if provider_id == "opencode" {
+            run_opencode_branch(input, id_str, workspace, sink, process_runner)?;
+            None
+        } else {
+            anyhow::bail!("unsupported profile provider: {}", provider_id);
+        }
     };
 
     // 6. Persist the (possibly rewritten) `prompt_overlay_path` and save.
@@ -213,6 +177,71 @@ fn to_domain_profile(input: &CreateProfileInput) -> crate::domain::profile::Prof
         llm_provider_id: input.llm_provider_id.clone(),
         agent_mcp_servers: input.agent_mcp_servers.clone(),
     }
+}
+
+/// Run the opencode branch of profile creation: spawn `opencode agent create`,
+/// locate the generated agent markdown, copy it into the profile dir, and emit
+/// the standard profile-created events.
+fn run_opencode_branch(
+    input: &CreateProfileInput,
+    id_str: &str,
+    workspace: &std::path::Path,
+    sink: &mut dyn CoreEventSink,
+    process_runner: &dyn ProcessRunnerPort,
+) -> CoreResult {
+    let profile_dir = workspace.join(".agk").join("profiles").join(id_str);
+    std::fs::create_dir_all(&profile_dir)?;
+
+    let profile_dir_str = profile_dir.display().to_string();
+    let mut args = vec![
+        "agent",
+        "create",
+        "--path",
+        &profile_dir_str,
+        "--mode",
+        "primary",
+        "--name",
+        id_str,
+    ];
+    let desc = input.description.trim();
+    let desc_arg;
+    if !desc.is_empty() {
+        desc_arg = desc.to_string();
+        args.push("--description");
+        args.push(&desc_arg);
+    }
+
+    let _output = process_runner.run("opencode", &args, Some(workspace), None)?;
+
+    // OpenCode `agent create --path <profile_dir>` writes the agent
+    // markdown into <profile_dir>/agents/<agent_name>.md.
+    let agents_dir = profile_dir.join("agents");
+    let source = std::fs::read_dir(&agents_dir).ok().and_then(|entries| {
+        entries
+            .flatten()
+            .find(|e| e.path().extension().and_then(|s| s.to_str()) == Some("md"))
+            .map(|e| e.path())
+    });
+
+    let target = profile_dir.join("agent.md");
+    if let Some(ref src) = source {
+        std::fs::copy(src, &target)?;
+        sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
+        sink.on_event(CoreEvent::Info(format!(
+            "Profile '{}' created. Agent markdown saved to {}",
+            id_str,
+            target.display()
+        )));
+    } else {
+        sink.on_event(CoreEvent::ProfileCreated(input.id.clone()));
+        sink.on_event(CoreEvent::Info(format!(
+            "Profile '{}' created. Agent markdown not found in {}. \
+                 You may need to run `opencode agent create` manually.",
+            id_str,
+            agents_dir.display()
+        )));
+    }
+    Ok(CoreOutcome::Ok)
 }
 
 #[cfg(test)]

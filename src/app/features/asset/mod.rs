@@ -1,4 +1,5 @@
 pub mod install;
+#[cfg(feature = "pack")]
 pub mod pack;
 pub mod remove;
 pub mod search_remote;
@@ -36,15 +37,25 @@ pub fn dispatch(
             target,
             stdout,
             scope,
-        } => Some(pack::run(
-            identity,
-            *target,
-            *stdout,
-            *scope,
-            core.registry.as_ref(),
-            &core.workspace_root,
-            sink,
-        )),
+        } => {
+            #[cfg(feature = "pack")]
+            {
+                Some(pack::run(
+                    identity,
+                    *target,
+                    *stdout,
+                    *scope,
+                    core.registry.as_ref(),
+                    &core.workspace_root,
+                    sink,
+                ))
+            }
+            #[cfg(not(feature = "pack"))]
+            {
+                let _ = (identity, target, stdout, scope);
+                None
+            }
+        }
         CoreCommand::InstallAsset {
             identity,
             scope,

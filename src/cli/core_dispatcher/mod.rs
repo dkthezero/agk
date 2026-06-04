@@ -6,9 +6,11 @@ use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
 use crate::app::outcome::CoreEventSink;
 use crate::cli::entry::{
-    Cli, Commands, ContextCommands, DebugCommands, PackTarget, TeamCommands, TelemetryCommands,
+    Cli, Commands, ContextCommands, DebugCommands, TeamCommands, TelemetryCommands,
     VaultCommands,
 };
+#[cfg(feature = "pack")]
+use crate::cli::entry::PackTarget;
 use crate::cli::presenter::CliPresenter;
 use crate::domain::context::ContextId;
 use crate::domain::scope::Scope;
@@ -123,6 +125,7 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 .map(|s| s.into_domain_scope())
                 .unwrap_or(Scope::Workspace),
         }),
+        #[cfg(feature = "pack")]
         Commands::Pack {
             identity,
             target,

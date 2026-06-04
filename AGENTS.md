@@ -248,6 +248,154 @@ When you need to understand or modify code, **search in this exact order**:
 
 ---
 
+## Anti-Patterns & Hard-Won Rules
+
+These rules come from actual bugs found in review. Follow them to avoid repeating the same mistakes.
+
+### Error Propagation in Dispatch
+
+**Never** swallow an error by emitting a `TaskFailed` event and then returning `Ok(CoreOutcome::Ok)`. The caller (CLI presenter, TUI runtime loop) relies on the `Result` to decide success/failure — a swallowed error looks like success.
+
+```rust
+// ❌ WRONG — error is reported to the user but the command "succeeds"
+sink.on_event(CoreEvent::TaskFailed(e.to_string()));
+Ok(CoreOutcome::Ok)
+
+// ✅ CORRECT — propagate the error so the caller knows it failed
+Some(Err(e))
+// or for fallible operations inside a match arm:
+Err(e) => Some(Err(e)),
+```
+
+The `dispatch()` function returns `Option<CoreResult>`. After any error that should halt the flow, return `Some(Err(e))` — never `Some(Ok(CoreOutcome::Ok))`.
+
+### Identity Matching: Never Use Substring Match
+
+Asset identities are embedded in item strings like `[my-skill:1.0.0:abc123]`. **Never** use `.contains(identity)` to check if an asset is installed — it produces false positives (e.g., searching for `"sec"` matches `"security-scan"`).
+
+```rust
+// ❌ WRONG — substring match, "sec" matches "security-scan"
+items.iter().any(|item| item.contains(identity))
+
+// ✅ CORRECT — exact identity match using shared parser
+use crate::app::features::common::parse_identity_from_item;
+items.iter().any(|item| parse_identity_from_item(item).as_deref() == Some(identity))
+```
+
+The `parse_identity_from_item()` and `parse_version_from_item()` helpers live in `app/features/common/mod.rs`. **Always** use them instead of writing inline parsers or using substring checks.
+
+### Asset Matching: Match by Vault + Kind, Not Just Identity
+
+Two assets can share the same identity but differ in kind or vault. A `Skill` named `"security-scan"` in vault `"shared"` does **not** satisfy a requirement for an `Instruction` named `"security-scan"` in the same vault.
+
+```rust
+// ❌ WRONG — counts any asset with matching identity, regardless of vault/kind
+installed.iter().filter(|a| a.identity == identity).count()
+
+// ✅ CORRECT — match within the correct vault and kind bucket
+if let Some(section) = config.vault_defs.get(&req.vault) {
+    let bucket = match req.kind {
+        AssetKind::Skill => &section.skills,
+        AssetKind::Instruction => &section.instructions,
+        // ...
+    };
+    bucket.as_ref().map(|b| b.items.iter().any(|item| /* identity match */))
+}
+```
+
+### Version Constraints: Never Equality-Compare Constraint Expressions
+
+A version constraint like `>=2.0.0` is **not** a pinned version. Comparing it with `==` against an installed version like `"2.3.1"` will always report `Outdated` — a false positive.
+
+```rust
+// ❌ WRONG — ">=2.0.0" != "2.3.1" → always Outdated
+if expected != actual { return Outdated; }
+
+// ✅ CORRECT — skip constraint expressions, only compare pinned versions
+fn is_version_constraint(s: &str) -> bool {
+    s.starts_with(|c: char| !c.is_ascii_digit())
+}
+if !is_version_constraint(expected) && expected != actual {
+    return Outdated;
+}
+```
+
+### Dependency Injection: Use Port Traits, Not Concrete Access
+
+Feature use cases must accept `&dyn` port traits as parameters, not reach through `core.` directly. The `dispatch()` function unwraps ports from `AgkCore`; the use case function signature should declare what it needs.
+
+```rust
+// ❌ WRONG — use case reaches into core internals
+pub fn team_status(core: &AgkCore) -> Result<...> {
+    let config = core.store.load(...);
+}
+
+// ✅ CORRECT — use case declares its dependencies as port parameters
+pub fn team_status(
+    team_store: &dyn TeamConfigStorePort,
+    config_store: &dyn ConfigStorePort,
+) -> Result<...> { ... }
+
+// dispatch() wires them:
+status::team_status(core.team_config_store.as_ref(), core.store.as_ref())
+```
+
+### Malformed Config: Surface Errors, Don't Default
+
+If a config file **exists** but is malformed, the error must propagate to the caller. Only default when the file **does not exist**.
+
+```rust
+// ❌ WRONG — silently ignores parse errors for existing files
+let config = config_store.load(scope).unwrap_or_default();
+
+// ✅ CORRECT — distinguish "file missing" from "file broken"
+let config = match config_store.load(scope) {
+    Ok(c) => c,
+    Err(e) => {
+        if config_store.exists(scope) {
+            return Err(e); // file exists but is broken — tell the user
+        }
+        Default::default() // file doesn't exist — that's fine
+    }
+};
+```
+
+### Path Types: `&Path` Over `&PathBuf` in Function Signatures
+
+Functions that read a path without ownership must accept `&Path`, not `&PathBuf`. `PathBuf` derefs to `Path`, so callers with either type work — but the signature communicates "I only need to read this."
+
+```rust
+// ❌ WRONG — requires the caller to have a PathBuf
+fn ensure_entry(path: &PathBuf) -> Result<...>
+
+// ✅ CORRECT — accepts PathBuf or Path
+fn ensure_entry(path: &Path) -> Result<...>
+```
+
+### CLI Arg Naming: Use Clap `name` When Flag Differs From Field Name
+
+When a Rust field name can't be the CLI flag (e.g., `vault_type` but the flag should be `--type`), use the `name` attribute:
+
+```rust
+// ❌ WRONG — CLI shows --vault-type instead of --type
+#[arg(long)]
+vault_type: Option<String>,
+
+// ✅ CORRECT — field name stays vault_type, CLI shows --type
+#[arg(long, name = "type")]
+vault_type: Option<String>,
+```
+
+### Don't Reference Non-Existent Flags
+
+Never suggest flags that don't exist (e.g., "Use --force to overwrite"). If a user-facing message mentions a flag, that flag **must** be defined in the Clap struct. If it isn't, remove the message.
+
+### Placeholder Formats: Use Canonical Form
+
+When synthesizing placeholder asset entries (e.g., for assets without a known version/hash), use the canonical format: `[identity:--:0000000000]`. Never use ad-hoc formats like `[identity::0]` — downstream parsers depend on the three-field structure.
+
+---
+
 ## CI & Quality Gates
 
 - `cargo fmt --check` (enforced)
