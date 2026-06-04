@@ -27,7 +27,7 @@ name = "integration_team_sync"
 path = "tests/integration/team_sync.rs"
 
 [features]
-default = ["tui", "vault-clawhub", "pack", "provider-opencode", "provider-claude", "provider-github", "provider-gemini", "provider-amp", "provider-firebender", "provider-letta", "provider-snowflake"]
+default = ["tui", "vault-clawhub", "pack", "provider-opencode", "provider-claude", "provider-github", "provider-gemini", "provider-amp", "provider-firebender", "provider-letta", "provider-snowflake", "profile-create", "claude-cli-probe"]
 headless = []
 tui = ["dep:ratatui", "dep:crossterm"]
 pack = ["dep:zip", "dep:tar", "dep:flate2"]
@@ -41,6 +41,12 @@ provider-amp = []
 provider-firebender = []
 provider-letta = []
 provider-snowflake = []
+profile-create = []
+claude-cli-probe = []
+llm-ollama = ["dep:reqwest"]
+llm-lmstudio = ["dep:reqwest"]
+llm-anthropic = ["dep:reqwest"]
+llm-openai = ["dep:reqwest"]
 observability = ["dep:tracing", "dep:tracing-subscriber"]
 
 [dependencies]
