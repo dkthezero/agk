@@ -65,6 +65,8 @@ pub struct AppState {
     pub export_resolve_vaults: bool,
     // Profile import state (Ctrl+I on Profile tab)
     pub import_file_path: String,
+    // True when workspace root contains .agk/vault.toml (vault source repo mode)
+    pub is_vault_workspace: bool,
 }
 
 impl AppState {
@@ -124,6 +126,7 @@ impl AppState {
             export_file_path: String::new(),
             export_resolve_vaults: false,
             import_file_path: String::new(),
+            is_vault_workspace: false,
         }
     }
 
@@ -183,6 +186,9 @@ impl AppState {
     }
 
     pub fn toggle_scope(&mut self) {
+        if self.is_vault_workspace {
+            return;
+        }
         self.active_scope = match self.active_scope {
             Scope::Global => Scope::Workspace,
             Scope::Workspace => Scope::Global,
@@ -211,6 +217,9 @@ impl AppState {
     }
 
     pub fn scope_label(&self) -> &'static str {
+        if self.is_vault_workspace {
+            return "[VAULT]";
+        }
         match self.active_scope {
             Scope::Global => "[Tab] GLOBAL",
             Scope::Workspace => "[Tab] WORKSPACE",
@@ -263,6 +272,12 @@ mod tests {
     fn filtered_packages_empty_query_returns_all() {
         let state = state_with_skills(vec![make_pkg("alpha"), make_pkg("beta")]);
         assert_eq!(state.filtered_packages().len(), 2);
+    }
+
+    #[test]
+    fn confirm_vault_init_is_a_list_mode() {
+        let mode = ListMode::ConfirmVaultInit;
+        assert!(matches!(mode, ListMode::ConfirmVaultInit));
     }
 
     #[test]
@@ -353,6 +368,21 @@ mod tests {
         state.toggle_scope();
         state.toggle_scope();
         assert_eq!(state.active_scope, Scope::Workspace);
+    }
+
+    #[test]
+    fn toggle_scope_locked_in_vault_workspace() {
+        let mut state = state_with_skills(vec![]);
+        state.is_vault_workspace = true;
+        state.toggle_scope();
+        assert_eq!(state.active_scope, Scope::Workspace, "vault mode must not toggle scope");
+    }
+
+    #[test]
+    fn scope_label_shows_vault_in_vault_workspace() {
+        let mut state = state_with_skills(vec![]);
+        state.is_vault_workspace = true;
+        assert_eq!(state.scope_label(), "[VAULT]");
     }
 
     #[test]
