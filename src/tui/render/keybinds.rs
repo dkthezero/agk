@@ -19,6 +19,7 @@ pub(crate) fn resolve_keybinds(state: &AppState) -> &'static str {
         ListMode::ConfirmMcpTest
             | ListMode::ConfirmClawHubInstall
             | ListMode::ConfirmDetachVault
+            | ListMode::ConfirmVaultInit
             | ListMode::ConfirmDeactivateLastProvider
             | ListMode::ConfirmDeleteProfile
     ) {
