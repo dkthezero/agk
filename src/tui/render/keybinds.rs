@@ -3,7 +3,7 @@ use crate::app::tab_kind::TabKind;
 use crate::tui::app::AppState;
 use crate::tui::list_mode::ListMode;
 
-pub fn resolve_keybinds(state: &AppState) -> &'static str {
+pub(crate) fn resolve_keybinds(state: &AppState) -> &'static str {
     let active_kind = state
         .tab_kinds
         .get(state.active_tab)
@@ -62,7 +62,11 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
                 "[↑/↓] Move  [F2] Add MCP  [Space] Enable  [Enter] Test  [Esc]x2 Quit"
             }
             TabKind::Vault => {
-                "[↑/↓] Move  [F2] Attach New  [Space] Toggle  [F4] Refresh  [Esc]x2 Quit"
+                if state.is_vault_workspace {
+                    "[↑/↓] Move  [F2] Attach New  [Space] Toggle  [F4] Refresh  [Esc]x2 Quit"
+                } else {
+                    "[↑/↓] Move  [F1] Init as Vault  [F2] Attach New  [Space] Toggle  [F4] Refresh  [Esc]x2 Quit"
+                }
             }
             TabKind::Profile => {
                 "[↑/↓] Move  [F2] Add Profile  [F3] Edit  [Ctrl+E] Export  [Ctrl+I] Import  [Delete] Remove  [Esc]x2 Quit"

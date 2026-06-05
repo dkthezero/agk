@@ -442,4 +442,32 @@ mod tests {
         apply_core_event(&mut state, &CoreEvent::VaultInitialized("my-vault".to_string()));
         assert!(state.is_vault_workspace, "VaultInitialized must set is_vault_workspace = true");
     }
+
+    #[test]
+    fn vault_keybinds_include_init_when_not_vault_workspace() {
+        use crate::tui::render::keybinds::resolve_keybinds;
+        let mut state = AppState::new(
+            vec!["Vaults".to_string()],
+            vec![true],
+            HashMap::new(),
+        );
+        state.tab_kinds = vec![TabKind::Vault];
+        state.is_vault_workspace = false;
+        let keybinds = resolve_keybinds(&state);
+        assert!(keybinds.contains("F1"), "non-vault workspace must show [F1] Init as Vault");
+    }
+
+    #[test]
+    fn vault_keybinds_hide_init_when_vault_workspace() {
+        use crate::tui::render::keybinds::resolve_keybinds;
+        let mut state = AppState::new(
+            vec!["Vaults".to_string()],
+            vec![true],
+            HashMap::new(),
+        );
+        state.tab_kinds = vec![TabKind::Vault];
+        state.is_vault_workspace = true;
+        let keybinds = resolve_keybinds(&state);
+        assert!(!keybinds.contains("F1"), "vault workspace must NOT show [F1] Init as Vault");
+    }
 }

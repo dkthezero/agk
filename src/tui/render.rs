@@ -1,6 +1,6 @@
 mod content;
 mod header;
-mod keybinds;
+pub mod keybinds;
 mod modals;
 mod profile_wizard;
 
