@@ -136,7 +136,7 @@ pub fn handle_space(state: &mut AppState, ctx: &EventContext) -> Result<()> {
             crate::tui::features::mcps::controller::handle_space_mcp(state, ctx)
         }
         Some(crate::app::tab_kind::TabKind::Asset) => {
-            if !state.active_scope_has_provider() {
+            if !state.is_vault_workspace && !state.active_scope_has_provider() {
                 let providers_idx = state
                     .tab_names
                     .iter()
