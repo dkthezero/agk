@@ -281,6 +281,13 @@ mod tests {
     }
 
     #[test]
+    fn pending_vault_local_path_used_as_vault_name_scratch() {
+        let mut state = state_with_skills(vec![]);
+        state.pending_vault_local_path = "my-vault".to_string();
+        assert_eq!(state.pending_vault_local_path, "my-vault");
+    }
+
+    #[test]
     fn filtered_packages_filters_by_name() {
         let state = state_with_skills(vec![make_pkg("alpha-skill"), make_pkg("beta-tool")]);
         let mut s = state;

@@ -173,6 +173,23 @@ This will remove it from the configuration.",
                 "[Enter] Confirm  [Esc] Cancel",
             );
         }
+        ListMode::ConfirmVaultInit => {
+            let vault_name = if state.pending_vault_local_path.is_empty() {
+                "this workspace".to_string()
+            } else {
+                format!("'{}'", state.pending_vault_local_path)
+            };
+            let msg = format!(
+                "Initialize {} as a vault?\n\nCreates:\n  .agk/vault.toml\n  skills/\n  instructions/\n  mcps/\n  profiles/",
+                vault_name
+            );
+            modal::render_confirm_modal(
+                frame,
+                "Init as Vault",
+                &msg,
+                "[Enter] Confirm  [Esc] Cancel",
+            );
+        }
         _ => {}
     }
 }
