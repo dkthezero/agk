@@ -52,7 +52,11 @@ pub fn resolve_keybinds(state: &AppState) -> &'static str {
                 "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F3] Team  [F5] Update All  [F4] Refresh  [Ctrl+O] Open Folder  [Ctrl+T] Terminal  [type] Search  [Esc]x2 Quit"
             }
             TabKind::Provider => {
-                "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F4] Refresh  [Esc]x2 Quit"
+                if state.is_vault_workspace {
+                    "[↑/↓] Move  [F4] Refresh  [Esc]x2 Quit  (providers inactive in vault mode)"
+                } else {
+                    "[↑/↓] Move  [Space] Toggle  [Enter] Update  [F4] Refresh  [Esc]x2 Quit"
+                }
             }
             TabKind::Mcp => {
                 "[↑/↓] Move  [F2] Add MCP  [Space] Enable  [Enter] Test  [Esc]x2 Quit"
