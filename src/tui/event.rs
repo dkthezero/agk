@@ -152,6 +152,7 @@ pub fn handle(
             ListMode::ConfirmMcpTest
                 | ListMode::ConfirmClawHubInstall
                 | ListMode::ConfirmDetachVault
+                | ListMode::ConfirmVaultInit
                 | ListMode::ConfirmDeactivateLastProvider
                 | ListMode::ConfirmDeleteProfile
         );
@@ -172,6 +173,9 @@ pub fn handle(
                 }
                 ListMode::ConfirmDeleteProfile => {
                     crate::tui::features::profiles::controller::handle_delete_profile_confirm(state, ctx)
+                }
+                ListMode::ConfirmVaultInit => {
+                    crate::tui::features::vaults::controller::handle_vault_init_confirm(state, ctx)
                 }
                 _ => Ok(ControlFlow::Continue),
             };
@@ -200,6 +204,9 @@ pub fn handle(
                     state.pending_delete_profile = None;
                     state.status_line = "Cancelled profile deletion".to_string();
                     Ok(ControlFlow::Continue)
+                }
+                ListMode::ConfirmVaultInit => {
+                    crate::tui::features::vaults::controller::handle_vault_init_cancel(state)
                 }
                 _ => Ok(ControlFlow::Continue),
             };
@@ -240,7 +247,7 @@ pub fn handle(
             KeyCode::Enter if state.list_mode == ListMode::Normal => {
                 crate::tui::features::common::controller::handle_enter(state, ctx)?;
             }
-            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(3) | KeyCode::F(2)
+            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(3) | KeyCode::F(2) | KeyCode::F(1)
                 if state.list_mode == ListMode::Normal =>
             {
                 crate::tui::features::common::controller::handle_f_keys(state, ctx, &key.code)?;

@@ -423,4 +423,13 @@ mod tests {
         assert_eq!(state.tab_kinds[3], TabKind::Provider); // Providers
         assert_eq!(state.tab_kinds[4], TabKind::Vault); // Vault
     }
+
+    #[test]
+    fn enter_vault_init_sets_confirm_mode() {
+        let mut state = state_with_skills(vec![]);
+        state.pending_vault_local_path = "my-workspace".to_string();
+        state.list_mode = ListMode::ConfirmVaultInit;
+        assert!(matches!(state.list_mode, ListMode::ConfirmVaultInit));
+        assert_eq!(state.pending_vault_local_path, "my-workspace");
+    }
 }

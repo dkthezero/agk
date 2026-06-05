@@ -119,6 +119,17 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
             }
             Ok(())
         }
+        KeyCode::F(1) => {
+            let vaults_idx = state
+                .tab_names
+                .iter()
+                .position(|n| n == "Vaults")
+                .unwrap_or(0);
+            if state.active_tab == vaults_idx && !state.is_vault_workspace {
+                crate::tui::features::vaults::controller::enter_vault_init(state, ctx);
+            }
+            Ok(())
+        }
         _ => Ok(()),
     }
 }
