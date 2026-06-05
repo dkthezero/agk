@@ -432,4 +432,14 @@ mod tests {
         assert!(matches!(state.list_mode, ListMode::ConfirmVaultInit));
         assert_eq!(state.pending_vault_local_path, "my-workspace");
     }
+
+    #[test]
+    fn vault_initialized_event_sets_is_vault_workspace() {
+        use crate::app::event::CoreEvent;
+        use crate::tui::core_event_reducer::apply_core_event;
+        let mut state = state_with_skills(vec![]);
+        assert!(!state.is_vault_workspace);
+        apply_core_event(&mut state, &CoreEvent::VaultInitialized("my-vault".to_string()));
+        assert!(state.is_vault_workspace, "VaultInitialized must set is_vault_workspace = true");
+    }
 }
