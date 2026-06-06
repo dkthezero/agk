@@ -11,7 +11,130 @@
 use crate::app::core::AgkCore;
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::domain::asset::AssetKind;
 use crate::domain::scope::Scope;
+
+/// Returns true when the workspace root contains `.agk/vault.toml`, meaning
+/// this workspace is a vault source repository. Skills are installed into the
+/// vault's own `skills/` folder rather than any provider-specific directory.
+fn is_vault_workspace(core: &AgkCore) -> bool {
+    core.workspace_root
+        .join(".agk")
+        .join("vault.toml")
+        .exists()
+}
+
+fn vault_kind_folder(kind: &AssetKind) -> &'static str {
+    match kind {
+        AssetKind::Skill => "skills",
+        AssetKind::Instruction => "instructions",
+        AssetKind::McpServer => "mcps",
+        AssetKind::Profile => "profiles",
+    }
+}
+
+fn vault_copy_dir(src: &std::path::Path, dest: &std::path::Path) -> anyhow::Result<()> {
+    if dest.exists() {
+        std::fs::remove_dir_all(dest)?;
+    }
+    std::fs::create_dir_all(dest)?;
+    for entry in walkdir::WalkDir::new(src).min_depth(1).follow_links(false) {
+        let entry = entry?;
+        if entry.file_type().is_symlink() {
+            continue;
+        }
+        let rel = entry.path().strip_prefix(src)?;
+        let target = dest.join(rel);
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&target)?;
+        } else {
+            std::fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
+}
+
+fn vault_install_asset(
+    identity: &str,
+    core: &AgkCore,
+    sink: &mut dyn CoreEventSink,
+) -> CoreResult {
+    let pkg = match core.registry.find_package_by_identity(identity) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Asset '{}' not found in any vault", identity),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+        Err(e) => {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Lookup failed: {}", e),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+    };
+
+    let folder = vault_kind_folder(&pkg.kind);
+    let dest = core.workspace_root.join(folder).join(&pkg.identity.name);
+    if let Err(e) = vault_copy_dir(&pkg.path, &dest) {
+        sink.on_event(CoreEvent::TaskFailed {
+            id: 0,
+            error: format!("Failed to copy '{}' to vault: {}", identity, e),
+        });
+        return Ok(CoreOutcome::Ok);
+    }
+
+    sink.on_event(CoreEvent::TaskCompleted {
+        id: 0,
+        message: format!("'{}' added to vault skills/", pkg.identity.name),
+    });
+    Ok(CoreOutcome::Ok)
+}
+
+fn vault_remove_asset(
+    identity: &str,
+    core: &AgkCore,
+    sink: &mut dyn CoreEventSink,
+) -> CoreResult {
+    let pkg = match core.registry.find_package_by_identity(identity) {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Asset '{}' not found", identity),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+        Err(e) => {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Lookup failed: {}", e),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+    };
+
+    let folder = vault_kind_folder(&pkg.kind);
+    let dest = core.workspace_root.join(folder).join(&pkg.identity.name);
+    if dest.exists() {
+        if let Err(e) = std::fs::remove_dir_all(&dest) {
+            sink.on_event(CoreEvent::TaskFailed {
+                id: 0,
+                error: format!("Failed to remove '{}' from vault: {}", identity, e),
+            });
+            return Ok(CoreOutcome::Ok);
+        }
+    }
+
+    sink.on_event(CoreEvent::TaskCompleted {
+        id: 0,
+        message: format!("'{}' removed from vault skills/", pkg.identity.name),
+    });
+    Ok(CoreOutcome::Ok)
+}
 
 pub(super) fn install_asset_cmd(
     identity: &str,
@@ -26,6 +149,10 @@ pub(super) fn install_asset_cmd(
         id: 0,
         name: format!("Installing '{}'", identity),
     });
+
+    if is_vault_workspace(core) {
+        return vault_install_asset(identity, core, sink);
+    }
 
     let config = match core.store.load(scope) {
         Ok(c) => c,
@@ -140,6 +267,10 @@ pub(super) fn remove_asset_cmd(
         id: 0,
         name: format!("Removing '{}'", identity),
     });
+
+    if is_vault_workspace(core) {
+        return vault_remove_asset(identity, core, sink);
+    }
 
     let config = match core.store.load(scope) {
         Ok(c) => c,
