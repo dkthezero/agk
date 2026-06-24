@@ -41,15 +41,23 @@ impl CliPresenter {
     }
 
     /// Returns true if the presenter has already rendered a failure event
-    /// (`TaskFailed` or `McpTested { healthy: false }`) during this
-    /// execution.  Use cases that emit such an event AND return `Err` rely
-    /// on this so the dispatcher's `Err` arm can skip the redundant
-    /// `on_error` call (which would otherwise print a second `Error: ...`
-    /// line to stderr — see the AGENTS.md anti-pattern note).
+    /// during this execution.  Use cases that emit such an event AND return
+    /// `Err` rely on this so the dispatcher's `Err` arm can skip the
+    /// redundant `on_error` call (which would otherwise print a second
+    /// `Error: ...` line to stderr — see the AGENTS.md anti-pattern note).
+    ///
+    /// Recognized failure events:
+    /// - `TaskFailed` (sync/install/remove/update, mcp registration soft-fail)
+    /// - `McpTested { healthy: false }` (mcp connectivity probe)
+    /// - `LlmProviderHealth { reachable: false }` (llm health probe)
     pub(crate) fn already_reported_task_failure(&self) -> bool {
         self.events.iter().any(|e| {
             matches!(e, CoreEvent::TaskFailed { .. })
                 || matches!(e, CoreEvent::McpTested { healthy: false, .. })
+                || matches!(
+                    e,
+                    CoreEvent::LlmProviderHealth { status, .. } if !status.reachable
+                )
         })
     }
 
