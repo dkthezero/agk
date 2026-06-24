@@ -45,9 +45,15 @@ pub fn dispatch(
                 add::team_add_vault(&core.workspace_root, identity, vault_type, url, branch);
             match result {
                 Ok(add_result) => {
-                    sink.on_event(crate::app::event::CoreEvent::TeamVaultAdded(
-                        add_result.identity.clone(),
-                    ));
+                    if add_result.added {
+                        sink.on_event(crate::app::event::CoreEvent::TeamVaultAdded(
+                            add_result.identity.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            add_result.message.clone(),
+                        ));
+                    }
                     Some(Ok(CoreOutcome::Ok))
                 }
                 Err(e) => Some(Err(e)),
@@ -68,9 +74,15 @@ pub fn dispatch(
             );
             match result {
                 Ok(add_result) => {
-                    sink.on_event(crate::app::event::CoreEvent::TeamRequirementAdded(
-                        add_result.identity.clone(),
-                    ));
+                    if add_result.added {
+                        sink.on_event(crate::app::event::CoreEvent::TeamRequirementAdded(
+                            add_result.identity.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            add_result.message.clone(),
+                        ));
+                    }
                     Some(Ok(CoreOutcome::Ok))
                 }
                 Err(e) => Some(Err(e)),
