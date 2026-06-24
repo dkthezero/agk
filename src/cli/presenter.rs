@@ -23,10 +23,16 @@ pub enum OutputMode {
 
 impl CliPresenter {
     pub fn new(json: bool, quiet: bool) -> Self {
-        let mode = if quiet {
-            OutputMode::Quiet
-        } else if json {
+        // `--json` takes precedence over `--quiet`: a user requesting
+        // structured JSON output still expects the JSON batch even when they
+        // also pass `--quiet` (common pattern: `--quiet --json` to get only
+        // machine-readable output with no human-readable noise).  Previously
+        // `--quiet` won, making `--quiet --json` emit zero output — silently
+        // breaking JSON consumers that paired the two flags.
+        let mode = if json {
             OutputMode::Json
+        } else if quiet {
+            OutputMode::Quiet
         } else {
             OutputMode::Normal
         };
@@ -273,6 +279,21 @@ mod tests {
                     if *id == 0 && error == "No active providers"
             )),
             "JSON-mode TaskFailed must be accumulated into the batch"
+        );
+    }
+
+    /// Regression: `--quiet --json` must still emit the JSON batch.  Previously
+    /// `--quiet` took precedence over `--json` in `CliPresenter::new`, so the
+    /// mode became `Quiet` and `finalize()` (which only prints in `Json` mode)
+    /// emitted zero output — silently breaking JSON consumers that paired the
+    /// two flags to get machine-readable output with no human-readable noise.
+    /// `--json` now takes precedence, so `--quiet --json` behaves like `--json`.
+    #[test]
+    fn quiet_with_json_still_emits_json_batch() {
+        let presenter = CliPresenter::new(true, true);
+        assert!(
+            matches!(presenter.mode, OutputMode::Json),
+            "--json must take precedence over --quiet so the JSON batch is still emitted"
         );
     }
 }
