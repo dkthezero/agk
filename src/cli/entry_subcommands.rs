@@ -242,6 +242,16 @@ pub enum VaultCommands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Attach a local vault directory to this workspace's global config
+    Attach {
+        /// Path to the vault directory (must contain .agk/vault.toml)
+        path: String,
+
+        /// Override the vault ID (defaults to the name in vault.toml or folder name)
+        #[arg(short, long)]
+        id: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

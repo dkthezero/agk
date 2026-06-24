@@ -7,13 +7,8 @@ use ratatui::{
     Frame,
 };
 
-pub fn draw_header(frame: &mut Frame, state: &AppState, area: Rect) {
-    let search_hint = if state.search_query.is_empty() {
-        String::new()
-    } else {
-        format!("  [ Search: {} ]", state.search_query)
-    };
-    let header_text = format!("agk v0.2.7{}", search_hint);
+pub fn draw_header(frame: &mut Frame, _state: &AppState, area: Rect) {
+    let header_text = format!("agk v{}", env!("CARGO_PKG_VERSION"));
     frame.render_widget(
         Paragraph::new(Line::from(header_text)).style(
             Style::default()
