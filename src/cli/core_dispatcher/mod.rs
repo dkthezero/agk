@@ -395,4 +395,77 @@ mod tests {
             "install with no active providers must surface as a non-zero exit code"
         );
     }
+
+    /// Regression: `agk context switch <name>` must exit non-zero when the
+    /// target context does not exist.  Previously the use case called
+    /// `sink.on_error` (rendering `Error: Context '...' does not exist`) but
+    /// returned `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the
+    /// failure — the `on_error`-then-`Ok` anti-pattern.
+    fn context_switch_cli(name: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Context {
+                command: ContextCommands::Switch {
+                    name: name.to_string(),
+                    dry_run: false,
+                },
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_context_switch_returns_failure_exit_for_missing_context() {
+        // `test_core`'s FakeCtxStore returns an empty ContextFile, so any
+        // non-"default" context lookup fails — but note `default` is also
+        // absent from the map (only `current_context` is set), so even
+        // switching to "default" is a no-op error here.  Use an explicit
+        // missing name to make the intent unambiguous.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = context_switch_cli("nonexistent");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "switching to a missing context must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk pack <identity>` must exit non-zero when the asset is
+    /// not found in any vault.  Previously the use case called `sink.on_error`
+    /// (rendering `Error: Asset '...' not found in any vault`) but returned
+    /// `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the failure.
+    #[cfg(feature = "pack")]
+    #[test]
+    fn dispatch_pack_returns_failure_exit_for_missing_asset() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        // Empty registry -> no package matches the identity.
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = Cli {
+            command: Some(Commands::Pack {
+                identity: "ghost-skill:1.0.0:deadbeef00".to_string(),
+                target: crate::cli::entry::PackTarget::ClaudeDesktop,
+                stdout: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        };
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "packing a missing asset must surface as a non-zero exit code"
+        );
+    }
 }

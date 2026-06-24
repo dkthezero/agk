@@ -27,15 +27,13 @@ pub fn run(
     let ctx = match file.get(id) {
         Some(ctx) => ctx,
         None => {
-            sink.on_error(format!("Context '{}' does not exist", id.as_str()));
-            return Ok(CoreOutcome::Ok);
+            return Err(anyhow::anyhow!("Context '{}' does not exist", id.as_str()));
         }
     };
 
     if !dry_run {
         if let Err(e) = context_store.switch_context(id) {
-            sink.on_error(format!("Failed to switch context: {}", e));
-            return Ok(CoreOutcome::Ok);
+            return Err(anyhow::anyhow!("Failed to switch context: {}", e));
         }
     }
 
@@ -191,7 +189,7 @@ mod tests {
             &mut sink,
             &config_store,
         );
-        assert!(result.is_ok());
+        assert!(result.is_err(), "switching to a missing context must error");
         // Context remains default
         assert_eq!(ctx_store.current_context().unwrap().as_str(), "default");
     }

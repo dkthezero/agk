@@ -22,14 +22,17 @@ pub fn run(
     let pkg = match registry.find_package_by_identity(identity_str)? {
         Some(p) => p,
         None => {
-            sink.on_error(format!("Asset '{}' not found in any vault", identity_str));
-            return Ok(CoreOutcome::Ok);
+            return Err(anyhow::anyhow!(
+                "Asset '{}' not found in any vault",
+                identity_str
+            ));
         }
     };
 
     if pkg.kind != AssetKind::Skill {
-        sink.on_error("Packing is only supported for Skills (not Instructions)".to_string());
-        return Ok(CoreOutcome::Ok);
+        return Err(anyhow::anyhow!(
+            "Packing is only supported for Skills (not Instructions)"
+        ));
     }
 
     match target {
@@ -37,11 +40,9 @@ pub fn run(
             pack_claude_desktop(&pkg, stdout_flag, workspace, sink)?;
         }
         PackTarget::Firebender => {
-            sink.on_error(
+            return Err(anyhow::anyhow!(
                 "Firebender pack target not yet implemented. Use --target claude-desktop."
-                    .to_string(),
-            );
-            return Ok(CoreOutcome::Ok);
+            ));
         }
         PackTarget::Tarball => {
             pack_tarball(&pkg, stdout_flag, workspace, sink)?;
