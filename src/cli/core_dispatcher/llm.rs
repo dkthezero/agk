@@ -282,21 +282,21 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_remove_missing_provider_is_idempotent() {
-        // The store's `remove` is intentionally idempotent (returns Ok even
-        // when the id is unknown) so `agk llm remove <id>` succeeds whether
-        // or not the provider was previously configured.  Verify the
-        // dispatch path mirrors that.
+    fn dispatch_remove_missing_provider_reports_error() {
+        // Removing a provider that was never configured is *not* idempotent
+        // from the user's perspective: `agk llm remove <id>` should tell them
+        // the id was unknown rather than falsely reporting a successful
+        // removal.  The use case now returns `Err`, so dispatch must surface
+        // that error (non-zero exit) instead of `EXIT_SUCCESS`.
         let dir = tempfile::tempdir().unwrap();
         let mut presenter = CliPresenter::new(false, true);
-        let rc = dispatch(
+        let result = dispatch(
             &args(LlmCommand::Remove {
                 id: "missing".into(),
             }),
             dir.path(),
             &mut presenter,
-        )
-        .unwrap();
-        assert_eq!(rc, crate::cli::EXIT_SUCCESS);
+        );
+        assert!(result.is_err(), "expected error for missing provider");
     }
 }
