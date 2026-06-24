@@ -44,7 +44,7 @@ pub fn run(
 
     // Merge context defaults into active config so vaults / providers are immediately visible.
     if !dry_run {
-        let mut config = store.load(Scope::Global).unwrap_or_default();
+        let mut config = store.load(Scope::Global)?;
         let mut changed = false;
 
         for vault_id in &ctx.vaults {
@@ -62,7 +62,7 @@ pub fn run(
         }
 
         if changed {
-            let _ = store.save(Scope::Global, &config);
+            store.save(Scope::Global, &config)?;
         }
     }
 
@@ -217,5 +217,51 @@ mod tests {
         );
         assert!(result.is_ok());
         assert_eq!(ctx_store.current_context().unwrap().as_str(), "default");
+    }
+
+    #[test]
+    fn switch_context_save_failure_returns_err() {
+        // Regression: a config-save failure during `agk context switch` must
+        // propagate as `Err` (exit non-zero) instead of being silently dropped
+        // via `let _ = store.save(...)` while `Switched to context ...` is
+        // reported as success.
+        let mut file = ContextFile::default();
+        file.ensure_default();
+        file.contexts.insert(
+            "company-x".to_string(),
+            ContextConfig {
+                display_name: Some("Company X".to_string()),
+                vaults: vec!["team".to_string()],
+                providers: vec!["opencode".to_string()],
+                ..ContextConfig::default()
+            },
+        );
+        let ctx_store = FakeCtxStore::with(file);
+        // Reuse FakeStore but flip save to fail. We wrap it in a store whose
+        // `save` always errors.
+        struct FailingSaveStore;
+        impl ConfigStorePort for FailingSaveStore {
+            fn load(&self, _scope: Scope) -> anyhow::Result<ConfigFile> {
+                Ok(ConfigFile::default())
+            }
+            fn save(&self, _scope: Scope, _config: &ConfigFile) -> anyhow::Result<()> {
+                anyhow::bail!("disk full")
+            }
+        }
+        let config_store = FailingSaveStore;
+        let mut sink = CollectingSink;
+        let result = run(
+            &ContextId::new("company-x"),
+            false,
+            &ctx_store,
+            &mut sink,
+            &config_store,
+        );
+        assert!(result.is_err(), "a save failure must surface as an error");
+        let msg = format!("{}", result.unwrap_err());
+        assert!(
+            msg.contains("disk full"),
+            "error should carry the underlying save error, got: {msg}"
+        );
     }
 }
