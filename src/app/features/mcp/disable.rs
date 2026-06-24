@@ -4,6 +4,11 @@ use crate::app::ports::McpRegistryPort;
 use crate::domain::scope::Scope;
 
 /// Disable an MCP server for a specific provider and scope.
+///
+/// On failure we emit the `Error` event (for renderers) AND return `Err` so
+/// the CLI exits non-zero — mirroring the validate/mcp-test convention.  The
+/// dispatcher's `Err` arm recognizes `CoreEvent::Error` via
+/// `already_reported_task_failure` and skips the redundant `Error:` line.
 pub fn run(
     name: &str,
     provider_id: &str,
@@ -16,7 +21,7 @@ pub fn run(
             "Failed to disable MCP '{}' for provider '{}': {}",
             name, provider_id, e
         )));
-        return Ok(CoreOutcome::Ok);
+        return Err(anyhow::anyhow!(e));
     }
 
     sink.on_event(CoreEvent::McpDisabled {
@@ -108,7 +113,7 @@ mod tests {
         let mut sink = CollectingSink { events: vec![] };
         let registry = FakeMcpRegistry { fail: true };
         let result = run("github", "opencode", Scope::Workspace, &registry, &mut sink);
-        assert!(result.is_ok());
+        assert!(result.is_err());
         assert!(sink.events.iter().any(|e| matches!(e,
             CoreEvent::Error(msg) if msg.contains("disable failed")
         )));

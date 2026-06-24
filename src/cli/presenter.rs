@@ -50,6 +50,7 @@ impl CliPresenter {
     /// - `TaskFailed` (sync/install/remove/update, mcp registration soft-fail)
     /// - `McpTested { healthy: false }` (mcp connectivity probe)
     /// - `LlmProviderHealth { reachable: false }` (llm health probe)
+    /// - `Error` (mcp enable/disable/toggle, asset per-provider errors)
     pub(crate) fn already_reported_task_failure(&self) -> bool {
         self.events.iter().any(|e| {
             matches!(e, CoreEvent::TaskFailed { .. })
@@ -58,7 +59,21 @@ impl CliPresenter {
                     e,
                     CoreEvent::LlmProviderHealth { status, .. } if !status.reachable
                 )
+                || matches!(e, CoreEvent::Error(..))
         })
+    }
+
+    /// Render a `CoreEvent::Error` to the human-readable streams.
+    ///
+    /// In JSON mode the event is already accumulated into the JSON batch by
+    /// the sink, so the human-readable line is suppressed here to avoid
+    /// duplicate output.  In text/quiet mode the message is written to stderr
+    /// so it is visible even when stdout is piped.
+    pub(crate) fn render_error_event(&self, message: &str) {
+        if matches!(self.mode, OutputMode::Json) {
+            return;
+        }
+        self.eprint(message);
     }
 
     /// Prints the final JSON batch if `--json`.
@@ -97,6 +112,30 @@ impl CliPresenter {
             self.print(&format!("Validation passed: {}", message));
         } else {
             self.eprint(&format!("Validation failed: {}", message));
+        }
+    }
+
+    /// Render an `LlmProviderHealth` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable line is suppressed here to avoid a duplicate.
+    pub(crate) fn render_llm_health(
+        &self,
+        id: &str,
+        status: &crate::domain::llm_provider::LlmHealthStatus,
+    ) {
+        if status.reachable {
+            self.print(&format!(
+                "{} reachable ({} ms)",
+                id,
+                status.latency_ms.unwrap_or(0)
+            ));
+        } else if matches!(self.mode, OutputMode::Json) {
+            // In JSON mode the event is emitted via the batch in `finalize()`;
+            // avoid a duplicate human-readable line.
+        } else {
+            let reason = status.error.as_deref().unwrap_or("unknown error");
+            self.eprint(&format!("{} unreachable: {}", id, reason));
         }
     }
 }
