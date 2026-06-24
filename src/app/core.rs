@@ -1,5 +1,5 @@
 use crate::app::command::CoreCommand;
-use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::app::outcome::{CoreEventSink, CoreResult};
 use crate::app::ports::{
     ClawHubPort, ConfigStorePort, ContextStorePort, McpRegistryPort, ProcessRunnerPort,
     ProfileRuntimePort, TaskTrackerPort, TeamConfigStorePort, VaultSearchPort,
@@ -106,8 +106,7 @@ impl AgkCore {
             return r;
         }
 
-        sink.on_error(format!("Command {:?} not yet implemented", command));
-        Ok(CoreOutcome::Ok)
+        Err(anyhow::anyhow!("Command {:?} not yet implemented", command))
     }
 }
 

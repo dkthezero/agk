@@ -22,21 +22,21 @@ pub fn run(
         if profile.mcps.len() < before {
             store.save(scope, &config)?;
             sink.on_event(CoreEvent::ProfileUpdated(profile_id.clone()));
+            Ok(CoreOutcome::Ok)
         } else {
-            sink.on_error(format!(
+            Err(anyhow::anyhow!(
                 "MCP '{}' not found in profile '{}'",
                 mcp_id.as_str(),
                 profile_name
-            ));
+            ))
         }
     } else {
-        sink.on_error(format!(
+        Err(anyhow::anyhow!(
             "Profile '{}' not found in {:?}",
-            profile_name, scope
-        ));
+            profile_name,
+            scope
+        ))
     }
-
-    Ok(CoreOutcome::Ok)
 }
 
 #[cfg(test)]
@@ -132,7 +132,7 @@ mod tests {
             &store,
             &mut sink,
         );
-        assert!(result.is_ok());
+        assert!(result.is_err());
         assert!(!sink
             .events
             .iter()
