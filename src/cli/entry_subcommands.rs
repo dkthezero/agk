@@ -29,7 +29,7 @@ pub enum ProfileCommands {
         provider: String,
 
         /// Comma-separated list of skill names to include
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short = 'k', long, value_delimiter = ',')]
         skills: Vec<String>,
 
         /// Comma-separated list of MCP server names to enable

@@ -6,7 +6,6 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::CoreEventSink;
 use crate::cli::presenter::{CliPresenter, OutputMode};
-use crate::cli::presenter_json::event_to_json;
 
 impl CoreEventSink for CliPresenter {
     fn on_event(&mut self, event: CoreEvent) {
@@ -61,7 +60,8 @@ impl CoreEventSink for CliPresenter {
             }
             CoreEvent::McpListed(servers) => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print_json_event(&event);
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else if servers.is_empty() {
                     self.print("No MCP servers registered.");
                 } else {
@@ -80,18 +80,17 @@ impl CoreEventSink for CliPresenter {
             } => {
                 if *healthy {
                     self.print(message);
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // In JSON mode the event is emitted via the batch in
+                    // `finalize()`; avoid a duplicate human-readable line.
                 } else {
                     self.eprint(message);
                 }
             }
             CoreEvent::ProfileLaunchPlan { plan } => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print(
-                        &serde_json::to_string_pretty(&event_to_json(
-                            &CoreEvent::ProfileLaunchPlan { plan: plan.clone() },
-                        ))
-                        .unwrap(),
-                    );
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else {
                     self.print(&format!("Launch plan for '{}':", plan.profile_id));
                     self.print(&format!("  Provider: {}", plan.provider_id));
@@ -118,7 +117,8 @@ impl CoreEventSink for CliPresenter {
             }
             CoreEvent::TelemetryStatusReport(status) => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print_json_event(&CoreEvent::TelemetryStatusReport(status.clone()));
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else {
                     self.print(&format!(
                         "Telemetry: {} | Skills: {} | Templates: {} | Profiles: {} | Last scan: {}",
@@ -144,8 +144,11 @@ impl CoreEventSink for CliPresenter {
                     } else {
                         self.print(&format!("Telemetry exported to {}", path));
                     }
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // The event (carrying `content`) is in the JSON batch;
+                    // avoid a duplicate inline print of the raw payload.
                 } else {
-                    println!("{}", content);
+                    self.print(content);
                 }
             }
             CoreEvent::Info(msg) => {
@@ -231,8 +234,11 @@ impl CoreEventSink for CliPresenter {
                     } else {
                         self.print(&format!("Profile '{}' exported to {}", profile_name, path));
                     }
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // The event (carrying `content`) is in the JSON batch;
+                    // avoid a duplicate inline print of the raw payload.
                 } else {
-                    println!("{}", content);
+                    self.print(content);
                     self.print(&format!("Profile '{}' exported", profile_name));
                 }
             }

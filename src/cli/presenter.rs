@@ -40,15 +40,17 @@ impl CliPresenter {
         self.mode
     }
 
-    /// Returns true if the presenter has already rendered a `TaskFailed`
-    /// event during this execution.  Use cases that emit `TaskFailed` AND
-    /// return `Err` rely on this so the dispatcher's `Err` arm can skip the
-    /// redundant `on_error` call (which would otherwise print a second
-    /// `Error: ...` line to stderr — see the AGENTS.md anti-pattern note).
+    /// Returns true if the presenter has already rendered a failure event
+    /// (`TaskFailed` or `McpTested { healthy: false }`) during this
+    /// execution.  Use cases that emit such an event AND return `Err` rely
+    /// on this so the dispatcher's `Err` arm can skip the redundant
+    /// `on_error` call (which would otherwise print a second `Error: ...`
+    /// line to stderr — see the AGENTS.md anti-pattern note).
     pub(crate) fn already_reported_task_failure(&self) -> bool {
-        self.events
-            .iter()
-            .any(|e| matches!(e, CoreEvent::TaskFailed { .. }))
+        self.events.iter().any(|e| {
+            matches!(e, CoreEvent::TaskFailed { .. })
+                || matches!(e, CoreEvent::McpTested { healthy: false, .. })
+        })
     }
 
     /// Prints the final JSON batch if `--json`.
@@ -71,15 +73,6 @@ impl CliPresenter {
 
     pub(crate) fn eprint(&self, msg: &str) {
         eprintln!("{}", msg);
-    }
-
-    pub(crate) fn print_json_event(&self, event: &CoreEvent) {
-        if matches!(self.mode, OutputMode::Json) {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&event_to_json(event)).unwrap()
-            );
-        }
     }
 
     /// Render a `ValidationReport` to the human-readable streams.
