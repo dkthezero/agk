@@ -77,6 +77,12 @@ pub fn run(
     };
 
     let json = serde_json::to_string_pretty(&exported)?;
+
+    if let Some(path) = output_path {
+        std::fs::write(path, &json)
+            .map_err(|e| anyhow::anyhow!("Failed to write export file '{}': {}", path, e))?;
+    }
+
     sink.on_event(CoreEvent::ProfileExported {
         profile_name: profile.name.clone(),
         content: json,
@@ -220,6 +226,33 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn export_profile_bad_output_path_returns_err_and_no_event() {
+        let store = FakeStore::new();
+        store
+            .save(Scope::Workspace, &make_config_with_profile())
+            .unwrap();
+        let mut sink = CollectingSink { events: vec![] };
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            false,
+            Some("/nonexistent_agk_dir/prof.json"),
+            std::path::Path::new("."),
+            &store,
+            &mut sink,
+        );
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to write export file"));
+        assert!(
+            sink.events.is_empty(),
+            "no event should be emitted on write failure"
+        );
     }
 
     #[test]

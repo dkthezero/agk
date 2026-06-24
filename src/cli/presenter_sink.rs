@@ -139,11 +139,7 @@ impl CoreEventSink for CliPresenter {
                 output_path,
             } => {
                 if let Some(path) = output_path {
-                    if let Err(e) = std::fs::write(path, content) {
-                        self.eprint(&format!("Failed to write export file: {}", e));
-                    } else {
-                        self.print(&format!("Telemetry exported to {}", path));
-                    }
+                    self.print(&format!("Telemetry exported to {}", path));
                 } else if matches!(self.mode, OutputMode::Json) {
                     // The event (carrying `content`) is in the JSON batch;
                     // avoid a duplicate inline print of the raw payload.
@@ -229,11 +225,7 @@ impl CoreEventSink for CliPresenter {
                 output_path,
             } => {
                 if let Some(path) = output_path {
-                    if let Err(e) = std::fs::write(path, content) {
-                        self.eprint(&format!("Failed to write export file: {}", e));
-                    } else {
-                        self.print(&format!("Profile '{}' exported to {}", profile_name, path));
-                    }
+                    self.print(&format!("Profile '{}' exported to {}", profile_name, path));
                 } else if matches!(self.mode, OutputMode::Json) {
                     // The event (carrying `content`) is in the JSON batch;
                     // avoid a duplicate inline print of the raw payload.
