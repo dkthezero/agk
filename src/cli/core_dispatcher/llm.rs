@@ -88,6 +88,9 @@ async fn run_health(
         None => store.list()?,
     };
     if cfgs.is_empty() {
+        sink.on_event(crate::app::event::CoreEvent::Info(
+            "No LLM providers configured. Use `agk llm add` to add one.".into(),
+        ));
         return Ok(crate::cli::EXIT_SUCCESS);
     }
 
