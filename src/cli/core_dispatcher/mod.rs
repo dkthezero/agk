@@ -39,6 +39,9 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
         let result = core.execute(cmd, &mut presenter);
         presenter.finalize();
         match result {
+            Ok(crate::app::outcome::CoreOutcome::ValidationReport { passed: false, .. }) => {
+                Ok(crate::cli::EXIT_GENERAL_FAILURE)
+            }
             Ok(_) => Ok(crate::cli::EXIT_SUCCESS),
             Err(e) => {
                 presenter.on_error(format!("{}", e));
@@ -212,7 +215,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::entry::{ProfileCommands, ScopeArg};
+    use crate::app::registry::Registry;
+    use crate::app::test_support::FakeStore;
+    use crate::cli::entry::{Cli, ProfileCommands, ScopeArg};
+    use crate::domain::config::{AssetBucket, AssetSource, ConfigFile, VaultSection};
+    use crate::domain::scope::Scope;
+    use std::sync::Arc;
 
     #[test]
     fn to_core_command_profile_start() {
@@ -249,5 +257,66 @@ mod tests {
             result,
             CoreCommand::CreateProfile { input } if input.id.as_str() == "test"
         ));
+    }
+
+    /// Regression: `agk validate` must exit non-zero when validation fails.
+    /// Previously it printed "Validation failed" but returned exit 0 because
+    /// the use case returned `Ok(CoreOutcome::Ok)`.
+    fn validate_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Validate { scope: None }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_validate_returns_failure_exit_on_failed_validation() {
+        let store = FakeStore::new();
+        let mut config = ConfigFile::default();
+        config.vault_defs.insert(
+            "ghost-vault".to_string(),
+            VaultSection {
+                vault: None,
+                skills: Some(AssetBucket {
+                    items: vec!["[ghost:1.0.0:deadbeef00]".to_string()],
+                    source: Some(AssetSource::Personal),
+                }),
+                instructions: None,
+                mcps: None,
+                profiles: None,
+            },
+        );
+        store.seed(Scope::Workspace, config);
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = validate_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "a failed validation must surface as a non-zero exit code"
+        );
+    }
+
+    #[test]
+    fn dispatch_validate_returns_success_exit_on_passed_validation() {
+        // Empty config -> no installed assets -> nothing fails -> passed.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = validate_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "a passing validation must keep exit code 0"
+        );
     }
 }

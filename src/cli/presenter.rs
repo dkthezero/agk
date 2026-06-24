@@ -70,6 +70,23 @@ impl CliPresenter {
             );
         }
     }
+
+    /// Render a `ValidationReport` to the human-readable streams.
+    ///
+    /// In JSON mode the event is already accumulated into the JSON batch by
+    /// the sink, so the human-readable line is suppressed here to avoid
+    /// duplicate output.  A failing validation is written to stderr so it is
+    /// visible even when stdout is piped; a passing one goes to stdout.
+    pub(crate) fn render_validation_report(&self, passed: bool, message: &str) {
+        if matches!(self.mode, OutputMode::Json) {
+            return;
+        }
+        if passed {
+            self.print(&format!("Validation passed: {}", message));
+        } else {
+            self.eprint(&format!("Validation failed: {}", message));
+        }
+    }
 }
 
 /// A serialisable summary of events emitted during a command execution.

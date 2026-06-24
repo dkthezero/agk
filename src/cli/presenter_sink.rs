@@ -108,11 +108,7 @@ impl CoreEventSink for CliPresenter {
                 }
             }
             CoreEvent::ValidationReport { passed, message } => {
-                if *passed {
-                    self.print(&format!("Validation passed: {}", message));
-                } else {
-                    self.eprint(&format!("Validation failed: {}", message));
-                }
+                self.render_validation_report(*passed, message);
             }
             CoreEvent::TelemetryEnabled => {
                 self.print("Telemetry enabled. Background scanner started.");
