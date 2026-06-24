@@ -9,7 +9,7 @@ pub fn run(
     output_path: Option<String>,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
-    let config = AnalyticsConfig::load(path).unwrap_or_default();
+    let config = AnalyticsConfig::load(path)?;
 
     let content = match format {
         TelemetryExportFormat::Json => serde_json::to_string_pretty(&config)?,
@@ -121,9 +121,11 @@ mod tests {
     fn export_bad_output_path_returns_err_and_emits_no_event() {
         use crate::app::outcome::NullSink;
         let tmp = tempfile::tempdir().unwrap();
+        let analytics_path = tmp.path().join("analytics.toml");
+        AnalyticsConfig::default().save(&analytics_path).unwrap();
         let mut sink = NullSink;
         let result = run(
-            tmp.path(),
+            &analytics_path,
             TelemetryExportFormat::Json,
             Some("/nonexistent_agk_dir/out.json".to_string()),
             &mut sink,
@@ -139,11 +141,13 @@ mod tests {
     fn export_to_output_path_writes_file_and_succeeds() {
         use crate::app::outcome::NullSink;
         let tmp = tempfile::tempdir().unwrap();
+        let analytics_path = tmp.path().join("analytics.toml");
+        AnalyticsConfig::default().save(&analytics_path).unwrap();
         let out = tmp.path().join("out.json");
         let out_str = out.to_str().unwrap().to_string();
         let mut sink = NullSink;
         let result = run(
-            tmp.path(),
+            &analytics_path,
             TelemetryExportFormat::Json,
             Some(out_str),
             &mut sink,
