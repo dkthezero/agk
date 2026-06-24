@@ -38,7 +38,21 @@ pub fn run(
         .join("profiles")
         .join(&profile.name)
         .join("agent.md");
-    let agent_markdown = std::fs::read_to_string(&agent_md_path).unwrap_or_default();
+    // Read agent markdown. A missing file is legitimate (the profile may not
+    // have one), but a read failure on an existing file (permission denied, IO
+    // error) must surface rather than be silently replaced with an empty
+    // string — otherwise the export reports success with truncated content.
+    let agent_markdown = match std::fs::read_to_string(&agent_md_path) {
+        Ok(contents) => contents,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "Failed to read agent markdown '{}': {}",
+                agent_md_path.display(),
+                e
+            ))
+        }
+    };
 
     // Build skill refs, optionally resolving "auto" vault names
     let skills = if resolve_vaults {
@@ -269,5 +283,45 @@ mod tests {
         let refs = vec![ProfileAssetRef::new("skill-a", "clawhub")];
         let resolved = resolve_vault_refs(&refs, &config);
         assert_eq!(resolved[0].vault, "clawhub");
+    }
+
+    /// A profile whose `agent.md` path is a directory (read fails with
+    /// `NotADirectory`/IO error, not `NotFound`) must surface the read error
+    /// instead of silently exporting an empty `agent_markdown` and reporting
+    /// success.
+    #[test]
+    fn export_profile_unreadable_agent_md_surfaces_error() {
+        let store = FakeStore::new();
+        store
+            .save(Scope::Workspace, &make_config_with_profile())
+            .unwrap();
+        // Point `workspace` at the temp dir so `.agk/profiles/dev/agent.md`
+        // resolves to a directory entry we control. Create the parent dirs and
+        // a *directory* at the agent.md path so `read_to_string` fails with a
+        // non-NotFound error.
+        let tmp = std::env::temp_dir().join(format!("agk_export_test_{}", std::process::id()));
+        let agent_dir = tmp.join(".agk").join("profiles").join("dev");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        // `agent.md` as a directory makes read_to_string fail with
+        // `NotADirectory`-style errors (not NotFound).
+        std::fs::create_dir_all(agent_dir.join("agent.md")).unwrap();
+
+        let mut sink = CollectingSink { events: vec![] };
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            false,
+            None,
+            &tmp,
+            &store,
+            &mut sink,
+        );
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to read agent markdown"));
+        // Clean up
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }
