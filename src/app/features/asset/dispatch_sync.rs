@@ -6,6 +6,23 @@ use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::domain::scope::Scope;
 
+/// Emit a `TaskFailed` event (so the TUI clears its spinner and the
+/// human-readable `[0] Failed:` line renders) AND return an `Err` carrying
+/// the same message, so the CLI dispatcher maps the failure to a non-zero
+/// exit code.
+///
+/// This replaces the previous `TaskFailed`-then-`Ok(CoreOutcome::Ok)`
+/// anti-pattern (documented in AGENTS.md) which printed a failure message
+/// but exited 0.
+fn fail(sink: &mut dyn CoreEventSink, error: impl Into<String>) -> CoreResult {
+    let error = error.into();
+    sink.on_event(CoreEvent::TaskFailed {
+        id: 0,
+        error: error.clone(),
+    });
+    Err(anyhow::anyhow!(error))
+}
+
 pub(super) fn sync_assets_cmd(
     scope: Scope,
     dry_run: bool,
@@ -62,11 +79,7 @@ pub(super) fn sync_assets_cmd(
         .collect();
 
     if provider_ids.is_empty() {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: "No active providers".into(),
-        });
-        return Ok(CoreOutcome::Ok);
+        return fail(sink, "No active providers");
     }
 
     let mut updated = Vec::new();

@@ -44,7 +44,13 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
             }
             Ok(_) => Ok(crate::cli::EXIT_SUCCESS),
             Err(e) => {
-                presenter.on_error(format!("{}", e));
+                // Some use cases emit a `TaskFailed` CoreEvent (which renders
+                // `[0] Failed: ...` to stderr) AND return `Err` so the exit
+                // code is non-zero.  In that case the failure has already
+                // been rendered; avoid a duplicate `Error: ...` line.
+                if !presenter.already_reported_task_failure() {
+                    presenter.on_error(format!("{}", e));
+                }
                 Ok(crate::cli::EXIT_GENERAL_FAILURE)
             }
         }
@@ -317,6 +323,76 @@ mod tests {
             rc,
             crate::cli::EXIT_SUCCESS,
             "a passing validation must keep exit code 0"
+        );
+    }
+
+    /// Regression: `agk sync` must exit non-zero when there are no active
+    /// providers.  Previously the use case emitted a `TaskFailed` event
+    /// (rendering `[0] Failed: No active providers`) but returned
+    /// `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the failure —
+    /// the `TaskFailed`-then-`Ok` anti-pattern documented in AGENTS.md.
+    fn sync_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Sync {
+                global: false,
+                dry_run: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_sync_returns_failure_exit_when_no_active_providers() {
+        // Empty config -> no providers active -> sync must fail.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = sync_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "sync with no active providers must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk install <identity>` must exit non-zero when there
+    /// are no active providers (same `TaskFailed`-then-`Ok` anti-pattern as
+    /// sync).
+    fn install_cli(identity: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Install {
+                identity: identity.to_string(),
+                scope: None,
+                dry_run: false,
+                provider: None,
+                evals: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_install_returns_failure_exit_when_no_active_providers() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = install_cli("ghost:1.0.0:deadbeef00");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "install with no active providers must surface as a non-zero exit code"
         );
     }
 }

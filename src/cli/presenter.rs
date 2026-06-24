@@ -40,6 +40,17 @@ impl CliPresenter {
         self.mode
     }
 
+    /// Returns true if the presenter has already rendered a `TaskFailed`
+    /// event during this execution.  Use cases that emit `TaskFailed` AND
+    /// return `Err` rely on this so the dispatcher's `Err` arm can skip the
+    /// redundant `on_error` call (which would otherwise print a second
+    /// `Error: ...` line to stderr — see the AGENTS.md anti-pattern note).
+    pub(crate) fn already_reported_task_failure(&self) -> bool {
+        self.events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::TaskFailed { .. }))
+    }
+
     /// Prints the final JSON batch if `--json`.
     pub fn finalize(&self) {
         if matches!(self.mode, OutputMode::Json) && !self.events.is_empty() {
