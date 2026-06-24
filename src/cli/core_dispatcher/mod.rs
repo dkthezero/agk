@@ -29,20 +29,35 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
             config_dir: std::path::PathBuf::from("."),
             command: command.clone(),
         };
-        let rc = llm::dispatch(&args, workspace, &mut presenter);
+        let rc = match llm::dispatch(&args, workspace, &mut presenter) {
+            Ok(code) => code,
+            Err(e) => {
+                // `llm::dispatch` returns `Err` for failures that did not emit
+                // a structured event (e.g. an unknown provider id or a
+                // malformed kind).  Push the error into the JSON batch (in
+                // JSON mode) or render it to stderr (text mode) via
+                // `on_error`, then surface a non-zero exit code — mirroring
+                // the main `Err` arm below so `--json` consumers always get a
+                // structured error instead of a stray `Error: ...` line from
+                // `main.rs`.
+                if !presenter.already_reported_task_failure() {
+                    presenter.on_error(format!("{}", e));
+                }
+                crate::cli::EXIT_GENERAL_FAILURE
+            }
+        };
         presenter.finalize();
-        return rc;
+        return Ok(rc);
     }
 
     if let Some(command) = &cli.command {
         let cmd = to_core_command(command, workspace)?;
         let result = core.execute(cmd, &mut presenter);
-        presenter.finalize();
-        match result {
+        let exit = match result {
             Ok(crate::app::outcome::CoreOutcome::ValidationReport { passed: false, .. }) => {
-                Ok(crate::cli::EXIT_GENERAL_FAILURE)
+                crate::cli::EXIT_GENERAL_FAILURE
             }
-            Ok(_) => Ok(crate::cli::EXIT_SUCCESS),
+            Ok(_) => crate::cli::EXIT_SUCCESS,
             Err(e) => {
                 // Some use cases emit a `TaskFailed` CoreEvent (which renders
                 // `[0] Failed: ...` to stderr) AND return `Err` so the exit
@@ -51,9 +66,15 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
                 if !presenter.already_reported_task_failure() {
                     presenter.on_error(format!("{}", e));
                 }
-                Ok(crate::cli::EXIT_GENERAL_FAILURE)
+                crate::cli::EXIT_GENERAL_FAILURE
             }
-        }
+        };
+        // `finalize()` prints the JSON batch (if any).  It must run AFTER the
+        // `Err` arm so that an `Err`-only failure (which `on_error` pushes
+        // into `events` as a structured `CoreEvent::Error`) is included in the
+        // batch rather than dropped.
+        presenter.finalize();
+        Ok(exit)
     } else {
         // No subcommand — fall through to TUI in main.rs
         Ok(crate::cli::EXIT_SUCCESS)
@@ -434,6 +455,42 @@ mod tests {
             rc,
             crate::cli::EXIT_GENERAL_FAILURE,
             "switching to a missing context must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk <cmd> --json` that fails with an `Err`-only error (no
+    /// structured failure event) must still surface a non-zero exit code while
+    /// the structured `CoreEvent::Error` is emitted into the JSON batch
+    /// (asserted at the presenter level in
+    /// `presenter::tests::on_error_in_json_mode_pushes_structured_error_event`).
+    fn context_switch_json_cli(name: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Context {
+                command: ContextCommands::Switch {
+                    name: name.to_string(),
+                    dry_run: false,
+                },
+            }),
+            quiet: false,
+            verbose: false,
+            json: true,
+        }
+    }
+
+    #[test]
+    fn dispatch_json_mode_failure_returns_nonzero_exit() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = context_switch_json_cli("nonexistent");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "a JSON-mode failure must still surface a non-zero exit code"
         );
     }
 

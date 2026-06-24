@@ -286,6 +286,6 @@ impl CoreEventSink for CliPresenter {
     }
 
     fn on_error(&mut self, error: String) {
-        self.eprint(&format!("Error: {}", error));
+        self.render_on_error(error);
     }
 }

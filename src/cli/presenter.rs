@@ -115,6 +115,22 @@ impl CliPresenter {
         }
     }
 
+    /// Render an `on_error` report.
+    ///
+    /// In JSON mode the error is pushed as a structured `CoreEvent::Error`
+    /// into the JSON batch (printed to stdout by `finalize()`), so JSON
+    /// consumers get a machine-readable failure signal rather than a
+    /// plain-text `Error: ...` line on stderr with an empty stdout batch.
+    /// In text/quiet mode the human-readable `Error: ...` line is written to
+    /// stderr so it is visible even when stdout is piped.
+    pub(crate) fn render_on_error(&mut self, error: String) {
+        if matches!(self.mode, OutputMode::Json) {
+            self.events.push(CoreEvent::Error(error));
+        } else {
+            self.eprint(&format!("Error: {}", error));
+        }
+    }
+
     /// Render an `LlmProviderHealth` event to the human-readable streams.
     ///
     /// In JSON mode the event is emitted via the batch in `finalize()`, so
@@ -168,5 +184,38 @@ mod tests {
         presenter.on_event(CoreEvent::ProviderActivated("opencode".into()));
         // finalize() would print JSON — we just verify it doesn't panic
         presenter.finalize();
+    }
+
+    /// Regression: in `--json` mode, an `Err`-only failure (one that does NOT
+    /// emit a structured failure event) must surface as a structured
+    /// `CoreEvent::Error` entry in the JSON batch rather than a plain-text
+    /// `Error: ...` line on stderr.  Previously `on_error` always wrote
+    /// `Error: ...` to stderr, polluting JSON consumers that parse stdout and
+    /// leaving the JSON batch empty so callers could not tell the command
+    /// failed.
+    #[test]
+    fn on_error_in_json_mode_pushes_structured_error_event() {
+        let mut presenter = CliPresenter::new(true, false);
+        presenter.on_error("boom".into());
+        assert!(
+            presenter.events.iter().any(|e| matches!(
+                e,
+                CoreEvent::Error(msg) if msg == "boom"
+            )),
+            "JSON-mode on_error must push a CoreEvent::Error into the batch"
+        );
+    }
+
+    /// In text mode `on_error` must keep writing `Error: ...` to stderr (it
+    /// must NOT push an event, otherwise the human-readable line would be
+    /// duplicated via the sink's `Error` render branch).
+    #[test]
+    fn on_error_in_text_mode_does_not_push_event() {
+        let mut presenter = CliPresenter::new(false, false);
+        presenter.on_error("boom".into());
+        assert!(
+            presenter.events.is_empty(),
+            "text-mode on_error must not push an event into the batch"
+        );
     }
 }
