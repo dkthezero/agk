@@ -101,8 +101,10 @@ pub fn team_diff(
         return Ok(TeamDiffResult { entries: vec![] });
     }
 
-    // Load the installed config
-    let installed_config = config_store.load(Scope::Workspace).unwrap_or_default();
+    // Load the installed config. Surface a malformed config as an error
+    // rather than silently defaulting — per AGENTS.md "Malformed Config:
+    // Surface Errors, Don't Default".
+    let installed_config = config_store.load(Scope::Workspace)?;
 
     let entries = compute_diff(&team_config, &installed_config);
 
@@ -471,5 +473,47 @@ mod tests {
             1,
             "Pinned 2.0.0 vs 2.3.1 should be Outdated"
         );
+    }
+
+    #[test]
+    fn team_diff_surfaces_malformed_installed_config_error() {
+        use crate::app::ports::ConfigStorePort;
+        use crate::app::ports::TeamConfigStorePort;
+        // A malformed (unparseable) workspace config must propagate as an
+        // error rather than being silently defaulted — per AGENTS.md
+        // "Malformed Config: Surface Errors, Don't Default".
+        struct FailingConfigStore;
+        impl ConfigStorePort for FailingConfigStore {
+            fn load(&self, _scope: Scope) -> Result<ConfigFile> {
+                Err(anyhow::anyhow!("malformed config"))
+            }
+            fn save(&self, _scope: Scope, _config: &ConfigFile) -> Result<()> {
+                Ok(())
+            }
+        }
+        struct FailingTeamStore;
+        impl TeamConfigStorePort for FailingTeamStore {
+            fn load(&self, _scope: Scope) -> Result<TeamConfig> {
+                Ok(TeamConfig {
+                    name: "t".to_string(),
+                    source: None,
+                    branch: None,
+                    vaults: vec![],
+                    requirements: vec![],
+                })
+            }
+            fn save(&self, _scope: Scope, _config: &TeamConfig) -> Result<()> {
+                Ok(())
+            }
+            fn exists(&self, _scope: Scope) -> bool {
+                true
+            }
+        }
+
+        let result = team_diff(&FailingTeamStore, &FailingConfigStore);
+        match result {
+            Err(e) => assert!(e.to_string().contains("malformed config")),
+            Ok(_) => panic!("expected error for malformed config"),
+        }
     }
 }
