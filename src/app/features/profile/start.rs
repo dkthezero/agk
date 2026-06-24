@@ -77,12 +77,18 @@ pub fn run(
             sink,
         );
         if !result.all_succeeded() {
+            let mut messages: Vec<String> = Vec::new();
             for (dep, err) in &result.failed {
-                sink.on_error(format!("Failed to install dependency '{}': {}", dep, err));
+                messages.push(format!("Failed to install dependency '{}': {}", dep, err));
             }
             for (dep, err) in &result.rollback_failed {
-                sink.on_error(format!("Rollback failed for '{}': {}", dep, err));
+                messages.push(format!("Rollback failed for '{}': {}", dep, err));
             }
+            return Err(anyhow::anyhow!(
+                "Could not resolve all dependencies for profile '{}': {}",
+                domain_profile.name,
+                messages.join("; ")
+            ));
         }
         // Re-load config after dependency resolution may have modified it.
         config = store.load(scope)?;
@@ -294,6 +300,46 @@ mod tests {
         assert_eq!(plan.frontmatter.skills, vec!["rust".to_string()]);
     }
 
+    #[test]
+    fn start_profile_with_unresolvable_dependency_returns_err() {
+        // FakeStore returns a profile referencing the "rust" skill in the
+        // "auto" vault, but the config does NOT install it and there are no
+        // active providers to install it from. Previously this printed
+        // `sink.on_error` messages and continued to launch the profile with
+        // missing dependencies (false success); it must now return `Err`.
+        let registry = Registry::new();
+        let mcp_registry = FakeMcpRegistry::new();
+        let mut sink = RecordingSink::default();
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            false,
+            &FakeStore,
+            &std::collections::HashMap::new(),
+            &registry,
+            &mcp_registry,
+            &mut sink,
+        );
+        assert!(
+            result.is_err(),
+            "profile start with unresolvable deps must error, not launch"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Could not resolve all dependencies"),
+            "error should mention dependency resolution failure, got: {err}"
+        );
+        // No ProfileSessionStarted should be emitted when deps fail.
+        let started = sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::ProfileSessionStarted { .. }));
+        assert!(
+            !started,
+            "no ProfileSessionStarted event should be emitted on dep failure"
+        );
+    }
+
     struct FakeStore;
     impl Default for FakeStore {
         fn default() -> Self {
@@ -342,6 +388,22 @@ mod tests {
                 permission_mode: Some("acceptEdits".into()),
                 prompt_overlay_path: None,
             });
+            // Pre-install the "rust" skill in the "auto" vault so dependency
+            // resolution is not triggered and the test can verify the launch
+            // plan emission path.
+            config.vault_defs.insert(
+                "auto".to_string(),
+                crate::domain::config::VaultSection {
+                    vault: None,
+                    skills: Some(crate::domain::config::AssetBucket {
+                        items: vec!["[rust:1.0.0:0000000000]".to_string()],
+                        source: None,
+                    }),
+                    instructions: None,
+                    mcps: None,
+                    profiles: None,
+                },
+            );
             Ok(config)
         }
         fn save(
