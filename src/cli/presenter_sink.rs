@@ -20,7 +20,7 @@ impl CoreEventSink for CliPresenter {
                 self.print(&format!("[{}] Completed: {}", id, message));
             }
             CoreEvent::TaskFailed { id, error } => {
-                self.eprint(&format!("[{}] Failed: {}", id, error));
+                self.render_task_failed(*id, error);
             }
             CoreEvent::ProfileCreated(id) => {
                 self.print(&format!("Profile '{}' created", id.as_str()));
@@ -254,10 +254,7 @@ impl CoreEventSink for CliPresenter {
                 name,
                 elapsed_sec,
             } => {
-                self.eprint(&format!(
-                    "[HUNG] Task {} '{}' has been running for {}s",
-                    id, name, elapsed_sec
-                ));
+                self.render_task_hung_warning(*id, name, *elapsed_sec);
             }
             CoreEvent::LlmProviderListed(cfg) => {
                 self.print(&format!(

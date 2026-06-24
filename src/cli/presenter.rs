@@ -131,6 +131,37 @@ impl CliPresenter {
         }
     }
 
+    /// Render a `TaskFailed` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable `[id] Failed: ...` line is suppressed here to
+    /// avoid a duplicate stderr line polluting JSON consumers.
+    pub(crate) fn render_task_failed(&self, id: usize, error: &str) {
+        if matches!(self.mode, OutputMode::Json) {
+            // The event is accumulated into the JSON batch by `finalize()`;
+            // avoid a duplicate human-readable line.
+        } else {
+            self.eprint(&format!("[{}] Failed: {}", id, error));
+        }
+    }
+
+    /// Render a `TaskHungWarning` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable `[HUNG] ...` line is suppressed here to avoid a
+    /// duplicate stderr line polluting JSON consumers.
+    pub(crate) fn render_task_hung_warning(&self, id: usize, name: &str, elapsed_sec: u64) {
+        if matches!(self.mode, OutputMode::Json) {
+            // The event is accumulated into the JSON batch by `finalize()`;
+            // avoid a duplicate human-readable line.
+        } else {
+            self.eprint(&format!(
+                "[HUNG] Task {} '{}' has been running for {}s",
+                id, name, elapsed_sec
+            ));
+        }
+    }
+
     /// Render an `LlmProviderHealth` event to the human-readable streams.
     ///
     /// In JSON mode the event is emitted via the batch in `finalize()`, so
@@ -216,6 +247,32 @@ mod tests {
         assert!(
             presenter.events.is_empty(),
             "text-mode on_error must not push an event into the batch"
+        );
+    }
+
+    /// Regression: `CoreEvent::TaskFailed` must be accumulated into the JSON
+    /// batch in `--json` mode (so `finalize()` emits it as the sole output)
+    /// rather than also leaking a human-readable `[0] Failed: ...` line to
+    /// stderr.  Previously the `TaskFailed` (and `TaskHungWarning`) render
+    /// branches in `presenter_sink.rs` called `self.eprint` unconditionally,
+    /// polluting JSON consumers with a mixed stderr/stdout output even though
+    /// the event was already in the batch.  This test locks in that the event
+    /// reaches the batch in JSON mode (the human-readable line is suppressed by
+    /// `render_task_failed`'s JSON guard).
+    #[test]
+    fn task_failed_is_in_json_batch_in_json_mode() {
+        let mut presenter = CliPresenter::new(true, false);
+        presenter.on_event(CoreEvent::TaskFailed {
+            id: 0,
+            error: "No active providers".into(),
+        });
+        assert!(
+            presenter.events.iter().any(|e| matches!(
+                e,
+                CoreEvent::TaskFailed { id, error }
+                    if *id == 0 && error == "No active providers"
+            )),
+            "JSON-mode TaskFailed must be accumulated into the batch"
         );
     }
 }
