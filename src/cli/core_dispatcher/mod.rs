@@ -165,33 +165,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 name: name.clone(),
                 dry_run: *dry_run,
             }),
-            VaultCommands::Attach { path, id } => {
-                let vault_path = std::path::Path::new(path);
-                let vault_toml = vault_path.join(".agk").join("vault.toml");
-                if !vault_toml.exists() {
-                    anyhow::bail!(
-                        "No .agk/vault.toml found at '{}'. Run 'agk vault init' in that directory first.",
-                        vault_path.display()
-                    );
-                }
-                let manifest_content = std::fs::read_to_string(&vault_toml)?;
-                let manifest: crate::domain::vault_manifest::VaultManifest =
-                    toml::from_str(&manifest_content)?;
-                let vault_id = id.clone().unwrap_or_else(|| manifest.name.clone());
-                let abs_path = std::fs::canonicalize(vault_path)
-                    .unwrap_or_else(|_| vault_path.to_path_buf());
-                Ok(CoreCommand::AttachVault {
-                    input: crate::app::features::vault::command::AttachVaultInput {
-                        vault_id,
-                        config: crate::domain::config::VaultConfig::Local(
-                            crate::domain::config::LocalVaultSource {
-                                path: abs_path.to_string_lossy().to_string(),
-                            },
-                        ),
-                        scope: crate::domain::scope::Scope::Global,
-                    },
-                })
-            }
+            // Manifest read/parse/canonicalize live in the vault use-case
+            // (`attach::attach_local`) so this stays a pure translator.
+            VaultCommands::Attach { path, id } => Ok(CoreCommand::AttachLocalVault {
+                path: path.clone(),
+                id: id.clone(),
+            }),
         },
         Commands::Team { command } => match command {
             TeamCommands::Init { name, dry_run } => Ok(CoreCommand::TeamInit {

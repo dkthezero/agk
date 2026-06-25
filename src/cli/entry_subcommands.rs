@@ -248,7 +248,7 @@ pub enum VaultCommands {
         /// Path to the vault directory (must contain .agk/vault.toml)
         path: String,
 
-        /// Override the vault ID (defaults to the name in vault.toml or folder name)
+        /// Override the vault ID (defaults to the name in vault.toml)
         #[arg(short, long)]
         id: Option<String>,
     },

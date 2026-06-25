@@ -25,6 +25,16 @@ pub fn dispatch(
             )
             .map(|_| CoreOutcome::Ok),
         ),
+        CoreCommand::AttachLocalVault { path, id } => Some(
+            attach::attach_local(
+                path,
+                id.clone(),
+                core.store.as_ref(),
+                core.clawhub.as_ref(),
+                sink,
+            )
+            .map(|_| CoreOutcome::Ok),
+        ),
         CoreCommand::DetachVault { vault_id, .. } => {
             Some(detach::detach_vault(vault_id, core.store.as_ref()).map(|_| CoreOutcome::Ok))
         }

@@ -426,9 +426,24 @@ mod tests {
 
     #[test]
     fn enter_vault_init_sets_confirm_mode() {
+        use crate::tui::event::EventContext;
+        use std::sync::Arc;
+
         let mut state = state_with_skills(vec![]);
-        state.pending_vault_local_path = "my-workspace".to_string();
-        state.list_mode = ListMode::ConfirmVaultInit;
+        assert_ne!(state.list_mode, ListMode::ConfirmVaultInit);
+
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let ctx = EventContext {
+            tx,
+            workspace_root: std::path::PathBuf::from("/tmp/my-workspace"),
+            file_opener: Arc::new(crate::infra::process::opener::OsFileOpener),
+            core: Arc::new(crate::app::core::test_core()),
+        };
+
+        crate::tui::features::vaults::controller::enter_vault_init(&mut state, &ctx);
+
+        // The real handler must enter confirm mode and derive the modal's
+        // display name from the workspace folder.
         assert!(matches!(state.list_mode, ListMode::ConfirmVaultInit));
         assert_eq!(state.pending_vault_local_path, "my-workspace");
     }

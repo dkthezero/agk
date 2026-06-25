@@ -62,34 +62,31 @@ fn vault_install_asset(
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
         Ok(None) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Asset '{}' not found in any vault", identity),
-            });
-            return Ok(CoreOutcome::Ok);
+            // Emit TaskFailed so the TUI clears its install spinner, then
+            // return Err so CLI/TUI control flow detects the failure
+            // (TaskFailed alone leaves the command's exit code at success).
+            let error = format!("Asset '{}' not found in any vault", identity);
+            sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+            return Err(anyhow::anyhow!(error));
         }
         Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Lookup failed: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
+            let error = format!("Lookup failed: {}", e);
+            sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+            return Err(anyhow::anyhow!(error));
         }
     };
 
     let folder = vault_kind_folder(&pkg.kind);
     let dest = core.workspace_root.join(folder).join(&pkg.identity.name);
     if let Err(e) = vault_copy_dir(&pkg.path, &dest) {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: format!("Failed to copy '{}' to vault: {}", identity, e),
-        });
-        return Ok(CoreOutcome::Ok);
+        let error = format!("Failed to copy '{}' to vault: {}", identity, e);
+        sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+        return Err(anyhow::anyhow!(error));
     }
 
     sink.on_event(CoreEvent::TaskCompleted {
         id: 0,
-        message: format!("'{}' added to vault skills/", pkg.identity.name),
+        message: format!("'{}' added to vault {}/", pkg.identity.name, folder),
     });
     Ok(CoreOutcome::Ok)
 }
@@ -102,18 +99,14 @@ fn vault_remove_asset(
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
         Ok(None) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Asset '{}' not found", identity),
-            });
-            return Ok(CoreOutcome::Ok);
+            let error = format!("Asset '{}' not found", identity);
+            sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+            return Err(anyhow::anyhow!(error));
         }
         Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Lookup failed: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
+            let error = format!("Lookup failed: {}", e);
+            sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+            return Err(anyhow::anyhow!(error));
         }
     };
 
@@ -121,17 +114,15 @@ fn vault_remove_asset(
     let dest = core.workspace_root.join(folder).join(&pkg.identity.name);
     if dest.exists() {
         if let Err(e) = std::fs::remove_dir_all(&dest) {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Failed to remove '{}' from vault: {}", identity, e),
-            });
-            return Ok(CoreOutcome::Ok);
+            let error = format!("Failed to remove '{}' from vault: {}", identity, e);
+            sink.on_event(CoreEvent::TaskFailed { id: 0, error: error.clone() });
+            return Err(anyhow::anyhow!(error));
         }
     }
 
     sink.on_event(CoreEvent::TaskCompleted {
         id: 0,
-        message: format!("'{}' removed from vault skills/", pkg.identity.name),
+        message: format!("'{}' removed from vault {}/", pkg.identity.name, folder),
     });
     Ok(CoreOutcome::Ok)
 }
