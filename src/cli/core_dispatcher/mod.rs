@@ -455,6 +455,39 @@ mod tests {
         );
     }
 
+    /// Regression: `agk install <identity> --dry-run` is a preview and must
+    /// NOT fail on the empty-providers guard (matching `sync --dry-run`), and
+    /// must NOT trigger the remote ClawHub fetch (which writes files as a real
+    /// side effect, violating the dry-run contract). Previously it exited 1
+    /// with "No active providers" even on a dry-run.
+    #[test]
+    fn dispatch_install_dry_run_succeeds_with_no_active_providers() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = Cli {
+            command: Some(Commands::Install {
+                identity: "ghost:1.0.0:deadbeef00".to_string(),
+                scope: None,
+                dry_run: true,
+                provider: None,
+                evals: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        };
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "install --dry-run is a preview and must not fail when no providers are active"
+        );
+    }
+
     /// Regression: `agk context switch <name>` must exit non-zero when the
     /// target context does not exist.  Previously the use case called
     /// `sink.on_error` (rendering `Error: Context '...' does not exist`) but

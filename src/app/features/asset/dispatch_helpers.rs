@@ -58,13 +58,27 @@ pub(super) fn install_asset_cmd(
     if let Some(filter) = provider_filter {
         providers.retain(|p| p.id() == filter);
     }
-    if providers.is_empty() {
-        return fail(sink, "No active providers");
-    }
 
+    // Resolve the package first so the dry-run preview can describe what
+    // *would* be installed even when no providers are configured. The
+    // empty-providers guard is a hard precondition only for the live
+    // install path (matching `sync --dry-run` semantics).
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
         Ok(None) => {
+            // Dry-run must not perform the remote ClawHub fetch (it writes
+            // files to the local ClawHub cache as a real side effect). Report
+            // a preview-only resolution failure instead.
+            if dry_run {
+                if identity.contains('/') {
+                    return fail(sink, format!("Asset '{}' not found in any vault", identity));
+                }
+                sink.on_event(CoreEvent::Info(format!(
+                    "Dry run: '{}' is not installed locally; a live install would fetch it from ClawHub",
+                    identity
+                )));
+                return Ok(CoreOutcome::Ok);
+            }
             // Attempt remote fetch via ClawHub for simple slugs.
             if !identity.contains('/') {
                 if let Err(e) = core.clawhub.cli_install(identity) {
@@ -87,12 +101,23 @@ pub(super) fn install_asset_cmd(
     };
 
     if dry_run {
-        sink.on_event(CoreEvent::Info(format!(
-            "Dry run: would install '{}' to {} provider(s)",
-            pkg.identity.name,
-            providers.len()
-        )));
+        if providers.is_empty() {
+            sink.on_event(CoreEvent::Info(format!(
+                "Dry run: would install '{}' but no providers are configured (run `agk apply` or add a provider first)",
+                pkg.identity.name
+            )));
+        } else {
+            sink.on_event(CoreEvent::Info(format!(
+                "Dry run: would install '{}' to {} provider(s)",
+                pkg.identity.name,
+                providers.len()
+            )));
+        }
         return Ok(CoreOutcome::Ok);
+    }
+
+    if providers.is_empty() {
+        return fail(sink, "No active providers");
     }
 
     let mut installed_providers = Vec::new();
