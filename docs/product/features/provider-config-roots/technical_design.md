@@ -102,7 +102,7 @@ Provider instances are constructed with `workspace_root` but **not** with config
 - [x] Unit test: `OpenCodeProvider::provider_root` respects config override.
 - [x] Unit test: `ConfigFile` round-trips `provider_roots` in TOML.
 - [x] Unit test: TUI `SelectProviderRoot` state transitions correctly on Enter/Esc.
-- [ ] Integration: enable OpenCode in TUI, select `.agents`, verify skill installs to `.agents/skills/`.
+- [x] Integration: enable OpenCode in TUI, select `.agents`, verify skill installs to `.agents/skills/`.
 
 ## Module changes
 
