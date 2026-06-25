@@ -33,10 +33,9 @@ impl ClaudeCodeProvider {
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".claude"),
             Scope::Workspace => {
-                let folder = config
-                    .and_then(|c| c.provider_roots.get(self.id()))
-                    .map(|s| s.as_str())
-                    .unwrap_or(".claude");
+                let folder = self
+                    .selected_config_root(scope, config)
+                    .unwrap_or_else(|| ".claude".to_string());
                 self.workspace_root.join(folder)
             }
         }

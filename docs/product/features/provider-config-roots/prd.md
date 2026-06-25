@@ -25,7 +25,7 @@ Allow each provider to support multiple config folder names (e.g., OpenCode can 
 
 ### Provider Trait Extension (Approach B)
 - [x] Add `fn available_config_roots(&self) -> Vec<(String, String)>` to `ProviderPort` with a default empty vec (single root).
-- [ ] Add `fn selected_config_root(&self) -> Option<String>` to read the persisted choice.
+- [x] Add `fn selected_config_root(&self) -> Option<String>` to read the persisted choice.
 - [x] Update `fn provider_root(&self, scope: &Scope) -> PathBuf` in each provider to use the selected root from config.
 
 ### Config Schema

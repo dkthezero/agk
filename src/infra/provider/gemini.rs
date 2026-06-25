@@ -28,10 +28,9 @@ impl GeminiProvider {
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".gemini"),
             Scope::Workspace => {
-                let folder = config
-                    .and_then(|c| c.provider_roots.get(self.id()))
-                    .map(|s| s.as_str())
-                    .unwrap_or(".gemini");
+                let folder = self
+                    .selected_config_root(scope, config)
+                    .unwrap_or_else(|| ".gemini".to_string());
                 self.workspace_root.join(folder)
             }
         }
