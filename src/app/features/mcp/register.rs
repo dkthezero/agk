@@ -59,16 +59,16 @@ pub fn run(
     if input.test_after {
         match mcp_registry.test_server(&server.name) {
             Ok(_) => {
-                sink.on_event(CoreEvent::TaskCompleted {
-                    id: 0,
-                    message: format!("MCP server '{}' tested successfully", server.name),
-                });
+                sink.on_event(CoreEvent::Info(format!(
+                    "MCP server '{}' tested successfully",
+                    server.name
+                )));
             }
             Err(e) => {
-                sink.on_event(CoreEvent::TaskFailed {
-                    id: 0,
-                    error: format!("MCP server '{}' test failed: {}", server.name, e),
-                });
+                sink.on_event(CoreEvent::Info(format!(
+                    "MCP server '{}' registered, but post-registration test failed: {}",
+                    server.name, e
+                )));
             }
         }
     }
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn register_mcp_with_test_pass_emits_completed() {
+    fn register_mcp_with_test_pass_emits_info() {
         let mut sink = CollectingSink { events: vec![] };
         let registry = FakeMcpRegistry {
             should_pass_test: true,
@@ -197,11 +197,11 @@ mod tests {
         assert!(sink
             .events
             .iter()
-            .any(|e| matches!(e, CoreEvent::TaskCompleted { ref message, .. } if message.contains("tested successfully"))));
+            .any(|e| matches!(e, CoreEvent::Info(ref msg) if msg.contains("tested successfully"))));
     }
 
     #[test]
-    fn register_mcp_with_test_fail_emits_failed() {
+    fn register_mcp_with_test_fail_emits_info_warning() {
         let mut sink = CollectingSink { events: vec![] };
         let registry = FakeMcpRegistry {
             should_pass_test: false,
@@ -220,7 +220,7 @@ mod tests {
         assert!(sink
             .events
             .iter()
-            .any(|e| matches!(e, CoreEvent::TaskFailed { ref error, .. } if error.contains("test failed"))));
+            .any(|e| matches!(e, CoreEvent::Info(ref msg) if msg.contains("registered, but post-registration test failed"))));
     }
 
     /// Regression: the SSE URL carried on `McpTransport::Sse { url }` must

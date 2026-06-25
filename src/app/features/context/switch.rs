@@ -17,10 +17,10 @@ pub fn run(
     store: &dyn ConfigStorePort,
 ) -> CoreResult {
     if dry_run {
-        sink.on_event(CoreEvent::TaskStarted {
-            id: 0,
-            name: format!("Dry-run switch context '{}'", id.as_str()),
-        });
+        sink.on_event(CoreEvent::Info(format!(
+            "Dry-run switch context '{}'",
+            id.as_str()
+        )));
     }
 
     let file = context_store.load_contexts()?;
@@ -37,10 +37,10 @@ pub fn run(
         }
     }
 
-    sink.on_event(CoreEvent::TaskCompleted {
-        id: 0,
-        message: format!("Switched to context '{}'", id.as_str()),
-    });
+    sink.on_event(CoreEvent::Info(format!(
+        "Switched to context '{}'",
+        id.as_str()
+    )));
 
     // Merge context defaults into active config so vaults / providers are immediately visible.
     if !dry_run {

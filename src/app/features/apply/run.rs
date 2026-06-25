@@ -36,13 +36,10 @@ pub fn run(
     let input = resolve_source(input)?;
 
     if dry_run {
-        sink.on_event(CoreEvent::TaskStarted {
-            id: 0,
-            name: format!(
-                "Dry-run apply {} (env: {:?}, context: {:?})",
-                input.source_url, environment, context
-            ),
-        });
+        sink.on_event(CoreEvent::Info(format!(
+            "Dry-run apply {} (env: {:?}, context: {:?})",
+            input.source_url, environment, context
+        )));
     }
 
     // Step 1: Upsert context definition if a name was provided.
@@ -81,10 +78,10 @@ pub fn run(
 
             context_store.save_contexts(&file)?;
         }
-        sink.on_event(CoreEvent::TaskCompleted {
-            id: 0,
-            message: format!("Updated context '{}'", ctx_id.as_str()),
-        });
+        sink.on_event(CoreEvent::Info(format!(
+            "Updated context '{}'",
+            ctx_id.as_str()
+        )));
     }
 
     // Step 2: Attach vaults (global scope only)
@@ -128,10 +125,10 @@ pub fn run(
         store.save(scope, &config)?;
     }
 
-    sink.on_event(CoreEvent::TaskCompleted {
-        id: 0,
-        message: format!("Applied config from {}", input.source_url),
-    });
+    sink.on_event(CoreEvent::Info(format!(
+        "Applied config from {}",
+        input.source_url
+    )));
 
     Ok(CoreOutcome::Ok)
 }
