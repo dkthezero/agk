@@ -99,9 +99,9 @@ When `list_mode == SelectProviderRoot`:
 Provider instances are constructed with `workspace_root` but **not** with config yet (config is loaded after providers are built). So `provider_root()` must accept the config lazily (passed at call time from actions).
 
 ### Testing strategy
-- [ ] Unit test: `OpenCodeProvider::provider_root` respects config override.
-- [ ] Unit test: `ConfigFile` round-trips `provider_roots` in TOML.
-- [ ] Unit test: TUI `SelectProviderRoot` state transitions correctly on Enter/Esc.
+- [x] Unit test: `OpenCodeProvider::provider_root` respects config override.
+- [x] Unit test: `ConfigFile` round-trips `provider_roots` in TOML.
+- [x] Unit test: TUI `SelectProviderRoot` state transitions correctly on Enter/Esc.
 - [ ] Integration: enable OpenCode in TUI, select `.agents`, verify skill installs to `.agents/skills/`.
 
 ## Module changes
