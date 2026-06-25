@@ -57,7 +57,7 @@ While `agk`'s TUI excels at discovery and interactive management, team workflows
 - **Behavior:** Compiles the raw markdown and supporting files of a skill into a provider-specific distributable package.
 - **Targets:**
   - `claude-desktop` — Claude Desktop zip bundle (✅ implemented)
-  - `firebender` — JSON schema for Firebender (🚧 stubbed; target exists but not fully wired)
+  - `firebender` — JSON manifest for Firebender (✅ implemented; emits a JSON document describing the skill identity, metadata, and base64-encoded file tree)
   - `tarball` — Plain tarball for generic use (✅ implemented)
 - **Output:** Writes to `./.agk/pack/<identity>-<target>.zip` (or prints to stdout with `--stdout`).
 
@@ -106,7 +106,7 @@ While `agk`'s TUI excels at discovery and interactive management, team workflows
 - [x] Headless commands never allocate a terminal alternate screen.
 - [x] TUI still uses the same underlying pure async functions (no logic duplication).
 - [x] `cargo test` includes at least one integration test per subcommand.
-- [ ] `pack` Firebender target fully wired (stub exists, needs serialization logic).
+- [x] `pack` Firebender target fully wired (emits a JSON manifest with skill identity, metadata, and base64 file tree).
 
 ---
 
