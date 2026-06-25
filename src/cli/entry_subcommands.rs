@@ -265,4 +265,29 @@ pub enum VaultCommands {
     },
 }
 
+#[derive(Subcommand, Debug)]
+pub enum ProviderCommands {
+    /// List all registered providers with their capability flags
+    List,
+
+    /// Activate or deactivate a provider for a scope
+    Toggle {
+        /// Provider id (e.g. `claude-code`, `opencode`)
+        id: String,
+
+        /// Desired state: `on` activates, `off` deactivates
+        state: ToggleState,
+
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum ToggleState {
+    On,
+    Off,
+}
+
 pub use crate::cli::entry_team_subcommands::TeamCommands;

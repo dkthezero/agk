@@ -37,6 +37,24 @@ pub(crate) fn listing_event_to_json(event: &CoreEvent) -> serde_json::Value {
                 }).collect::<Vec<_>>()
             })
         }
+        CoreEvent::ProviderListed(entries) => {
+            serde_json::json!({
+                "type": "ProviderListed",
+                "providers": entries.iter().map(|e| {
+                    serde_json::json!({
+                        "id": e.id,
+                        "name": e.name,
+                        "active": e.active,
+                        "supports_mcp": e.supports_mcp,
+                        "supports_profiles": e.supports_profiles,
+                        "available_tools": e.available_tools,
+                        "available_permission_modes": e.available_permission_modes.iter().map(|(id, desc)| {
+                            serde_json::json!({ "id": id, "description": desc })
+                        }).collect::<Vec<_>>(),
+                    })
+                }).collect::<Vec<_>>()
+            })
+        }
         _ => serde_json::Value::Null,
     }
 }

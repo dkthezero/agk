@@ -8,7 +8,8 @@ use crate::app::outcome::CoreEventSink;
 #[cfg(feature = "pack")]
 use crate::cli::entry::PackTarget;
 use crate::cli::entry::{
-    Cli, Commands, ContextCommands, DebugCommands, TeamCommands, TelemetryCommands, VaultCommands,
+    Cli, Commands, ContextCommands, DebugCommands, ProviderCommands, TeamCommands,
+    TelemetryCommands, VaultCommands,
 };
 use crate::cli::presenter::CliPresenter;
 use crate::domain::context::ContextId;
@@ -201,6 +202,19 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 path: path.clone(),
                 id: id.clone(),
             }),
+        },
+        Commands::Provider { command } => match command {
+            ProviderCommands::List => Ok(CoreCommand::ListProviders),
+            ProviderCommands::Toggle { id, state, scope } => match state {
+                crate::cli::entry::ToggleState::On => Ok(CoreCommand::ActivateProvider {
+                    id: id.clone(),
+                    scope: scope.into_domain_scope(),
+                }),
+                crate::cli::entry::ToggleState::Off => Ok(CoreCommand::DeactivateProvider {
+                    id: id.clone(),
+                    scope: scope.into_domain_scope(),
+                }),
+            },
         },
         Commands::Team { command } => match command {
             TeamCommands::Init { name, dry_run } => Ok(CoreCommand::TeamInit {

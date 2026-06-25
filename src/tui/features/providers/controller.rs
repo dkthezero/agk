@@ -260,6 +260,9 @@ mod tests {
             name: "Fake".to_string(),
             active: true,
             supports_mcp: false,
+            supports_profiles: false,
+            available_tools: vec![],
+            available_permission_modes: vec![],
         }];
 
         let mut config = ConfigFile {

@@ -136,6 +136,12 @@ pub enum Commands {
         command: VaultCommands,
     },
 
+    /// Manage agent providers (activate / list capabilities)
+    Provider {
+        #[command(subcommand)]
+        command: ProviderCommands,
+    },
+
     /// Manage team configuration
     Team {
         #[command(subcommand)]
@@ -160,8 +166,10 @@ pub enum Commands {
 // ContextCommands) were moved to `entry_subcommands.rs` for ADR-001 §6.4
 // file-size compliance and are re-exported here so caller paths
 // (`crate::cli::entry::ProfileCommands`, …) continue to resolve.
+pub use crate::cli::entry_subcommands::ToggleState;
 pub use crate::cli::entry_subcommands::{
-    ContextCommands, DebugCommands, McpCommands, ProfileCommands, TelemetryCommands, VaultCommands,
+    ContextCommands, DebugCommands, McpCommands, ProfileCommands, ProviderCommands,
+    TelemetryCommands, VaultCommands,
 };
 pub use crate::cli::entry_team_subcommands::TeamCommands;
 

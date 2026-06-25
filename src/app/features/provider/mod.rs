@@ -1,5 +1,6 @@
 pub mod activate;
 pub mod deactivate;
+pub mod list;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
@@ -34,6 +35,12 @@ pub fn dispatch(
             )),
             Err(e) => Some(Err(anyhow::anyhow!("Provider '{}' not found: {}", id, e))),
         },
+        CoreCommand::ListProviders => Some(list::run(
+            crate::domain::scope::Scope::Workspace,
+            core.store.as_ref(),
+            core.registry.as_ref(),
+            sink,
+        )),
         _ => None,
     }
 }

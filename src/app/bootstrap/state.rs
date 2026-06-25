@@ -120,6 +120,9 @@ pub fn build_provider_entries(config: &ConfigFile, registry: &Registry) -> Vec<P
                 name,
                 active: config.providers.contains(&id),
                 supports_mcp: p.supports_mcp(),
+                supports_profiles: p.supports_profiles(),
+                available_tools: p.available_profile_tools(),
+                available_permission_modes: p.available_permission_modes(),
             }
         })
         .collect()
