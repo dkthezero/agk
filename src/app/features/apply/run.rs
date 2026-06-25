@@ -1,5 +1,6 @@
 use crate::app::event::CoreEvent;
 use crate::app::features::apply::command::ApplyConfigInput;
+use crate::app::features::apply::source::resolve_source;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{ConfigStorePort, ContextStorePort};
 use crate::domain::context::{ContextConfig, ContextId};
@@ -27,6 +28,13 @@ pub fn run(
     _all_providers: Vec<String>,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
+    // Resolve the source (read + parse a local file, reject unsupported URL
+    // sources, surface missing/unreadable files) BEFORE applying anything,
+    // so a bad source surfaces as a clear error instead of a silent
+    // false-success that reports "Applied config from <source>" while doing
+    // nothing. The `context://` scheme short-circuits (context create path).
+    let input = resolve_source(input)?;
+
     if dry_run {
         sink.on_event(CoreEvent::TaskStarted {
             id: 0,
