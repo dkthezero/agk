@@ -19,6 +19,13 @@ pub enum ProfileCommands {
         dry_run: bool,
     },
 
+    /// List all configured profiles
+    List {
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
+
     /// Create a new profile headlessly and generate the agent file
     Create {
         /// Profile name
@@ -253,3 +260,5 @@ pub enum VaultCommands {
         id: Option<String>,
     },
 }
+
+pub use crate::cli::entry_team_subcommands::TeamCommands;

@@ -19,6 +19,10 @@ pub enum CoreEvent {
     ProfileCreated(crate::domain::profile::ProfileId),
     ProfileUpdated(crate::domain::profile::ProfileId),
     ProfileDeleted(crate::domain::profile::ProfileId),
+    /// One `ProfileListed` event per profile returned by `ListProfiles`.
+    /// Carries the lightweight display view model so CLI/JSON/TUI render
+    /// identically.
+    ProfileListed(Vec<crate::app::snapshot::ProfileEntry>),
     ProfileValidated {
         id: crate::domain::profile::ProfileId,
         valid: bool,

@@ -51,6 +51,9 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::ProfileDeleted(id) => {
             state.status_line = format!("Profile '{}' deleted", id.as_str());
         }
+        CoreEvent::ProfileListed(entries) => {
+            state.status_line = format!("{} profiles listed", entries.len());
+        }
         CoreEvent::ProfileValidated { id, valid, message } => {
             state.status_line = format!(
                 "Profile '{}' validation: {} ({})",

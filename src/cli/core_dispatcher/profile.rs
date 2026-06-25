@@ -12,6 +12,9 @@ pub(super) fn to_core_command(command: &ProfileCommands) -> anyhow::Result<CoreC
             scope: Scope::Workspace,
             dry_run: *dry_run,
         }),
+        ProfileCommands::List { scope } => Ok(CoreCommand::ListProfiles {
+            scope: Some(scope.into_domain_scope()),
+        }),
         ProfileCommands::Create {
             name,
             provider,
