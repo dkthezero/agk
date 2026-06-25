@@ -6,7 +6,8 @@ use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::time::Duration;
 
-/// Register a new MCP server in the global registry.
+/// Register a new MCP server in the registry at `registry_path`. The path
+/// is explicit so tests can sandbox I/O without mutating global `HOME`.
 pub fn register(
     name: &str,
     command: &str,
@@ -14,9 +15,9 @@ pub fn register(
     env: Option<&str>,
     transport_str: &str,
     description: Option<&str>,
+    registry_path: &std::path::Path,
 ) -> Result<McpServer> {
-    let path = crate::domain::paths::mcp_path();
-    let mut registry = McpRegistry::load(&path).unwrap_or_default();
+    let mut registry = McpRegistry::load(registry_path).unwrap_or_default();
 
     if registry.servers.contains_key(name) {
         bail!("MCP server '{}' already exists", name);
@@ -71,7 +72,7 @@ pub fn register(
     };
 
     registry.servers.insert(name.to_string(), server.clone());
-    registry.save(&path)?;
+    registry.save(registry_path)?;
 
     Ok(server)
 }
@@ -312,17 +313,12 @@ mod tests {
     /// Regression: an SSE transport string encoded as `sse:<url>` must yield
     /// an `McpTransport::Sse { url }` with that exact URL (not derived from
     /// `args[0]`), and `server.args` must not be polluted with the URL. We
-    /// exercise the real `register()` by redirecting HOME to a temp dir so
-    /// `mcp_path()` resolves into the sandbox.
+    /// exercise the real `register()` against an explicit registry path in a
+    /// temp dir, avoiding mutation of the process-global `HOME`.
     #[test]
     fn register_parses_sse_url_from_encoded_transport_string() {
         let dir = tempfile::tempdir().unwrap();
-        // Redirect HOME so `global_config_root()` (macOS: ~/.config/agk) and
-        // thus `mcp_path()` resolve inside the sandbox.
-        let prev_home = std::env::var_os("HOME");
-        std::env::set_var("HOME", dir.path());
-        // Ensure the config dir exists.
-        std::fs::create_dir_all(dir.path().join(".config").join("agk")).unwrap();
+        let path = dir.path().join("mcp.toml");
 
         let server = register(
             "remote-sse",
@@ -331,6 +327,7 @@ mod tests {
             None,
             "sse:https://mcp.example.com/sse",
             None,
+            &path,
         )
         .expect("register should succeed");
         assert_eq!(
@@ -344,12 +341,6 @@ mod tests {
             server.args.is_empty(),
             "args must not be polluted with the SSE URL"
         );
-
-        // Restore HOME.
-        match prev_home {
-            Some(v) => std::env::set_var("HOME", v),
-            None => std::env::remove_var("HOME"),
-        }
     }
 
     /// Regression: the legacy `transport = "sse"` form (no embedded URL)
@@ -358,9 +349,7 @@ mod tests {
     #[test]
     fn register_legacy_sse_still_derives_url_from_args() {
         let dir = tempfile::tempdir().unwrap();
-        let prev_home = std::env::var_os("HOME");
-        std::env::set_var("HOME", dir.path());
-        std::fs::create_dir_all(dir.path().join(".config").join("agk")).unwrap();
+        let path = dir.path().join("mcp.toml");
 
         let server = register(
             "legacy-sse",
@@ -369,6 +358,7 @@ mod tests {
             None,
             "sse",
             None,
+            &path,
         )
         .expect("register should succeed");
         assert_eq!(
@@ -384,10 +374,5 @@ mod tests {
                 "--flag".to_string()
             ]
         );
-
-        match prev_home {
-            Some(v) => std::env::set_var("HOME", v),
-            None => std::env::remove_var("HOME"),
-        }
     }
 }
