@@ -17,7 +17,8 @@ pub fn register(
     description: Option<&str>,
     registry_path: &std::path::Path,
 ) -> Result<McpServer> {
-    let mut registry = McpRegistry::load(registry_path).unwrap_or_default();
+    let mut registry = McpRegistry::load(registry_path)
+        .with_context(|| format!("failed to load MCP registry at {}", registry_path.display()))?;
 
     if registry.servers.contains_key(name) {
         bail!("MCP server '{}' already exists", name);
