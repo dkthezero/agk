@@ -151,7 +151,7 @@ Each provider row now shows additional indicators:
 - [x] Letta, Snowflake, Firebender return `supports_mcp: false` and are excluded from MCP operations.
 - [x] TUI Providers tab shows MCP checkbox `[✓]` only for capable providers.
 - [x] All new provider configs preserve existing JSON content (no destructive overwrites).
-- [ ] Tests cover write/read roundtrips for all 3 new providers.
+- [x] Tests cover write/read roundtrips for all 3 new providers.
 - [x] `available_profile_tools()` returns correct lists for Claude Code and OpenCode.
 - [x] `available_permission_modes()` returns correct lists for Claude Code.
 - [x] Wizard injects tool/permission steps only when provider returns non-empty lists.
