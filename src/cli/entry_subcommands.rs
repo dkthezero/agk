@@ -127,6 +127,10 @@ pub enum McpCommands {
         #[arg(short, long, default_value = "stdio")]
         transport: String,
 
+        /// URL for SSE transports (required when `--transport sse`)
+        #[arg(long)]
+        url: Option<String>,
+
         /// Description of the server
         #[arg(short, long)]
         description: Option<String>,

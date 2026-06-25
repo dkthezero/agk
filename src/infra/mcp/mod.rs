@@ -40,6 +40,15 @@ pub fn register(
         .unwrap_or_default();
 
     let transport = match transport_str {
+        // Prefer the URL encoded into the transport string (`sse:<url>`) —
+        // the canonical path produced by the `mcp::register` use case, which
+        // encodes the typed `McpTransport::Sse { url }` so it survives the
+        // `McpRegistryPort::register` boundary. Fall back to the legacy
+        // behaviour (URL as the first arg) for any pre-existing callers, then
+        // to an empty string, so this is strictly additive.
+        s if s.starts_with("sse:") => McpTransport::Sse {
+            url: s.strip_prefix("sse:").unwrap_or("").to_string(),
+        },
         "sse" => McpTransport::Sse {
             url: args_vec.first().cloned().unwrap_or_default(),
         },
@@ -288,6 +297,8 @@ pub fn build_mcp_providers(workspace_root: &std::path::Path) -> Vec<Box<dyn McpP
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn register_and_load_round_trip() {
         let dir = tempfile::tempdir().unwrap();
@@ -296,5 +307,87 @@ mod tests {
 
         // TODO: Test register + load
         let _ = path;
+    }
+
+    /// Regression: an SSE transport string encoded as `sse:<url>` must yield
+    /// an `McpTransport::Sse { url }` with that exact URL (not derived from
+    /// `args[0]`), and `server.args` must not be polluted with the URL. We
+    /// exercise the real `register()` by redirecting HOME to a temp dir so
+    /// `mcp_path()` resolves into the sandbox.
+    #[test]
+    fn register_parses_sse_url_from_encoded_transport_string() {
+        let dir = tempfile::tempdir().unwrap();
+        // Redirect HOME so `global_config_root()` (macOS: ~/.config/agk) and
+        // thus `mcp_path()` resolve inside the sandbox.
+        let prev_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", dir.path());
+        // Ensure the config dir exists.
+        std::fs::create_dir_all(dir.path().join(".config").join("agk")).unwrap();
+
+        let server = register(
+            "remote-sse",
+            "npx",
+            None,
+            None,
+            "sse:https://mcp.example.com/sse",
+            None,
+        )
+        .expect("register should succeed");
+        assert_eq!(
+            server.transport,
+            McpTransport::Sse {
+                url: "https://mcp.example.com/sse".to_string()
+            },
+            "SSE URL encoded in the transport string must be parsed verbatim"
+        );
+        assert!(
+            server.args.is_empty(),
+            "args must not be polluted with the SSE URL"
+        );
+
+        // Restore HOME.
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+    }
+
+    /// Regression: the legacy `transport = "sse"` form (no embedded URL)
+    /// still derives the URL from `args[0]` so pre-existing callers don't
+    /// break, and `server.args` retains the value.
+    #[test]
+    fn register_legacy_sse_still_derives_url_from_args() {
+        let dir = tempfile::tempdir().unwrap();
+        let prev_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", dir.path());
+        std::fs::create_dir_all(dir.path().join(".config").join("agk")).unwrap();
+
+        let server = register(
+            "legacy-sse",
+            "npx",
+            Some("https://legacy.example.com/sse --flag"),
+            None,
+            "sse",
+            None,
+        )
+        .expect("register should succeed");
+        assert_eq!(
+            server.transport,
+            McpTransport::Sse {
+                url: "https://legacy.example.com/sse".to_string()
+            }
+        );
+        assert_eq!(
+            server.args,
+            vec![
+                "https://legacy.example.com/sse".to_string(),
+                "--flag".to_string()
+            ]
+        );
+
+        match prev_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
     }
 }
