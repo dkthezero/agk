@@ -382,6 +382,44 @@ mod tests {
         );
     }
 
+    /// Regression: `agk sync --dry-run` is a *preview* — it computes what
+    /// would be synced without touching providers (the per-asset loop
+    /// short-circuits with `continue` before the provider update).  Enforcing
+    /// the empty-providers guard on a dry-run made `agk sync --dry-run` fail
+    /// with "No active providers" even though it needs none, masking the
+    /// useful preview of installed/available assets.
+    fn sync_dry_run_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Sync {
+                global: false,
+                dry_run: true,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_sync_dry_run_succeeds_with_no_active_providers() {
+        // Empty config -> no providers active, but dry_run=true must NOT
+        // trip the empty-providers guard — the preview should succeed and
+        // emit a (possibly empty) SyncComplete event.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = sync_dry_run_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "sync --dry-run is a preview and must not fail when no providers are active"
+        );
+    }
+
     /// Regression: `agk install <identity>` must exit non-zero when there
     /// are no active providers (same `TaskFailed`-then-`Ok` anti-pattern as
     /// sync).

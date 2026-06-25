@@ -78,7 +78,14 @@ pub(super) fn sync_assets_cmd(
         .map(|p| p.id().to_string())
         .collect();
 
-    if provider_ids.is_empty() {
+    // A dry-run is a preview — it computes what *would* be synced without
+    // touching providers (the per-asset loop short-circuits with `continue`
+    // before the provider update).  Enforcing the empty-providers guard on a
+    // dry-run would make `agk sync --dry-run` fail even though it needs no
+    // providers, masking the useful preview of available assets.  Only
+    // enforce the guard for a live sync, which actually calls provider
+    // updates.
+    if provider_ids.is_empty() && !dry_run {
         return fail(sink, "No active providers");
     }
 
