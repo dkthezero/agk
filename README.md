@@ -341,6 +341,9 @@ agk profile create my-reviewer \
   --skills rust-patterns:clawhub,docker:ecc \
   --scope workspace
 
+# List configured profiles
+agk profile list
+
 # Start a profile session
 agk p start my-reviewer
 
