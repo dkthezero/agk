@@ -5,6 +5,7 @@ pub mod entry_team_subcommands;
 pub mod llm;
 pub mod presenter;
 pub mod presenter_json;
+pub mod presenter_json_listings;
 pub mod presenter_json_llm;
 pub mod presenter_sink;
 

@@ -52,6 +52,11 @@ pub enum CoreEvent {
         diff: crate::domain::profile_diff::ProfileDiff,
     },
 
+    /// One `ContextListed` event returned by `ListContexts`.
+    /// Carries the lightweight display view models so CLI/JSON/TUI render
+    /// identically.
+    ContextListed(Vec<crate::app::snapshot::ContextEntry>),
+
     // -----------------------------------------------------------------------
     // Vaults
     // -----------------------------------------------------------------------

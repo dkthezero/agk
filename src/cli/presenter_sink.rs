@@ -29,24 +29,10 @@ impl CoreEventSink for CliPresenter {
                 self.print(&format!("Profile '{}' deleted", id.as_str()));
             }
             CoreEvent::ProfileListed(entries) => {
-                if matches!(self.mode, OutputMode::Json) {
-                    // The event is accumulated into the JSON batch by
-                    // `finalize()`; avoid a duplicate inline print.
-                } else if entries.is_empty() {
-                    self.print("No profiles configured.");
-                } else {
-                    for e in entries {
-                        let drift = if e.has_drift { " (drift)" } else { "" };
-                        self.print(&format!(
-                            "{} [{}] skills={} mcps={}{}",
-                            e.name,
-                            e.provider_id,
-                            e.skills.len(),
-                            e.mcps.len(),
-                            drift
-                        ));
-                    }
-                }
+                self.render_profile_listed(entries);
+            }
+            CoreEvent::ContextListed(entries) => {
+                self.render_context_listed(entries);
             }
             CoreEvent::ProviderActivated(id) => {
                 self.print(&format!("Provider '{}' activated", id));

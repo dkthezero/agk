@@ -168,6 +168,58 @@ impl CliPresenter {
         }
     }
 
+    /// Render a `ProfileListed` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable lines are suppressed here to avoid duplicates.
+    pub(crate) fn render_profile_listed(&self, entries: &[crate::app::snapshot::ProfileEntry]) {
+        if matches!(self.mode, OutputMode::Json) {
+            // The event is accumulated into the JSON batch by `finalize()`;
+            // avoid a duplicate inline print.
+        } else if entries.is_empty() {
+            self.print("No profiles configured.");
+        } else {
+            for e in entries {
+                let drift = if e.has_drift { " (drift)" } else { "" };
+                self.print(&format!(
+                    "{} [{}] skills={} mcps={}{}",
+                    e.name,
+                    e.provider_id,
+                    e.skills.len(),
+                    e.mcps.len(),
+                    drift
+                ));
+            }
+        }
+    }
+
+    /// Render a `ContextListed` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable lines are suppressed here to avoid duplicates.
+    pub(crate) fn render_context_listed(&self, entries: &[crate::app::snapshot::ContextEntry]) {
+        if matches!(self.mode, OutputMode::Json) {
+            // The event is accumulated into the JSON batch by `finalize()`;
+            // avoid a duplicate inline print.
+        } else if entries.is_empty() {
+            self.print("No contexts configured.");
+        } else {
+            for e in entries {
+                let marker = if e.is_active { "* " } else { "  " };
+                let display = e.display_name.as_deref().unwrap_or(&e.name);
+                let env = e.environment.as_deref().unwrap_or("");
+                self.print(&format!(
+                    "{}{} [{}] (vaults: {}, profiles: {})",
+                    marker,
+                    display,
+                    env,
+                    e.vaults.len(),
+                    e.profiles.len()
+                ));
+            }
+        }
+    }
+
     /// Render an `LlmProviderHealth` event to the human-readable streams.
     ///
     /// In JSON mode the event is emitted via the batch in `finalize()`, so

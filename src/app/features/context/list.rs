@@ -1,34 +1,26 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::ContextStorePort;
+use crate::app::snapshot::ContextEntry;
 
-/// List all available contexts, emitting one [`CoreEvent::TaskCompleted`]
-/// per context, with the active one marked by an asterisk.
+/// List all available contexts, emitting a single [`CoreEvent::ContextListed`]
+/// event carrying one [`ContextEntry`] per context (with the active one flagged).
 pub fn run(context_store: &dyn ContextStorePort, sink: &mut dyn CoreEventSink) -> CoreResult {
     let file = context_store.load_contexts()?;
-    for (name, ctx) in &file.contexts {
-        let marker = if name == &file.current_context {
-            "* "
-        } else {
-            "  "
-        };
-        let display = ctx.display_name.as_ref().unwrap_or(name);
-        let env = ctx
-            .environment
-            .map(|e| e.as_str().to_string())
-            .unwrap_or_default();
-        sink.on_event(CoreEvent::TaskCompleted {
-            id: 0,
-            message: format!(
-                "{}{} [{}] (vaults: {}, profiles: {})",
-                marker,
-                display,
-                env,
-                ctx.vaults.len(),
-                ctx.profiles.len()
-            ),
-        });
-    }
+    let entries: Vec<ContextEntry> = file
+        .contexts
+        .iter()
+        .map(|(name, ctx)| ContextEntry {
+            name: name.clone(),
+            display_name: ctx.display_name.clone(),
+            is_active: name == &file.current_context,
+            environment: ctx.environment.map(|e| e.as_str().to_string()),
+            vaults: ctx.vaults.clone(),
+            profiles: ctx.profiles.clone(),
+            providers: ctx.providers.clone(),
+        })
+        .collect();
+    sink.on_event(CoreEvent::ContextListed(entries));
     Ok(CoreOutcome::Ok)
 }
 
@@ -82,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn list_contexts_emits_one_completion_per_context() {
+    fn list_contexts_emits_single_context_listed_event() {
         let mut file = ContextFile::default();
         file.ensure_default();
         file.contexts.insert(
@@ -99,21 +91,39 @@ mod tests {
         let mut sink = CollectingSink { events: vec![] };
         let result = run(&store, &mut sink);
         assert!(result.is_ok());
-        assert_eq!(sink.events.len(), 2); // default + company-x
 
-        let messages: Vec<String> = sink
-            .events
-            .iter()
-            .filter_map(|e| {
-                if let CoreEvent::TaskCompleted { message, .. } = e {
-                    Some(message.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        // Exactly one ContextListed event carrying all contexts.
+        assert_eq!(sink.events.len(), 1);
+        let entries = match &sink.events[0] {
+            CoreEvent::ContextListed(e) => e.clone(),
+            other => panic!("expected ContextListed, got {:?}", other),
+        };
+        assert_eq!(entries.len(), 2); // default + company-x
 
-        assert!(messages.iter().any(|m| m.contains("* Personal")));
-        assert!(messages.iter().any(|m| m.contains("Company X [prod]")));
+        let personal = entries.iter().find(|e| e.name == "default").unwrap();
+        assert!(personal.is_active);
+        assert_eq!(personal.display_name.as_deref(), Some("Personal"));
+        let company = entries.iter().find(|e| e.name == "company-x").unwrap();
+        assert!(!company.is_active);
+        assert_eq!(company.display_name.as_deref(), Some("Company X"));
+        assert_eq!(company.environment.as_deref(), Some("prod"));
+        assert_eq!(company.vaults, vec!["team"]);
+        assert_eq!(company.profiles, vec!["backend"]);
+    }
+
+    #[test]
+    fn list_contexts_empty_file_emits_empty_list() {
+        let mut file = ContextFile::default();
+        file.contexts.clear();
+        file.current_context.clear();
+        let store = FakeCtxStore::with(file);
+        let mut sink = CollectingSink { events: vec![] };
+        let result = run(&store, &mut sink);
+        assert!(result.is_ok());
+        let entries = match &sink.events[0] {
+            CoreEvent::ContextListed(e) => e.clone(),
+            _ => panic!("expected ContextListed"),
+        };
+        assert!(entries.is_empty());
     }
 }

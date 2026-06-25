@@ -19,19 +19,8 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::ProfileDeleted(id) => {
             serde_json::json!({ "type": "ProfileDeleted", "id": id.as_str() })
         }
-        CoreEvent::ProfileListed(entries) => {
-            serde_json::json!({
-                "type": "ProfileListed",
-                "profiles": entries.iter().map(|e| {
-                    serde_json::json!({
-                        "name": e.name,
-                        "provider_id": e.provider_id,
-                        "skills": e.skills.iter().map(|s| &s.name).collect::<Vec<_>>(),
-                        "mcps": e.mcps.iter().map(|m| &m.name).collect::<Vec<_>>(),
-                        "has_drift": e.has_drift,
-                    })
-                }).collect::<Vec<_>>()
-            })
+        CoreEvent::ProfileListed(_) | CoreEvent::ContextListed(_) => {
+            crate::cli::presenter_json_listings::listing_event_to_json(event)
         }
         CoreEvent::ProfileValidated { id, valid, message } => {
             serde_json::json!({

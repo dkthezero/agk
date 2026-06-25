@@ -54,6 +54,9 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::ProfileListed(entries) => {
             state.status_line = format!("{} profiles listed", entries.len());
         }
+        CoreEvent::ContextListed(entries) => {
+            state.status_line = format!("{} contexts listed", entries.len());
+        }
         CoreEvent::ProfileValidated { id, valid, message } => {
             state.status_line = format!(
                 "Profile '{}' validation: {} ({})",

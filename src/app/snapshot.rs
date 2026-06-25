@@ -59,6 +59,20 @@ pub struct ProfileEntry {
     pub has_drift: bool,
 }
 
+/// Display-only struct for the context list.
+/// Carries the lightweight data needed by the CLI/JSON/TUI renderers so all
+/// three render `agk context list` identically.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextEntry {
+    pub name: String,
+    pub display_name: Option<String>,
+    pub is_active: bool,
+    pub environment: Option<String>,
+    pub vaults: Vec<String>,
+    pub profiles: Vec<String>,
+    pub providers: Vec<String>,
+}
+
 /// A profile package discovered in a vault but not yet registered in config.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiscoveredProfile {
