@@ -146,7 +146,7 @@ Provides read/write access to the local filesystem through the Model Context Pro
 
 - [x] Arbitrary code execution warning before registering.
 - [x] Vault-sourced MCPs execute the same command as manually-registered ones; same security model applies.
-- [ ] `~/.config/agk/mcp.toml` file permissions `0600` (pending hardening).
+- [x] `~/.config/agk/mcp.toml` file permissions set to `0600` (owner-only) on save.
 
 ---
 

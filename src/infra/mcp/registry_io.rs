@@ -10,6 +10,22 @@ use crate::domain::mcp::McpRegistry;
 use anyhow::Result;
 use std::path::Path;
 
+/// Restrict the MCP registry file to owner-only access (`0600` on Unix),
+/// per the mcp-vault PRD Security Considerations. On non-Unix platforms
+/// this is a no-op (Windows ACLs are not adjusted here); the file is still
+/// written, just without the Unix mode hardening.
+fn restrict_permissions(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+}
+
 impl McpRegistry {
     pub fn load(path: &Path) -> Result<Self> {
         if !path.exists() {
@@ -26,6 +42,7 @@ impl McpRegistry {
         }
         let content = toml::to_string_pretty(self)?;
         std::fs::write(path, content)?;
+        restrict_permissions(path);
         Ok(())
     }
 }
@@ -75,5 +92,21 @@ mod tests {
         let path = dir.path().join("absent.toml");
         let loaded = McpRegistry::load(&path).unwrap();
         assert!(loaded.servers.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_sets_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mcp.toml");
+        McpRegistry::default().save(&path).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "mcp.toml should be 0600 owner-only, got {:o}",
+            mode & 0o777
+        );
     }
 }
