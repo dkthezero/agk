@@ -57,6 +57,47 @@ pub fn run(
         ));
     }
 
+    // 3a. Dry-run preview: emit a description of what would happen WITHOUT
+    //     shelling out to the provider CLI, writing agent markdown, or
+    //     persisting the new profile to config. Honours the --dry-run
+    //     contract (no fs side effects, no provider invocation).
+    if input.dry_run {
+        let skills = input
+            .skill_refs
+            .iter()
+            .map(|r| r.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mcps = input
+            .mcp_refs
+            .iter()
+            .map(|r| r.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+        sink.on_event(CoreEvent::Info(format!(
+            "Would create profile '{}' (provider: {}, scope: {:?}){}{}{}",
+            id_str,
+            provider_id,
+            input.scope,
+            if skills.is_empty() {
+                String::new()
+            } else {
+                format!(", skills: [{}]", skills)
+            },
+            if mcps.is_empty() {
+                String::new()
+            } else {
+                format!(", mcps: [{}]", mcps)
+            },
+            if input.description.trim().is_empty() {
+                String::new()
+            } else {
+                format!(", description: {:?}", input.description.trim())
+            },
+        )));
+        return Ok(CoreOutcome::Ok);
+    }
+
     // 4. Build and save (initial placeholder; provider-specific branches
     //    below may rewrite `prompt_overlay_path` after rendering agent
     //    markdown for the `claude-code` provider).
@@ -434,5 +475,61 @@ mod tests {
             &mut sink,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn dry_run_does_not_invoke_provider_or_persist_config() {
+        let store = FakeStore::new();
+        let mut sink = CollectingSink { events: vec![] };
+        let mut input = CreateProfileInput::new(
+            ProfileId::new("preview-profile"),
+            crate::domain::profile::ProviderId::new("opencode"),
+            Scope::Workspace,
+        );
+        input.dry_run = true;
+        input.description = "A preview".to_string();
+
+        let result = run(
+            &input,
+            &store,
+            &FakeProcessRunner,
+            &test_registry(),
+            std::path::Path::new("."),
+            &mut sink,
+        );
+
+        // Dry-run is a successful preview.
+        assert!(result.is_ok());
+        // No ProfileCreated/WorkspaceLoaded success events leaked.
+        assert!(!sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::ProfileCreated(_))));
+        assert!(!sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::WorkspaceLoaded(_))));
+        // Exactly one Info preview mentioning the profile name + 'Would create'.
+        let previews: Vec<_> = sink
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                CoreEvent::Info(m) => Some(m.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            previews.len(),
+            1,
+            "dry-run should emit exactly one Info preview"
+        );
+        assert!(previews[0].contains("Would create profile 'preview-profile'"));
+        assert!(previews[0].contains("opencode"));
+        // Config must NOT have been mutated.
+        let config = store.load(Scope::Workspace).unwrap();
+        assert!(
+            config.profiles.is_empty(),
+            "dry-run must not persist the profile"
+        );
     }
 }
