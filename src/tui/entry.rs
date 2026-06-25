@@ -45,9 +45,6 @@ pub fn build_state(
     state.configs.insert(Scope::Global, global_config);
     state.configs.insert(Scope::Workspace, workspace_config);
     state.team_config = team_config;
-    state.is_vault_workspace = workspace_root
-        .join(".agk")
-        .join("vault.toml")
-        .exists();
+    state.is_vault_workspace = workspace_root.join(".agk").join("vault.toml").exists();
     state
 }

@@ -1,6 +1,7 @@
 pub mod core_dispatcher;
 pub mod entry;
 pub mod entry_subcommands;
+pub mod entry_team_subcommands;
 pub mod llm;
 pub mod presenter;
 pub mod presenter_json;

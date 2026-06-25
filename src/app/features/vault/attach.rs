@@ -83,8 +83,12 @@ pub fn attach_local(
 
     // Canonicalize so the stored path is deterministic; fail loudly rather
     // than silently storing a non-canonical path.
-    let abs_path = std::fs::canonicalize(vault_path)
-        .with_context(|| format!("Failed to canonicalize vault path '{}'", vault_path.display()))?;
+    let abs_path = std::fs::canonicalize(vault_path).with_context(|| {
+        format!(
+            "Failed to canonicalize vault path '{}'",
+            vault_path.display()
+        )
+    })?;
 
     let vault_id = id.unwrap_or_else(|| manifest.name.clone());
     let config = VaultConfig::Local(LocalVaultSource {

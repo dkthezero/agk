@@ -382,7 +382,11 @@ mod tests {
         let mut state = state_with_skills(vec![]);
         state.is_vault_workspace = true;
         state.toggle_scope();
-        assert_eq!(state.active_scope, Scope::Workspace, "vault mode must not toggle scope");
+        assert_eq!(
+            state.active_scope,
+            Scope::Workspace,
+            "vault mode must not toggle scope"
+        );
     }
 
     #[test]
@@ -424,6 +428,16 @@ mod tests {
         assert_eq!(state.tab_kinds[4], TabKind::Vault); // Vault
     }
 
+    struct StubFileOpener;
+    impl crate::app::ports::FileOpenerPort for StubFileOpener {
+        fn open_file_manager(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn open_terminal(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn enter_vault_init_sets_confirm_mode() {
         use crate::tui::event::EventContext;
@@ -436,7 +450,7 @@ mod tests {
         let ctx = EventContext {
             tx,
             workspace_root: std::path::PathBuf::from("/tmp/my-workspace"),
-            file_opener: Arc::new(crate::infra::process::opener::OsFileOpener),
+            file_opener: Arc::new(StubFileOpener),
             core: Arc::new(crate::app::core::test_core()),
         };
 
@@ -454,35 +468,39 @@ mod tests {
         use crate::tui::core_event_reducer::apply_core_event;
         let mut state = state_with_skills(vec![]);
         assert!(!state.is_vault_workspace);
-        apply_core_event(&mut state, &CoreEvent::VaultInitialized("my-vault".to_string()));
-        assert!(state.is_vault_workspace, "VaultInitialized must set is_vault_workspace = true");
+        apply_core_event(
+            &mut state,
+            &CoreEvent::VaultInitialized("my-vault".to_string()),
+        );
+        assert!(
+            state.is_vault_workspace,
+            "VaultInitialized must set is_vault_workspace = true"
+        );
     }
 
     #[test]
     fn vault_keybinds_include_init_when_not_vault_workspace() {
         use crate::tui::render::keybinds::resolve_keybinds;
-        let mut state = AppState::new(
-            vec!["Vaults".to_string()],
-            vec![true],
-            HashMap::new(),
-        );
+        let mut state = AppState::new(vec!["Vaults".to_string()], vec![true], HashMap::new());
         state.tab_kinds = vec![TabKind::Vault];
         state.is_vault_workspace = false;
         let keybinds = resolve_keybinds(&state);
-        assert!(keybinds.contains("F1"), "non-vault workspace must show [F1] Init as Vault");
+        assert!(
+            keybinds.contains("F1"),
+            "non-vault workspace must show [F1] Init as Vault"
+        );
     }
 
     #[test]
     fn vault_keybinds_hide_init_when_vault_workspace() {
         use crate::tui::render::keybinds::resolve_keybinds;
-        let mut state = AppState::new(
-            vec!["Vaults".to_string()],
-            vec![true],
-            HashMap::new(),
-        );
+        let mut state = AppState::new(vec!["Vaults".to_string()], vec![true], HashMap::new());
         state.tab_kinds = vec![TabKind::Vault];
         state.is_vault_workspace = true;
         let keybinds = resolve_keybinds(&state);
-        assert!(!keybinds.contains("F1"), "vault workspace must NOT show [F1] Init as Vault");
+        assert!(
+            !keybinds.contains("F1"),
+            "vault workspace must NOT show [F1] Init as Vault"
+        );
     }
 }

@@ -120,8 +120,7 @@ pub fn handle_f_keys(state: &mut AppState, ctx: &EventContext, code: &KeyCode) -
             Ok(())
         }
         KeyCode::F(1) => {
-            if state.tab_kinds.get(state.active_tab)
-                == Some(&crate::app::tab_kind::TabKind::Vault)
+            if state.tab_kinds.get(state.active_tab) == Some(&crate::app::tab_kind::TabKind::Vault)
                 && !state.is_vault_workspace
             {
                 crate::tui::features::vaults::controller::enter_vault_init(state, ctx);
