@@ -153,11 +153,20 @@ pub fn run(
             isolation: None,
             color: None,
         };
-        let prompt_body = app_profile
-            .prompt_overlay_path
-            .as_ref()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .unwrap_or_default();
+        let prompt_body = match app_profile.prompt_overlay_path.as_ref() {
+            None => String::new(),
+            Some(p) => match std::fs::read_to_string(p) {
+                Ok(body) => body,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Failed to read prompt overlay '{}': {}",
+                        p.display(),
+                        e
+                    ));
+                }
+            },
+        };
         let resolved_mcp_servers = app_profile.agent_mcp_servers.clone();
         let plan = crate::domain::launch_plan::LaunchPlan {
             profile_id: app_profile.id.as_str().to_string(),
@@ -338,6 +347,94 @@ mod tests {
             !started,
             "no ProfileSessionStarted event should be emitted on dep failure"
         );
+    }
+
+    #[test]
+    fn start_claude_code_profile_with_unreadable_prompt_overlay_returns_err() {
+        // A claude-code profile whose `prompt_overlay_path` points at an
+        // unreadable file (e.g. a directory) must surface the read error
+        // instead of silently launching with an empty prompt body.
+        let tmp =
+            std::env::temp_dir().join(format!("agk-prompt-overlay-dir-{}", std::process::id()));
+        let _ = std::fs::create_dir(&tmp);
+        let dir_path = tmp.to_string_lossy().to_string();
+
+        struct OverlayStore {
+            overlay: String,
+        }
+        impl ConfigStorePort for OverlayStore {
+            fn load(&self, _scope: Scope) -> anyhow::Result<crate::domain::config::ConfigFile> {
+                let mut config = crate::domain::config::ConfigFile::default();
+                config.profiles.push(crate::domain::config::Profile {
+                    name: "dev".into(),
+                    provider_id: "claude-code".into(),
+                    scope: "workspace".into(),
+                    skills: vec![crate::domain::profile::ProfileAssetRef::new("rust", "auto")],
+                    mcps: vec![],
+                    instructions: vec![],
+                    tool_refs: vec![],
+                    permission_mode: None,
+                    prompt_overlay_path: Some(self.overlay.clone()),
+                });
+                config.vault_defs.insert(
+                    "auto".to_string(),
+                    crate::domain::config::VaultSection {
+                        vault: None,
+                        skills: Some(crate::domain::config::AssetBucket {
+                            items: vec!["[rust:1.0.0:0000000000]".to_string()],
+                            source: None,
+                        }),
+                        instructions: None,
+                        mcps: None,
+                        profiles: None,
+                    },
+                );
+                Ok(config)
+            }
+            fn save(
+                &self,
+                _scope: Scope,
+                _config: &crate::domain::config::ConfigFile,
+            ) -> anyhow::Result<()> {
+                Ok(())
+            }
+        }
+
+        let registry = Registry::new();
+        let mcp_registry = FakeMcpRegistry::new();
+        let mut sink = RecordingSink::default();
+        let result = run(
+            &ProfileId::new("dev"),
+            Scope::Workspace,
+            true,
+            &OverlayStore {
+                overlay: dir_path.clone(),
+            },
+            &std::collections::HashMap::new(),
+            &registry,
+            &mcp_registry,
+            &mut sink,
+        );
+        assert!(
+            result.is_err(),
+            "claude-code profile with unreadable prompt overlay must error"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Failed to read prompt overlay"),
+            "error should mention prompt overlay read failure, got: {err}"
+        );
+        // No launch plan event should be emitted on the failure path.
+        let planned = sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::ProfileLaunchPlan { .. }));
+        assert!(
+            !planned,
+            "no ProfileLaunchPlan event should be emitted when prompt overlay is unreadable"
+        );
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     struct FakeStore;
