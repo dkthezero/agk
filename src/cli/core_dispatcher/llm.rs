@@ -59,11 +59,12 @@ pub fn dispatch(args: &LlmArgs, workspace: &Path, presenter: &mut CliPresenter) 
             // while we block on the future.  `Runtime::new().block_on` is
             // not an option: building a new runtime from inside an
             // existing one panics.
+            let presenter = sink.presenter;
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(run_health(
                     &store_path,
                     id.as_deref(),
-                    &mut sink,
+                    presenter,
                 ))
             })
         }
@@ -72,10 +73,26 @@ pub fn dispatch(args: &LlmArgs, workspace: &Path, presenter: &mut CliPresenter) 
 
 /// Async health probe that fans out across the configured providers and
 /// emits one `LlmProviderHealth` event per probe.
+///
+/// `health::run` emits a `LlmProviderHealth` event (rendered by the
+/// presenter) for every probe and returns `Err` when the provider is
+/// unreachable.  Two distinct failure shapes flow back here:
+///
+///   * an *unreachable* probe — the event already rendered
+///     `"<id> unreachable: ..."` to stderr, so we must NOT let the error
+///     propagate to `main.rs` (it would print a duplicate `Error: ...`
+///     line); we surface it as a non-zero exit code instead.
+///   * any other error (store/factory/probe failure) — no event was
+///     emitted, so we propagate it so `main.rs` prints `Error: ...`.
+///
+/// `presenter.already_reported_task_failure()` distinguishes the two: it
+/// returns true once an `LlmProviderHealth { reachable: false }` event has
+/// been rendered, mirroring the `TaskFailed`/`McpTested` convention used by
+/// the main dispatcher.
 async fn run_health(
     store_path: &Path,
     only: Option<&str>,
-    sink: &mut dyn CoreEventSink,
+    presenter: &mut CliPresenter,
 ) -> Result<i32> {
     let store = crate::infra::llm::store::FileLlmProviderStore::new(store_path);
     let cfgs = match only {
@@ -88,28 +105,47 @@ async fn run_health(
         None => store.list()?,
     };
     if cfgs.is_empty() {
+        presenter.on_event(crate::app::event::CoreEvent::Info(
+            "No LLM providers configured. Use `agk llm add` to add one.".into(),
+        ));
         return Ok(crate::cli::EXIT_SUCCESS);
     }
 
     let factory = crate::infra::llm::factory::InfraLlmProviderFactory::new();
     let health = build_health_check();
 
-    let mut last_result: CoreOutcome = CoreOutcome::Ok;
+    let mut had_unreachable = false;
     for cfg in &cfgs {
-        let result = llm::health::run(
+        match llm::health::run(
             &cfg.id,
             &store,
             &factory,
             health.as_ref(),
             HEALTH_TIMEOUT,
-            sink,
+            presenter,
         )
-        .await;
-        if result.is_err() {
-            last_result = result?;
+        .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                if presenter.already_reported_task_failure() {
+                    // The unreachable event already rendered the message
+                    // to stderr; surface a non-zero exit code without a
+                    // duplicate `Error:` line from `main.rs`.
+                    had_unreachable = true;
+                } else {
+                    // No event rendered this failure — propagate so
+                    // `main.rs` prints `Error: ...`.
+                    return Err(e);
+                }
+            }
         }
     }
-    map_outcome(Ok(last_result))
+    if had_unreachable {
+        Ok(crate::cli::EXIT_GENERAL_FAILURE)
+    } else {
+        Ok(crate::cli::EXIT_SUCCESS)
+    }
 }
 
 /// Construct the concrete health check port.  We always use the
@@ -279,21 +315,78 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_remove_missing_provider_is_idempotent() {
-        // The store's `remove` is intentionally idempotent (returns Ok even
-        // when the id is unknown) so `agk llm remove <id>` succeeds whether
-        // or not the provider was previously configured.  Verify the
-        // dispatch path mirrors that.
+    fn dispatch_remove_missing_provider_reports_error() {
+        // Removing a provider that was never configured is *not* idempotent
+        // from the user's perspective: `agk llm remove <id>` should tell them
+        // the id was unknown rather than falsely reporting a successful
+        // removal.  The use case now returns `Err`, so dispatch must surface
+        // that error (non-zero exit) instead of `EXIT_SUCCESS`.
         let dir = tempfile::tempdir().unwrap();
         let mut presenter = CliPresenter::new(false, true);
-        let rc = dispatch(
+        let result = dispatch(
             &args(LlmCommand::Remove {
                 id: "missing".into(),
+            }),
+            dir.path(),
+            &mut presenter,
+        );
+        assert!(result.is_err(), "expected error for missing provider");
+    }
+
+    /// Regression: `agk llm health <id>` must exit non-zero when the probe
+    /// reports the provider unreachable.  Previously `health::run` returned
+    /// `Ok(CoreOutcome::Ok)` on an unreachable probe and `run_health`
+    /// propagated `Ok`, so the CLI exited 0 despite printing
+    /// "<id> unreachable: ..." — a false success.
+    ///
+    /// The probe targets `127.0.0.1:1` (a privileged port that is reliably
+    /// not bound), so it is unreachable in *both* feature configurations:
+    /// the default (no-LLM-feature) build uses `NoopHealthCheck` which
+    /// always reports unreachable, and an `--all-features` build uses the
+    /// real `HttpLlmHealthCheck` which gets a connection refused on port 1.
+    /// The test runs on a multi-thread Tokio runtime because the dispatch
+    /// path uses `block_in_place`.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dispatch_health_unreachable_returns_failure_exit() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut presenter = CliPresenter::new(false, false);
+        // Add a provider so the health probe has something to probe.  Port 1
+        // is reliably closed, so the probe is unreachable in every build.
+        let rc = dispatch(
+            &args(LlmCommand::Add {
+                id: "dead".into(),
+                kind: "ollama".into(),
+                endpoint: "http://127.0.0.1:1".into(),
+                api_key: None,
+                model: Some("llama3.2".into()),
             }),
             dir.path(),
             &mut presenter,
         )
         .unwrap();
         assert_eq!(rc, crate::cli::EXIT_SUCCESS);
+
+        // Probe it.  Both NoopHealthCheck (default) and HttpLlmHealthCheck
+        // (all-features) report unreachable for port 1, so the dispatcher
+        // must surface a non-zero exit code.
+        let rc = dispatch(
+            &args(LlmCommand::Health {
+                id: Some("dead".into()),
+            }),
+            dir.path(),
+            &mut presenter,
+        )
+        .unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "an unreachable health probe must surface as a non-zero exit code"
+        );
     }
+
+    // When a provider is reachable, `agk llm health <id>` must exit 0.
+    // This requires a live HTTP endpoint, so it is only covered by the
+    // use-case-level `run_reachable_*` test (which uses a fake health
+    // check) rather than a dispatcher test.  The dispatcher path is
+    // exercised end-to-end for the *unreachable* case above.
 }

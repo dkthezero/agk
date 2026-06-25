@@ -19,27 +19,34 @@ pub fn run(
 ) -> CoreResult {
     let mut config = store.load(scope)?;
     if !config.providers.contains(&provider_id) {
-        sink.on_error(format!("Provider '{}' already deactivated", provider_id));
-        return Ok(CoreOutcome::Ok);
+        anyhow::bail!("Provider '{}' already deactivated", provider_id);
     }
 
     config.providers.retain(|p| p != &provider_id);
     config.provider_roots.remove(&provider_id);
 
     // Remove installed assets from the provider's filesystem
+    let mut failures: Vec<String> = Vec::new();
     for section in config.vault_defs.values() {
         if let Some(ref skills) = section.skills {
             for item in &skills.items {
                 if let Some(identity) = crate::domain::config::parse_identity(item) {
-                    let _ = provider.remove(&identity, &AssetKind::Skill, scope, Some(&config));
+                    if let Err(e) =
+                        provider.remove(&identity, &AssetKind::Skill, scope, Some(&config))
+                    {
+                        failures.push(format!("{}: {}", identity.name, e));
+                    }
                 }
             }
         }
         if let Some(ref instructions) = section.instructions {
             for item in &instructions.items {
                 if let Some(identity) = crate::domain::config::parse_identity(item) {
-                    let _ =
-                        provider.remove(&identity, &AssetKind::Instruction, scope, Some(&config));
+                    if let Err(e) =
+                        provider.remove(&identity, &AssetKind::Instruction, scope, Some(&config))
+                    {
+                        failures.push(format!("{}: {}", identity.name, e));
+                    }
                 }
             }
         }
@@ -58,15 +65,22 @@ pub fn run(
 
     // If the entire config is now default (empty), delete the file
     if config == ConfigFile::default() {
-        if let Err(e) = store.delete_file(scope) {
-            sink.on_error(format!("Failed to delete empty config file: {}", e));
-            return Ok(CoreOutcome::Ok);
-        }
+        store.delete_file(scope)?;
     } else {
-        let _ = store.save(scope, &config);
+        store.save(scope, &config)?;
     }
 
-    sink.on_event(CoreEvent::ProviderDeactivated(provider_id.clone()));
+    if !failures.is_empty() {
+        sink.on_event(CoreEvent::ProviderDeactivated(provider_id.clone()));
+        anyhow::bail!(
+            "Deactivated '{}' but {} asset(s) failed to remove: {}",
+            provider_id,
+            failures.len(),
+            failures.join("; ")
+        );
+    }
+
+    sink.on_event(CoreEvent::ProviderDeactivated(provider_id));
     Ok(CoreOutcome::Ok)
 }
 
@@ -153,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn deactivate_already_inactive_is_noop() {
+    fn deactivate_already_inactive_returns_err() {
         let store = FakeStore::new(ConfigFile::default());
         let provider = FakeProvider;
         let mut sink = NullSink;
@@ -164,7 +178,8 @@ mod tests {
             &provider,
             &mut sink,
         );
-        assert!(result.is_ok());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already deactivated"), "got: {}", err);
     }
 
     #[test]
@@ -185,5 +200,117 @@ mod tests {
 
         let config = store.load(Scope::Workspace).unwrap();
         assert!(config.providers.is_empty());
+    }
+
+    struct FailingRemoveProvider;
+    impl ProviderPort for FailingRemoveProvider {
+        fn id(&self) -> &str {
+            "failing-remove"
+        }
+        fn name(&self) -> &str {
+            "FailingRemove"
+        }
+        fn install(
+            &self,
+            _: &ScannedPackage,
+            _: Scope,
+            _: Option<&ConfigFile>,
+            _: bool,
+        ) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn remove(
+            &self,
+            _: &AssetIdentity,
+            _: &AssetKind,
+            _: Scope,
+            _: Option<&ConfigFile>,
+        ) -> anyhow::Result<()> {
+            anyhow::bail!("permission denied")
+        }
+    }
+
+    #[test]
+    fn deactivate_with_remove_failure_returns_err_and_emits_event() {
+        let mut config = ConfigFile::default();
+        config.providers.push("failing-remove".into());
+        let mut section = crate::domain::config::VaultSection::default();
+        let mut skills = crate::domain::config::AssetBucket::default();
+        skills.items.push("[skill-a:1.0.0:0000000000]".to_string());
+        section.skills = Some(skills);
+        config.vault_defs.insert("vault-a".to_string(), section);
+
+        let store = FakeStore::new(config);
+        let provider = FailingRemoveProvider;
+        let mut sink = NullSink;
+        let result = run(
+            "failing-remove".into(),
+            Scope::Workspace,
+            &store,
+            &provider,
+            &mut sink,
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("failed to remove"), "got: {}", err);
+        assert!(err.contains("permission denied"), "got: {}", err);
+    }
+
+    struct SaveFailingStore {
+        data: Mutex<HashMap<String, ConfigFile>>,
+    }
+
+    impl SaveFailingStore {
+        fn new(config: ConfigFile) -> Self {
+            let mut data = HashMap::new();
+            data.insert(format!("{:?}", Scope::Workspace), config);
+            Self {
+                data: Mutex::new(data),
+            }
+        }
+    }
+
+    impl ConfigStorePort for SaveFailingStore {
+        fn load(&self, scope: Scope) -> anyhow::Result<ConfigFile> {
+            Ok(self
+                .data
+                .lock()
+                .unwrap()
+                .get(&format!("{:?}", scope))
+                .cloned()
+                .unwrap_or_default())
+        }
+        fn save(&self, _scope: Scope, _config: &ConfigFile) -> anyhow::Result<()> {
+            anyhow::bail!("disk full")
+        }
+        fn delete_file(&self, scope: Scope) -> anyhow::Result<()> {
+            self.data.lock().unwrap().remove(&format!("{:?}", scope));
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn deactivate_save_failure_returns_err() {
+        let mut config = ConfigFile::default();
+        config.providers.push("fake".into());
+        // A profile keeps the config non-default after asset clearing, forcing
+        // the `store.save` branch (instead of `delete_file`) so the failing
+        // save surfaces.
+        config.profiles.push(crate::domain::config::Profile {
+            name: "dev".into(),
+            provider_id: "claude".into(),
+            ..Default::default()
+        });
+        let store = SaveFailingStore::new(config);
+        let provider = FakeProvider;
+        let mut sink = NullSink;
+        let result = run(
+            "fake".into(),
+            Scope::Workspace,
+            &store,
+            &provider,
+            &mut sink,
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("disk full"), "got: {}", err);
     }
 }

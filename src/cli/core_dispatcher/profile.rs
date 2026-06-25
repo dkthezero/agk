@@ -12,6 +12,9 @@ pub(super) fn to_core_command(command: &ProfileCommands) -> anyhow::Result<CoreC
             scope: Scope::Workspace,
             dry_run: *dry_run,
         }),
+        ProfileCommands::List { scope } => Ok(CoreCommand::ListProfiles {
+            scope: Some(scope.into_domain_scope()),
+        }),
         ProfileCommands::Create {
             name,
             provider,
@@ -20,7 +23,7 @@ pub(super) fn to_core_command(command: &ProfileCommands) -> anyhow::Result<CoreC
             description,
             description_file,
             scope,
-            dry_run: _,
+            dry_run,
         } => {
             let desc = if let Some(path) = description_file {
                 std::fs::read_to_string(path)
@@ -48,6 +51,7 @@ pub(super) fn to_core_command(command: &ProfileCommands) -> anyhow::Result<CoreC
                     agent_mcp_servers: Vec::new(),
                     tool_refs: Vec::new(),
                     permission_mode: None,
+                    dry_run: *dry_run,
                 },
             })
         }

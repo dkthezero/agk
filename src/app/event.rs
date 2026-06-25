@@ -19,6 +19,10 @@ pub enum CoreEvent {
     ProfileCreated(crate::domain::profile::ProfileId),
     ProfileUpdated(crate::domain::profile::ProfileId),
     ProfileDeleted(crate::domain::profile::ProfileId),
+    /// A single `ProfileListed` event carrying all profiles returned by
+    /// `ListProfiles` (one entry per profile). Holds the lightweight display
+    /// view model so CLI/JSON/TUI render identically.
+    ProfileListed(Vec<crate::app::snapshot::ProfileEntry>),
     ProfileValidated {
         id: crate::domain::profile::ProfileId,
         valid: bool,
@@ -47,6 +51,11 @@ pub enum CoreEvent {
         profile_name: String,
         diff: crate::domain::profile_diff::ProfileDiff,
     },
+
+    /// One `ContextListed` event returned by `ListContexts`.
+    /// Carries the lightweight display view models so CLI/JSON/TUI render
+    /// identically.
+    ContextListed(Vec<crate::app::snapshot::ContextEntry>),
 
     // -----------------------------------------------------------------------
     // Vaults

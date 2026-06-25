@@ -9,6 +9,7 @@ pub mod detach_skill;
 pub mod diff;
 pub mod export;
 pub mod import;
+pub mod list;
 pub mod start;
 pub mod template;
 pub mod token_estimate;
@@ -35,6 +36,11 @@ pub fn dispatch(
             core.process_runner.as_ref(),
             core.registry.as_ref(),
             &core.workspace_root,
+            sink,
+        )),
+        CoreCommand::ListProfiles { scope } => Some(list::run(
+            scope.unwrap_or(crate::domain::scope::Scope::Workspace),
+            core.store.as_ref(),
             sink,
         )),
         CoreCommand::StartProfile { id, scope, dry_run } => Some(start::run(

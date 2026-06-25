@@ -1,5 +1,6 @@
 pub mod command;
 pub mod run;
+pub mod source;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;

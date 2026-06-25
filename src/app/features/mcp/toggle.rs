@@ -30,9 +30,10 @@ pub fn run(name: &str, scope: Scope, core: &AgkCore, sink: &mut dyn CoreEventSin
     }
 
     // Load current MCP registry to determine per-provider enablement
-    let servers = core.mcp_registry.list().unwrap_or_default();
+    let servers = core.mcp_registry.list()?;
     let server = servers.iter().find(|s| s.name == name);
 
+    let mut failures: Vec<String> = Vec::new();
     for pid in &target_providers {
         let is_enabled = server
             .and_then(|s| s.activation.get(pid))
@@ -63,12 +64,20 @@ pub fn run(name: &str, scope: Scope, core: &AgkCore, sink: &mut dyn CoreEventSin
                 }
             }
             Err(e) => {
-                sink.on_event(CoreEvent::Error(format!(
-                    "Failed to toggle MCP '{}' for {}: {}",
-                    name, pid, e
-                )));
+                let msg = format!("Failed to toggle MCP '{}' for {}: {}", name, pid, e);
+                sink.on_event(CoreEvent::Error(msg.clone()));
+                failures.push(msg);
             }
         }
+    }
+
+    if !failures.is_empty() {
+        return Err(anyhow::anyhow!(
+            "Failed to toggle MCP '{}' for {} provider(s): {}",
+            name,
+            failures.len(),
+            failures.join("; ")
+        ));
     }
 
     Ok(CoreOutcome::Ok)

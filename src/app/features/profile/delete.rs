@@ -17,15 +17,14 @@ pub fn run(
     if removed {
         store.save(scope, &config)?;
         sink.on_event(CoreEvent::ProfileDeleted(id.clone()));
+        Ok(CoreOutcome::Ok)
     } else {
-        sink.on_error(format!(
+        Err(anyhow::anyhow!(
             "Profile '{}' not found in {:?}",
             id.as_str(),
             scope
-        ));
+        ))
     }
-
-    Ok(CoreOutcome::Ok)
 }
 
 #[cfg(test)]
@@ -101,7 +100,7 @@ mod tests {
             &store,
             &mut sink,
         );
-        assert!(result.is_ok());
+        assert!(result.is_err());
         assert!(!sink
             .events
             .iter()

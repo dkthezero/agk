@@ -12,6 +12,7 @@ pub(super) fn to_core_command(command: &McpCommands) -> anyhow::Result<CoreComma
             args,
             env,
             transport,
+            url,
             description,
             no_test,
         } => Ok(CoreCommand::RegisterMcp {
@@ -36,9 +37,17 @@ pub(super) fn to_core_command(command: &McpCommands) -> anyhow::Result<CoreComma
                     })
                     .unwrap_or_default(),
                 transport: match transport.as_str() {
-                    "sse" => McpTransport::Sse {
-                        url: "http://localhost:3000".to_string(),
-                    },
+                    "sse" => {
+                        // SSE transports require a URL. Allow `--url` to
+                        // supply it explicitly; fall back to
+                        // `http://localhost:3000` only when omitted so a
+                        // bare `--transport sse` is still usable (matching
+                        // the historical default) rather than hard-erroring.
+                        let sse_url = url
+                            .clone()
+                            .unwrap_or_else(|| "http://localhost:3000".to_string());
+                        McpTransport::Sse { url: sse_url }
+                    }
                     _ => McpTransport::Stdio,
                 },
                 description: description.clone(),

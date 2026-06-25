@@ -468,7 +468,7 @@ agk mcp test my-server
 
 > **Cảnh báo:** Thử nghiệm handshake MCP chạy lệnh server trên máy của bạn. Chỉ đăng ký các MCP server mà bạn tin tưởng.
 
-> **Lưu ý:** Lệnh CLI `agk mcp add` không hỗ trợ chỉ định URL SSE trực tiếp. Để đăng ký SSE server, hãy sử dụng wizard TUI (tab MCP → `F2`) hoặc chỉnh sửa trực tiếp file `~/.config/agk/mcp.toml` với `transport = "sse"` và trường `url`.
+> **Lưu ý:** Đối với giao thức SSE, hãy truyền URL server qua `--url` (ví dụ `agk mcp add --name remote --transport sse --url https://mcp.example.com/sse`). Nếu bỏ qua `--url` khi dùng `--transport sse`, giá trị mặc định là `http://localhost:3000`.
 
 `[Personal]` `[Team]`
 
@@ -525,12 +525,9 @@ Context được lưu trữ trong `~/.config/agk/contexts.toml`.
 
 ### 5.7 Áp dụng Cấu hình Khai báo (Onboarding Team)
 
-`agk apply` đọc một nguồn cấu hình (URL hoặc file) và đồng bộ thiết lập cục bộ của bạn cho khớp với nó. Hãy nghĩ về nó như `docker compose up` cho công cụ AI — bạn mô tả những gì bạn muốn, và `apply` biến nó thành hiện thực.
+`agk apply` đọc một file `team.toml` cục bộ và đồng bộ thiết lập cục bộ của bạn cho khớp với nó. Hãy nghĩ về nó như `docker compose up` cho công cụ AI — bạn mô tả những gì bạn muốn, và `apply` biến nó thành hiện thực.
 
 ```bash
-# Áp dụng từ URL
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
-
 # Áp dụng từ file cục bộ
 agk apply ./team-config.toml
 
@@ -540,6 +537,8 @@ agk apply ./team-config.toml --dry-run
 # Áp dụng cho context và môi trường cụ thể
 agk apply ./team-config.toml --context acme-corp --environment prod
 ```
+
+> **Lưu ý:** Nguồn URL (`http://` / `https://`) chưa được hỗ trợ — `agk apply` chỉ phân giải đường dẫn file cục bộ. Để áp dụng cấu hình từ xa, hãy tải về trước (ví dụ `curl -o team.toml https://...`) rồi truyền đường dẫn cục bộ.
 
 Nguồn cấu hình có thể chỉ định vault, provider, profile, và MCP server. `agk apply` thêm các mục còn thiếu, cập nhật các mục đã thay đổi, và gỡ bỏ các mục không còn trong nguồn.
 
@@ -612,11 +611,11 @@ agk clean --global
 
 ### 6.1 Onboarding Team với Apply
 
-Cách nhanh nhất để thiết lập cho thành viên team mới là dùng `agk apply`. Team lead tạo file cấu hình khai báo và commit vào repository của team. Thành viên mới chỉ cần chạy một lệnh:
+Cách nhanh nhất để thiết lập cho thành viên team mới là dùng `agk apply`. Team lead tạo file cấu hình khai báo và commit vào repository của team. Thành viên mới checkout file đó về máy rồi chạy một lệnh trên file cục bộ:
 
 ```bash
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml --dry-run
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
+agk apply ./team.toml --dry-run
+agk apply ./team.toml
 ```
 
 File cấu hình chỉ định vault cần gắn, provider cần kích hoạt, và profile cần tạo. Mọi người trong team sẽ có cùng một thiết lập.
@@ -626,7 +625,7 @@ Kết hợp với chuyển đổi context cho các team làm việc trên nhiề
 ```bash
 agk context create project-alpha --display-name "Project Alpha"
 agk context switch project-alpha
-agk apply https://internal.configs/alpha.toml
+agk apply ./alpha.toml
 ```
 
 `[Team]`
@@ -892,13 +891,14 @@ agk context create client-x --display-name "Client X"
 
 #### `agk apply <SOURCE>`
 
-Áp dụng cấu hình khai báo từ URL hoặc đường dẫn cục bộ.
+Áp dụng cấu hình khai báo từ một file `team.toml` cục bộ.
 
 ```bash
-agk apply https://example.com/team.toml
 agk apply ./team-config.toml --dry-run
 agk apply ./team.toml --context acme-corp --environment prod
 ```
+
+> **Lưu ý:** Nguồn URL (`http://` / `https://`) chưa được hỗ trợ; hãy truyền đường dẫn file cục bộ.
 
 | Flag | Mô tả |
 |---|---|
@@ -929,6 +929,7 @@ agk mcp add \
 | `--args <args>` / `-a` | Tham số (phân cách bằng dấu phẩy) |
 | `--env <env>` / `-e` | Biến môi trường (`KEY=VALUE`, phân cách bằng dấu phẩy) |
 | `--transport <type>` / `-t` | Loại giao thức: `stdio` (mặc định) hoặc `sse` |
+| `--url <url>` | URL cho giao thức SSE (dùng với `--transport sse`; mặc định `http://localhost:3000` nếu bỏ qua) |
 | `--description <desc>` / `-d` | Mô tả |
 | `--no-test` | Bỏ qua kiểm tra kết nối sau khi đăng ký |
 
@@ -968,6 +969,18 @@ agk mcp test my-server
 
 > **Mẹo:** `agk profile` có alias viết tắt `agk p` — ví dụ, `agk p start my-reviewer`.
 
+#### `agk profile list`
+
+Liệt kê tất cả profile đã cấu hình trong scope mục tiêu.
+
+```bash
+agk profile list [--scope <scope>]
+```
+
+| Flag | Mô tả |
+|---|---|
+| `--scope <scope>` / `-s` | Scope mục tiêu: `global` hoặc `workspace` (mặc định: `workspace`) |
+
 #### `agk profile start <NAME>`
 
 Khởi động phiên profile.
@@ -992,11 +1005,11 @@ agk profile create my-reviewer \
 | Flag | Mô tả |
 |---|---|
 | `--provider <provider>` / `-p` | Provider sử dụng (mặc định: `opencode`) |
-| `--skills <list>` / `-s` | Tên skill phân cách bằng dấu phẩy |
+| `--skills <list>` / `-k` | Tên skill phân cách bằng dấu phẩy |
 | `--mcps <list>` / `-m` | Tên MCP server phân cách bằng dấu phẩy |
 | `--description <desc>` / `-d` | Mô tả agent (hoặc đường dẫn đến file markdown) |
 | `--description-file <path>` | Đọc mô tả từ file markdown |
-| `--scope <scope>` | Phạm vi: `global` hoặc `workspace` (mặc định: `workspace`) |
+| `--scope <scope>` / `-s` | Phạm vi: `global` hoặc `workspace` (mặc định: `workspace`) |
 | `--dry-run` | Xem trước thay đổi mà không chỉnh sửa |
 
 ### 8.6 Các lệnh Telemetry

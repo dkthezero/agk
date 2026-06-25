@@ -14,6 +14,23 @@ use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::domain::scope::Scope;
 
+/// Emit a `TaskFailed` event (so the TUI clears its spinner and the
+/// human-readable `[0] Failed:` line renders) AND return an `Err` carrying
+/// the same message, so the CLI dispatcher maps the failure to a non-zero
+/// exit code.
+///
+/// This replaces the previous `TaskFailed`-then-`Ok(CoreOutcome::Ok)`
+/// anti-pattern (documented in AGENTS.md) which printed a failure message
+/// but exited 0.
+fn fail(sink: &mut dyn CoreEventSink, error: impl Into<String>) -> CoreResult {
+    let error = error.into();
+    sink.on_event(CoreEvent::TaskFailed {
+        id: 0,
+        error: error.clone(),
+    });
+    Err(anyhow::anyhow!(error))
+}
+
 pub(super) fn install_asset_cmd(
     identity: &str,
     scope: Scope,
@@ -34,73 +51,73 @@ pub(super) fn install_asset_cmd(
 
     let config = match core.store.load(scope) {
         Ok(c) => c,
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Failed to load config: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Err(e) => return fail(sink, format!("Failed to load config: {}", e)),
     };
 
     let mut providers = core.registry.active_providers_from_config(&config);
     if let Some(filter) = provider_filter {
         providers.retain(|p| p.id() == filter);
     }
-    if providers.is_empty() {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: "No active providers".into(),
-        });
-        return Ok(CoreOutcome::Ok);
-    }
 
+    // Resolve the package first so the dry-run preview can describe what
+    // *would* be installed even when no providers are configured. The
+    // empty-providers guard is a hard precondition only for the live
+    // install path (matching `sync --dry-run` semantics).
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
         Ok(None) => {
+            // Dry-run must not perform the remote ClawHub fetch (it writes
+            // files to the local ClawHub cache as a real side effect). Report
+            // a preview-only resolution failure instead.
+            if dry_run {
+                if identity.contains('/') {
+                    return fail(sink, format!("Asset '{}' not found in any vault", identity));
+                }
+                sink.on_event(CoreEvent::Info(format!(
+                    "Dry run: '{}' is not installed locally; a live install would fetch it from ClawHub",
+                    identity
+                )));
+                return Ok(CoreOutcome::Ok);
+            }
             // Attempt remote fetch via ClawHub for simple slugs.
             if !identity.contains('/') {
                 if let Err(e) = core.clawhub.cli_install(identity) {
-                    sink.on_event(CoreEvent::TaskFailed {
-                        id: 0,
-                        error: format!("Fetch failed: {}", e),
-                    });
-                    return Ok(CoreOutcome::Ok);
+                    return fail(sink, format!("Fetch failed: {}", e));
                 }
                 match core.registry.find_package_by_identity(identity) {
                     Ok(Some(p)) => p,
                     _ => {
-                        sink.on_event(CoreEvent::TaskFailed {
-                            id: 0,
-                            error: format!("Asset '{}' not found after remote fetch", identity),
-                        });
-                        return Ok(CoreOutcome::Ok);
+                        return fail(
+                            sink,
+                            format!("Asset '{}' not found after remote fetch", identity),
+                        );
                     }
                 }
             } else {
-                sink.on_event(CoreEvent::TaskFailed {
-                    id: 0,
-                    error: format!("Asset '{}' not found in any vault", identity),
-                });
-                return Ok(CoreOutcome::Ok);
+                return fail(sink, format!("Asset '{}' not found in any vault", identity));
             }
         }
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Lookup failed: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Err(e) => return fail(sink, format!("Lookup failed: {}", e)),
     };
 
     if dry_run {
-        sink.on_event(CoreEvent::Info(format!(
-            "Dry run: would install '{}' to {} provider(s)",
-            pkg.identity.name,
-            providers.len()
-        )));
+        if providers.is_empty() {
+            sink.on_event(CoreEvent::Info(format!(
+                "Dry run: would install '{}' but no providers are configured (run `agk apply` or add a provider first)",
+                pkg.identity.name
+            )));
+        } else {
+            sink.on_event(CoreEvent::Info(format!(
+                "Dry run: would install '{}' to {} provider(s)",
+                pkg.identity.name,
+                providers.len()
+            )));
+        }
         return Ok(CoreOutcome::Ok);
+    }
+
+    if providers.is_empty() {
+        return fail(sink, "No active providers");
     }
 
     let mut installed_providers = Vec::new();
@@ -125,13 +142,10 @@ pub(super) fn install_asset_cmd(
             identity: pkg.identity.name.clone(),
             providers: installed_providers,
         });
+        Ok(CoreOutcome::Ok)
     } else {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: format!("Failed to install '{}'", identity),
-        });
+        fail(sink, format!("Failed to install '{}'", identity))
     }
-    Ok(CoreOutcome::Ok)
 }
 
 pub(super) fn remove_asset_cmd(
@@ -152,13 +166,7 @@ pub(super) fn remove_asset_cmd(
 
     let config = match core.store.load(scope) {
         Ok(c) => c,
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Failed to load config: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Err(e) => return fail(sink, format!("Failed to load config: {}", e)),
     };
 
     let mut providers = core.registry.active_providers_from_config(&config);
@@ -166,29 +174,13 @@ pub(super) fn remove_asset_cmd(
         providers.retain(|p| p.id() == filter);
     }
     if providers.is_empty() {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: "No active providers".into(),
-        });
-        return Ok(CoreOutcome::Ok);
+        return fail(sink, "No active providers");
     }
 
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
-        Ok(None) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Asset '{}' not found", identity),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Lookup failed: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Ok(None) => return fail(sink, format!("Asset '{}' not found", identity)),
+        Err(e) => return fail(sink, format!("Lookup failed: {}", e)),
     };
 
     let mut any_failed = false;
@@ -214,11 +206,8 @@ pub(super) fn remove_asset_cmd(
         sink.on_event(CoreEvent::AssetRemoved {
             identity: pkg.identity.name.clone(),
         });
+        Ok(CoreOutcome::Ok)
     } else {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: format!("Failed to remove '{}'", identity),
-        });
+        fail(sink, format!("Failed to remove '{}'", identity))
     }
-    Ok(CoreOutcome::Ok)
 }

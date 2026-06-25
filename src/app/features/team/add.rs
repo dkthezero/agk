@@ -9,6 +9,8 @@ use std::path::Path;
 pub struct TeamAddVaultResult {
     pub identity: String,
     pub message: String,
+    /// `true` only when a new vault entry was actually appended.
+    pub added: bool,
 }
 
 /// Add a vault entry to the team configuration.
@@ -29,6 +31,7 @@ pub fn team_add_vault(
         return Ok(TeamAddVaultResult {
             identity: identity.to_string(),
             message: format!("Vault '{}' already exists in team configuration.", identity),
+            added: false,
         });
     }
 
@@ -45,12 +48,15 @@ pub fn team_add_vault(
     Ok(TeamAddVaultResult {
         identity: identity.to_string(),
         message: format!("Vault '{}' added to team configuration.", identity),
+        added: true,
     })
 }
 
 pub struct TeamAddRequirementResult {
     pub identity: String,
     pub message: String,
+    /// `true` only when a new requirement entry was actually appended.
+    pub added: bool,
 }
 
 /// Add a skill requirement to the team configuration.
@@ -92,6 +98,7 @@ pub fn team_add_requirement(
                 "Requirement '{}' from vault '{}' already exists in team configuration.",
                 identity, vault
             ),
+            added: false,
         });
     }
 
@@ -107,6 +114,7 @@ pub fn team_add_requirement(
     Ok(TeamAddRequirementResult {
         identity: identity.to_string(),
         message: format!("Requirement '{}' added to team configuration.", identity),
+        added: true,
     })
 }
 
@@ -138,6 +146,7 @@ mod tests {
             "main",
         )
         .unwrap();
+        assert!(result.added);
         assert!(result.message.contains("added"));
 
         // Reload and verify
@@ -170,6 +179,7 @@ mod tests {
             "main",
         )
         .unwrap();
+        assert!(!result.added);
         assert!(result.message.contains("already exists"));
     }
 
@@ -190,6 +200,7 @@ mod tests {
 
         let result =
             team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
+        assert!(result.added);
         assert!(result.message.contains("added"));
 
         // Reload and verify
@@ -251,6 +262,7 @@ mod tests {
 
         let result =
             team_add_requirement(&workspace, "react-conventions", "shared", "skill", None).unwrap();
+        assert!(!result.added);
         assert!(result.message.contains("already exists"));
     }
 }

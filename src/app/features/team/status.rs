@@ -39,8 +39,10 @@ pub fn team_status(
 
     let total_required = team_config.requirements.len();
 
-    // Load installed config to count matching requirements
-    let installed_config = config_store.load(Scope::Workspace).unwrap_or_default();
+    // Load installed config to count matching requirements. Surface a
+    // malformed config as an error rather than silently defaulting — per
+    // AGENTS.md "Malformed Config: Surface Errors, Don't Default".
+    let installed_config = config_store.load(Scope::Workspace)?;
 
     let team_vault_ids: Vec<String> = team_config
         .vaults
@@ -230,5 +232,37 @@ mod tests {
             "Skill should NOT satisfy Instruction requirement"
         );
         assert_eq!(result.required, 1);
+    }
+
+    #[test]
+    fn status_surfaces_malformed_installed_config_error() {
+        // A malformed (unparseable) workspace config must propagate as an
+        // error rather than being silently defaulted — per AGENTS.md
+        // "Malformed Config: Surface Errors, Don't Default".
+        use crate::domain::config::ConfigFile;
+        struct FailingStore;
+        impl ConfigStorePort for FailingStore {
+            fn load(&self, _scope: Scope) -> Result<ConfigFile> {
+                Err(anyhow::anyhow!("malformed config"))
+            }
+            fn save(&self, _scope: Scope, _config: &ConfigFile) -> Result<()> {
+                Ok(())
+            }
+        }
+
+        let team_store = FakeTeamConfigStore::new();
+        let team_config = TeamConfig {
+            name: "my-team".to_string(),
+            source: None,
+            branch: None,
+            vaults: vec![],
+            requirements: vec![],
+        };
+        team_store.save(Scope::Workspace, &team_config).unwrap();
+
+        match team_status(&team_store, &FailingStore) {
+            Err(e) => assert!(e.to_string().contains("malformed config")),
+            Ok(_) => panic!("expected error for malformed config"),
+        }
     }
 }

@@ -470,7 +470,7 @@ agk mcp test my-server
 
 > **Warning:** The MCP handshake test runs the server command on your machine. Only register MCP servers you trust.
 
-> **Note:** The CLI `agk mcp add` command does not support specifying an SSE URL directly. To register an SSE server, use the TUI wizard (MCP tab → `F2`) or edit `~/.config/agk/mcp.toml` directly and set `transport = "sse"` with the `url` field.
+> **Note:** For SSE transports, pass the server URL with `--url` (for example, `agk mcp add --name remote --transport sse --url https://mcp.example.com/sse`). If `--url` is omitted with `--transport sse`, it defaults to `http://localhost:3000`.
 
 `[Personal]` `[Team]`
 
@@ -527,12 +527,9 @@ Contexts are stored in `~/.config/agk/contexts.toml`.
 
 ### 5.7 Applying Declarative Config (Team Onboarding)
 
-`agk apply` reads a configuration source (URL or file) and reconciles your local setup to match it. Think of it as `docker compose up` for your AI tooling — you describe what you want, and `apply` makes it so.
+`agk apply` reads a configuration source (a local `team.toml` file) and reconciles your local setup to match it. Think of it as `docker compose up` for your AI tooling — you describe what you want, and `apply` makes it so.
 
 ```bash
-# Apply from a URL
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
-
 # Apply from a local file
 agk apply ./team-config.toml
 
@@ -542,6 +539,8 @@ agk apply ./team-config.toml --dry-run
 # Apply to a specific context and environment
 agk apply ./team-config.toml --context acme-corp --environment prod
 ```
+
+> **Note:** URL sources (`http://` / `https://`) are not yet supported — `agk apply` resolves local file paths only. To apply a remote config, download it first (for example, `curl -o team.toml https://...`) and pass the local path.
 
 The configuration source can specify vaults, providers, profiles, and MCP servers. `agk apply` adds missing entries, updates changed entries, and removes entries that are no longer in the source.
 
@@ -614,11 +613,11 @@ agk clean --global
 
 ### 6.1 Team Onboarding with Apply
 
-The fastest way to get a new team member set up is with `agk apply`. A team lead creates a declarative configuration file and commits it to the team repository. New hires run one command:
+The fastest way to get a new team member set up is with `agk apply`. A team lead creates a declarative configuration file and commits it to the team repository. New hires check it out and run one command against the local file:
 
 ```bash
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml --dry-run
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
+agk apply ./team.toml --dry-run
+agk apply ./team.toml
 ```
 
 The configuration file specifies which vaults to attach, which providers to activate, and which profiles to create. Everyone on the team ends up with the same setup.
@@ -628,7 +627,7 @@ Combine this with context switching for teams that work on multiple projects:
 ```bash
 agk context create project-alpha --display-name "Project Alpha"
 agk context switch project-alpha
-agk apply https://internal.configs/alpha.toml
+agk apply ./alpha.toml
 ```
 
 `[Team]`
@@ -894,13 +893,14 @@ agk context create client-x --display-name "Client X"
 
 #### `agk apply <SOURCE>`
 
-Apply a declarative configuration from a URL or local path.
+Apply a declarative configuration from a local `team.toml` file.
 
 ```bash
-agk apply https://example.com/team.toml
 agk apply ./team-config.toml --dry-run
 agk apply ./team.toml --context acme-corp --environment prod
 ```
+
+> **Note:** URL sources (`http://` / `https://`) are not yet supported; pass a local file path instead.
 
 | Flag | Description |
 |---|---|
@@ -931,6 +931,7 @@ agk mcp add \
 | `--args <args>` / `-a` | Arguments (comma-separated) |
 | `--env <env>` / `-e` | Environment variables (`KEY=VALUE`, comma-separated) |
 | `--transport <type>` / `-t` | Transport type: `stdio` (default) or `sse` |
+| `--url <url>` | URL for SSE transports (used with `--transport sse`; defaults to `http://localhost:3000` if omitted) |
 | `--description <desc>` / `-d` | Description |
 | `--no-test` | Skip the connection test after registering |
 
@@ -970,6 +971,18 @@ agk mcp test my-server
 
 > **Tip:** `agk profile` has a shorthand alias `agk p` — for example, `agk p start my-reviewer`.
 
+#### `agk profile list`
+
+List all configured profiles in the target scope.
+
+```bash
+agk profile list [--scope <scope>]
+```
+
+| Flag | Description |
+|---|---|
+| `--scope <scope>` / `-s` | Target scope: `global` or `workspace` (default: `workspace`) |
+
 #### `agk profile start <NAME>`
 
 Start (launch) a profile session.
@@ -994,11 +1007,11 @@ agk profile create my-reviewer \
 | Flag | Description |
 |---|---|
 | `--provider <provider>` / `-p` | Provider to use (default: `opencode`) |
-| `--skills <list>` / `-s` | Comma-separated skill names |
+| `--skills <list>` / `-k` | Comma-separated skill names |
 | `--mcps <list>` / `-m` | Comma-separated MCP server names |
 | `--description <desc>` / `-d` | Agent description (or path to a markdown file) |
 | `--description-file <path>` | Read description from a markdown file |
-| `--scope <scope>` | Scope: `global` or `workspace` (default: `workspace`) |
+| `--scope <scope>` / `-s` | Scope: `global` or `workspace` (default: `workspace`) |
 | `--dry-run` | Preview changes without modifying |
 
 ### 8.6 Telemetry Commands

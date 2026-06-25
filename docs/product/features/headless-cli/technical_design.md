@@ -142,6 +142,7 @@ src/cli/
 
 | CLI Subcommand | CoreCommand Variant |
 |---------------|-------------------|
+| `profile list [--scope]` | `ListProfiles { scope }` |
 | `profile start <name> --dry-run` | `StartProfile { id, scope, dry_run }` |
 | `profile create <name> --provider ...` | `CreateProfile { input }` |
 | `mcp add ...` | `RegisterMcp { input }` |

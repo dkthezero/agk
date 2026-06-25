@@ -22,6 +22,11 @@ pub struct CreateProfileInput {
     /// Optional permission mode (e.g. `acceptEdits`). Embedded into the
     /// generated agent markdown for the `claude-code` provider branch.
     pub permission_mode: Option<String>,
+    /// When true, the use case emits a preview (LaunchPlan-style) instead of
+    /// shelling out to the provider CLI, writing agent markdown, or persisting
+    /// the new profile to config. Honours the `--dry-run` contract: no fs
+    /// side effects, no provider invocation, no config mutation.
+    pub dry_run: bool,
 }
 
 impl CreateProfileInput {
@@ -43,6 +48,7 @@ impl CreateProfileInput {
             agent_mcp_servers: Vec::new(),
             tool_refs: Vec::new(),
             permission_mode: None,
+            dry_run: false,
         }
     }
 }

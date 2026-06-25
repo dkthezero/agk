@@ -18,8 +18,7 @@ pub fn run(
 ) -> CoreResult {
     let mut config = store.load(scope)?;
     if config.providers.contains(&provider_id) {
-        sink.on_error(format!("Provider '{}' already activated", provider_id));
-        return Ok(CoreOutcome::Ok);
+        anyhow::bail!("Provider '{}' already activated", provider_id);
     }
 
     config.providers.push(provider_id.clone());
@@ -40,6 +39,7 @@ pub fn run(
             .unwrap_or(0);
     }
 
+    let mut failures: Vec<String> = Vec::new();
     let mut current = 0usize;
     for (vault_id, section) in &config.vault_defs {
         if let Some(ref skills) = section.skills {
@@ -48,9 +48,11 @@ pub fn run(
                 if let Some(identity) = crate::domain::config::parse_identity(item) {
                     let hint = format!("{}/{}", vault_id, identity.name);
                     if let Ok(Some(pkg)) = registry.find_package_by_identity(&hint) {
-                        let _ = crate::app::features::asset::install::install_asset(
+                        if let Err(e) = crate::app::features::asset::install::install_asset(
                             scope, &pkg, store, provider,
-                        );
+                        ) {
+                            failures.push(format!("{}: {}", hint, e));
+                        }
                     }
                 }
                 let percent = ((current as f32 / total.max(1) as f32) * 100.0) as u8;
@@ -63,15 +65,27 @@ pub fn run(
                 if let Some(identity) = crate::domain::config::parse_identity(item) {
                     let hint = format!("{}/{}", vault_id, identity.name);
                     if let Ok(Some(pkg)) = registry.find_package_by_identity(&hint) {
-                        let _ = crate::app::features::asset::install::install_asset(
+                        if let Err(e) = crate::app::features::asset::install::install_asset(
                             scope, &pkg, store, provider,
-                        );
+                        ) {
+                            failures.push(format!("{}: {}", hint, e));
+                        }
                     }
                 }
                 let percent = ((current as f32 / total.max(1) as f32) * 100.0) as u8;
                 sink.on_event(CoreEvent::TaskProgress { id: 0, percent });
             }
         }
+    }
+
+    if !failures.is_empty() {
+        sink.on_event(CoreEvent::ProviderActivated(provider_id.clone()));
+        anyhow::bail!(
+            "Activated '{}' but {} asset(s) failed to install: {}",
+            provider_id,
+            failures.len(),
+            failures.join("; ")
+        );
     }
 
     sink.on_event(CoreEvent::ProviderActivated(provider_id));
@@ -157,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn activate_already_active_is_noop() {
+    fn activate_already_active_returns_err() {
         let mut config = ConfigFile::default();
         config.providers.push("fake".into());
         let store = FakeStore::new(config);
@@ -172,7 +186,8 @@ mod tests {
             &registry,
             &mut sink,
         );
-        assert!(result.is_ok());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("already activated"), "got: {}", err);
     }
 
     #[test]

@@ -3,7 +3,7 @@ pub mod deactivate;
 
 use crate::app::command::CoreCommand;
 use crate::app::core::AgkCore;
-use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
+use crate::app::outcome::{CoreEventSink, CoreResult};
 
 /// Dispatch provider-related [`CoreCommand`] variants.
 /// Returns `Some(result)` if the command was handled, `None` otherwise.
@@ -22,10 +22,7 @@ pub fn dispatch(
                 core.registry.as_ref(),
                 sink,
             )),
-            Err(e) => {
-                sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                Some(Ok(CoreOutcome::Ok))
-            }
+            Err(e) => Some(Err(anyhow::anyhow!("Provider '{}' not found: {}", id, e))),
         },
         CoreCommand::DeactivateProvider { id, scope } => match core.registry.get_provider(id) {
             Ok(provider) => Some(deactivate::run(
@@ -35,10 +32,7 @@ pub fn dispatch(
                 provider,
                 sink,
             )),
-            Err(e) => {
-                sink.on_error(format!("Provider '{}' not found: {}", id, e));
-                Some(Ok(CoreOutcome::Ok))
-            }
+            Err(e) => Some(Err(anyhow::anyhow!("Provider '{}' not found: {}", id, e))),
         },
         _ => None,
     }

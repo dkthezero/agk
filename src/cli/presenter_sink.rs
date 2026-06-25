@@ -6,7 +6,6 @@
 use crate::app::event::CoreEvent;
 use crate::app::outcome::CoreEventSink;
 use crate::cli::presenter::{CliPresenter, OutputMode};
-use crate::cli::presenter_json::event_to_json;
 
 impl CoreEventSink for CliPresenter {
     fn on_event(&mut self, event: CoreEvent) {
@@ -21,13 +20,19 @@ impl CoreEventSink for CliPresenter {
                 self.print(&format!("[{}] Completed: {}", id, message));
             }
             CoreEvent::TaskFailed { id, error } => {
-                self.eprint(&format!("[{}] Failed: {}", id, error));
+                self.render_task_failed(*id, error);
             }
             CoreEvent::ProfileCreated(id) => {
                 self.print(&format!("Profile '{}' created", id.as_str()));
             }
             CoreEvent::ProfileDeleted(id) => {
                 self.print(&format!("Profile '{}' deleted", id.as_str()));
+            }
+            CoreEvent::ProfileListed(entries) => {
+                self.render_profile_listed(entries);
+            }
+            CoreEvent::ContextListed(entries) => {
+                self.render_context_listed(entries);
             }
             CoreEvent::ProviderActivated(id) => {
                 self.print(&format!("Provider '{}' activated", id));
@@ -61,7 +66,8 @@ impl CoreEventSink for CliPresenter {
             }
             CoreEvent::McpListed(servers) => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print_json_event(&event);
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else if servers.is_empty() {
                     self.print("No MCP servers registered.");
                 } else {
@@ -80,18 +86,17 @@ impl CoreEventSink for CliPresenter {
             } => {
                 if *healthy {
                     self.print(message);
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // In JSON mode the event is emitted via the batch in
+                    // `finalize()`; avoid a duplicate human-readable line.
                 } else {
                     self.eprint(message);
                 }
             }
             CoreEvent::ProfileLaunchPlan { plan } => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print(
-                        &serde_json::to_string_pretty(&event_to_json(
-                            &CoreEvent::ProfileLaunchPlan { plan: plan.clone() },
-                        ))
-                        .unwrap(),
-                    );
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else {
                     self.print(&format!("Launch plan for '{}':", plan.profile_id));
                     self.print(&format!("  Provider: {}", plan.provider_id));
@@ -108,11 +113,7 @@ impl CoreEventSink for CliPresenter {
                 }
             }
             CoreEvent::ValidationReport { passed, message } => {
-                if *passed {
-                    self.print(&format!("Validation passed: {}", message));
-                } else {
-                    self.eprint(&format!("Validation failed: {}", message));
-                }
+                self.render_validation_report(*passed, message);
             }
             CoreEvent::TelemetryEnabled => {
                 self.print("Telemetry enabled. Background scanner started.");
@@ -122,7 +123,8 @@ impl CoreEventSink for CliPresenter {
             }
             CoreEvent::TelemetryStatusReport(status) => {
                 if matches!(self.mode, OutputMode::Json) {
-                    self.print_json_event(&CoreEvent::TelemetryStatusReport(status.clone()));
+                    // The event is accumulated into the JSON batch by
+                    // `finalize()`; avoid a duplicate inline print.
                 } else {
                     self.print(&format!(
                         "Telemetry: {} | Skills: {} | Templates: {} | Profiles: {} | Last scan: {}",
@@ -143,13 +145,12 @@ impl CoreEventSink for CliPresenter {
                 output_path,
             } => {
                 if let Some(path) = output_path {
-                    if let Err(e) = std::fs::write(path, content) {
-                        self.eprint(&format!("Failed to write export file: {}", e));
-                    } else {
-                        self.print(&format!("Telemetry exported to {}", path));
-                    }
+                    self.print(&format!("Telemetry exported to {}", path));
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // The event (carrying `content`) is in the JSON batch;
+                    // avoid a duplicate inline print of the raw payload.
                 } else {
-                    println!("{}", content);
+                    self.print(content);
                 }
             }
             CoreEvent::Info(msg) => {
@@ -230,13 +231,12 @@ impl CoreEventSink for CliPresenter {
                 output_path,
             } => {
                 if let Some(path) = output_path {
-                    if let Err(e) = std::fs::write(path, content) {
-                        self.eprint(&format!("Failed to write export file: {}", e));
-                    } else {
-                        self.print(&format!("Profile '{}' exported to {}", profile_name, path));
-                    }
+                    self.print(&format!("Profile '{}' exported to {}", profile_name, path));
+                } else if matches!(self.mode, OutputMode::Json) {
+                    // The event (carrying `content`) is in the JSON batch;
+                    // avoid a duplicate inline print of the raw payload.
                 } else {
-                    println!("{}", content);
+                    self.print(content);
                     self.print(&format!("Profile '{}' exported", profile_name));
                 }
             }
@@ -252,10 +252,7 @@ impl CoreEventSink for CliPresenter {
                 name,
                 elapsed_sec,
             } => {
-                self.eprint(&format!(
-                    "[HUNG] Task {} '{}' has been running for {}s",
-                    id, name, elapsed_sec
-                ));
+                self.render_task_hung_warning(*id, name, *elapsed_sec);
             }
             CoreEvent::LlmProviderListed(cfg) => {
                 self.print(&format!(
@@ -272,15 +269,10 @@ impl CoreEventSink for CliPresenter {
                 self.print(&format!("removed provider '{}'", id));
             }
             CoreEvent::LlmProviderHealth { id, status } => {
-                if status.reachable {
-                    self.print(&format!(
-                        "{} reachable ({} ms)",
-                        id,
-                        status.latency_ms.unwrap_or(0)
-                    ));
-                } else {
-                    self.eprint(&format!("{} unreachable: {:?}", id, status.error));
-                }
+                self.render_llm_health(id, status);
+            }
+            CoreEvent::Error(msg) => {
+                self.render_error_event(msg);
             }
             // Other events are silent in CLI mode
             _ => {}
@@ -289,6 +281,6 @@ impl CoreEventSink for CliPresenter {
     }
 
     fn on_error(&mut self, error: String) {
-        self.eprint(&format!("Error: {}", error));
+        self.render_on_error(error);
     }
 }

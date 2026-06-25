@@ -92,6 +92,15 @@ agk profile create <name> \
 - `--mcps` now accepts `name:vault` syntax.
 - `--description-file` allows supplying a custom `agent.md` instead of wizard-generated.
 - `--tools` and `--permission-mode` flags added for providers that support them.
+- `--dry-run` emits a preview of what would be created (profile name, provider, scope, skills, MCPs) without shelling out to the provider CLI, writing agent markdown, or persisting config — honouring the dry-run contract (no side effects).
+
+#### List configured profiles (v0.3.2)
+
+```bash
+agk profile list [--scope workspace|global]
+```
+
+Lists all profiles stored in the target scope's config. Emits one `ProfileListed` event carrying the lightweight display view models so the CLI, `--json`, and TUI render identically. A missing config file is treated as an empty set; a malformed config surfaces as an error.
 
 ---
 

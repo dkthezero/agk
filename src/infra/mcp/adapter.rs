@@ -27,7 +27,8 @@ impl McpRegistryPort for InfraMcpRegistryAdapter {
         transport: &str,
         description: Option<&str>,
     ) -> Result<McpServer> {
-        crate::infra::mcp::register(name, command, args, env, transport, description)
+        let path = crate::domain::paths::mcp_path();
+        crate::infra::mcp::register(name, command, args, env, transport, description, &path)
     }
 
     fn list(&self) -> Result<Vec<McpServer>> {

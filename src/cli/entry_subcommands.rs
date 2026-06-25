@@ -19,6 +19,13 @@ pub enum ProfileCommands {
         dry_run: bool,
     },
 
+    /// List all configured profiles
+    List {
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
+
     /// Create a new profile headlessly and generate the agent file
     Create {
         /// Profile name
@@ -29,7 +36,7 @@ pub enum ProfileCommands {
         provider: String,
 
         /// Comma-separated list of skill names to include
-        #[arg(short, long, value_delimiter = ',')]
+        #[arg(short = 'k', long, value_delimiter = ',')]
         skills: Vec<String>,
 
         /// Comma-separated list of MCP server names to enable
@@ -119,6 +126,10 @@ pub enum McpCommands {
         /// Transport type (stdio or sse)
         #[arg(short, long, default_value = "stdio")]
         transport: String,
+
+        /// URL for SSE transports (required when `--transport sse`)
+        #[arg(long)]
+        url: Option<String>,
 
         /// Description of the server
         #[arg(short, long)]
@@ -253,3 +264,5 @@ pub enum VaultCommands {
         id: Option<String>,
     },
 }
+
+pub use crate::cli::entry_team_subcommands::TeamCommands;

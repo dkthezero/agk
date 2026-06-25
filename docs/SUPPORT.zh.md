@@ -468,7 +468,7 @@ agk mcp test my-server
 
 > **警告：** MCP 握手测试会在你的机器上运行服务器命令。请只注册你信任的 MCP 服务器。
 
-> **注意：** CLI 命令 `agk mcp add` 不支持直接指定 SSE URL。要注册 SSE 服务器，请使用 TUI 向导（MCP 标签页 → `F2`）或直接编辑 `~/.config/agk/mcp.toml`，设置 `transport = "sse"` 并填写 `url` 字段。
+> **注意：** 对于 SSE 传输，使用 `--url` 指定服务器 URL（例如 `agk mcp add --name remote --transport sse --url https://mcp.example.com/sse`）。如果在使用 `--transport sse` 时省略 `--url`，则默认为 `http://localhost:3000`。
 
 `[Personal]` `[Team]`
 
@@ -525,12 +525,9 @@ agk context create client-x --display-name "Client X"
 
 ### 5.7 应用声明式配置（团队入职）
 
-`agk apply` 读取一个配置源（URL 或文件），并将你的本地设置调整为与其一致。你可以把它想象成 AI 工具领域的 `docker compose up` ——你声明想要的状态，`apply` 让它变为现实。
+`agk apply` 读取一个本地 `team.toml` 配置文件，并将你的本地设置调整为与其一致。你可以把它想象成 AI 工具领域的 `docker compose up` ——你声明想要的状态，`apply` 让它变为现实。
 
 ```bash
-# 从 URL 应用
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
-
 # 从本地文件应用
 agk apply ./team-config.toml
 
@@ -540,6 +537,8 @@ agk apply ./team-config.toml --dry-run
 # 应用到指定上下文和环境
 agk apply ./team-config.toml --context acme-corp --environment prod
 ```
+
+> **注意：** 暂不支持 URL 源（`http://` / `https://`）——`agk apply` 仅解析本地文件路径。要应用远程配置，请先下载（例如 `curl -o team.toml https://...`）再传入本地路径。
 
 配置源可以指定仓库、provider、profile 和 MCP 服务器。`agk apply` 会添加缺失的条目、更新有变化的条目，并移除配置源中已不存在的条目。
 
@@ -612,11 +611,11 @@ agk clean --global
 
 ### 6.1 使用 Apply 进行团队入职
 
-让新团队成员快速上手的最佳方式是使用 `agk apply`。团队负责人创建一个声明式配置文件并提交到团队仓库。新成员只需运行一条命令：
+让新团队成员快速上手的最佳方式是使用 `agk apply`。团队负责人创建一个声明式配置文件并提交到团队仓库。新成员将其检出到本地后，对本地文件运行一条命令：
 
 ```bash
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml --dry-run
-agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
+agk apply ./team.toml --dry-run
+agk apply ./team.toml
 ```
 
 配置文件指定了要挂载的仓库、要激活的 provider 和要创建的 profile。团队中的每个人都会获得一致的配置。
@@ -626,7 +625,7 @@ agk apply https://raw.githubusercontent.com/my-org/configs/main/team.toml
 ```bash
 agk context create project-alpha --display-name "Project Alpha"
 agk context switch project-alpha
-agk apply https://internal.configs/alpha.toml
+agk apply ./alpha.toml
 ```
 
 `[Team]`
@@ -892,13 +891,14 @@ agk context create client-x --display-name "Client X"
 
 #### `agk apply <SOURCE>`
 
-从 URL 或本地路径应用声明式配置。
+从本地 `team.toml` 文件应用声明式配置。
 
 ```bash
-agk apply https://example.com/team.toml
 agk apply ./team-config.toml --dry-run
 agk apply ./team.toml --context acme-corp --environment prod
 ```
+
+> **注意：** 暂不支持 URL 源（`http://` / `https://`）；请传入本地文件路径。
 
 | 标志 | 说明 |
 |---|---|
@@ -929,6 +929,7 @@ agk mcp add \
 | `--args <args>` / `-a` | 参数（逗号分隔） |
 | `--env <env>` / `-e` | 环境变量（`KEY=VALUE`，逗号分隔） |
 | `--transport <type>` / `-t` | 传输类型：`stdio`（默认）或 `sse` |
+| `--url <url>` | SSE 传输的 URL（与 `--transport sse` 一起使用；省略时默认为 `http://localhost:3000`） |
 | `--description <desc>` / `-d` | 描述 |
 | `--no-test` | 注册后跳过连接测试 |
 
@@ -968,6 +969,18 @@ agk mcp test my-server
 
 > **提示：** `agk profile` 有简写别名 `agk p`——例如，`agk p start my-reviewer`。
 
+#### `agk profile list`
+
+列出目标 scope 中所有已配置的 profile。
+
+```bash
+agk profile list [--scope <scope>]
+```
+
+| 标志 | 说明 |
+|---|---|
+| `--scope <scope>` / `-s` | 目标 scope：`global` 或 `workspace`（默认：`workspace`） |
+
 #### `agk profile start <NAME>`
 
 启动（运行）一个 profile 会话。
@@ -992,11 +1005,11 @@ agk profile create my-reviewer \
 | 标志 | 说明 |
 |---|---|
 | `--provider <provider>` / `-p` | 使用的 provider（默认：`opencode`） |
-| `--skills <list>` / `-s` | 逗号分隔的技能名称 |
+| `--skills <list>` / `-k` | 逗号分隔的技能名称 |
 | `--mcps <list>` / `-m` | 逗号分隔的 MCP 服务器名称 |
 | `--description <desc>` / `-d` | 代理描述（或 markdown 文件路径） |
 | `--description-file <path>` | 从 markdown 文件读取描述 |
-| `--scope <scope>` | 作用域：`global` 或 `workspace`（默认：`workspace`） |
+| `--scope <scope>` / `-s` | 作用域：`global` 或 `workspace`（默认：`workspace`） |
 | `--dry-run` | 预览更改但不实际修改 |
 
 ### 8.6 遥测命令

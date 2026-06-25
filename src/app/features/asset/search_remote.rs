@@ -25,11 +25,12 @@ pub fn run(
     let packages = match results {
         Ok(pkgs) => pkgs,
         Err(e) => {
+            let msg = format!("Search failed: {}", e);
             sink.on_event(CoreEvent::TaskFailed {
                 id: 0,
-                error: format!("Search failed: {}", e),
+                error: msg.clone(),
             });
-            return Ok(CoreOutcome::Ok);
+            return Err(anyhow::anyhow!(msg));
         }
     };
 

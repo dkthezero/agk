@@ -45,9 +45,15 @@ pub fn dispatch(
                 add::team_add_vault(&core.workspace_root, identity, vault_type, url, branch);
             match result {
                 Ok(add_result) => {
-                    sink.on_event(crate::app::event::CoreEvent::TeamVaultAdded(
-                        add_result.identity.clone(),
-                    ));
+                    if add_result.added {
+                        sink.on_event(crate::app::event::CoreEvent::TeamVaultAdded(
+                            add_result.identity.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            add_result.message.clone(),
+                        ));
+                    }
                     Some(Ok(CoreOutcome::Ok))
                 }
                 Err(e) => Some(Err(e)),
@@ -68,9 +74,15 @@ pub fn dispatch(
             );
             match result {
                 Ok(add_result) => {
-                    sink.on_event(crate::app::event::CoreEvent::TeamRequirementAdded(
-                        add_result.identity.clone(),
-                    ));
+                    if add_result.added {
+                        sink.on_event(crate::app::event::CoreEvent::TeamRequirementAdded(
+                            add_result.identity.clone(),
+                        ));
+                    } else {
+                        sink.on_event(crate::app::event::CoreEvent::Info(
+                            add_result.message.clone(),
+                        ));
+                    }
                     Some(Ok(CoreOutcome::Ok))
                 }
                 Err(e) => Some(Err(e)),
@@ -122,16 +134,12 @@ pub fn dispatch(
             }
         }
         CoreCommand::TeamUpdate => {
-            let result = update::team_update(&core.workspace_root);
-            match result {
-                Ok(update_result) => {
-                    sink.on_event(crate::app::event::CoreEvent::Info(
-                        update_result.message.clone(),
-                    ));
-                    Some(Ok(CoreOutcome::Ok))
-                }
-                Err(e) => Some(Err(e)),
-            }
+            // `team_update` returns `Err` until the git-pull logic is
+            // implemented; surface it as a non-success result (non-zero CLI
+            // exit) so scripts don't mistake the no-op for a successful
+            // update. The error message is rendered by the dispatcher's
+            // `Err` arm (text: `Error: ...`, JSON: structured `Error` event).
+            Some(update::team_update(&core.workspace_root).map(|()| CoreOutcome::Ok))
         }
         _ => None,
     }

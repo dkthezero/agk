@@ -1,5 +1,6 @@
 use crate::app::event::CoreEvent;
 use crate::app::features::apply::command::ApplyConfigInput;
+use crate::app::features::apply::source::resolve_source;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::app::ports::{ConfigStorePort, ContextStorePort};
 use crate::domain::context::{ContextConfig, ContextId};
@@ -27,14 +28,18 @@ pub fn run(
     _all_providers: Vec<String>,
     sink: &mut dyn CoreEventSink,
 ) -> CoreResult {
+    // Resolve the source (read + parse a local file, reject unsupported URL
+    // sources, surface missing/unreadable files) BEFORE applying anything,
+    // so a bad source surfaces as a clear error instead of a silent
+    // false-success that reports "Applied config from <source>" while doing
+    // nothing. The `context://` scheme short-circuits (context create path).
+    let input = resolve_source(input)?;
+
     if dry_run {
-        sink.on_event(CoreEvent::TaskStarted {
-            id: 0,
-            name: format!(
-                "Dry-run apply {} (env: {:?}, context: {:?})",
-                input.source_url, environment, context
-            ),
-        });
+        sink.on_event(CoreEvent::Info(format!(
+            "Dry-run apply {} (env: {:?}, context: {:?})",
+            input.source_url, environment, context
+        )));
     }
 
     // Step 1: Upsert context definition if a name was provided.
@@ -71,33 +76,31 @@ pub fn run(
                 entry.environment = Some(env);
             }
 
-            let _ = context_store.save_contexts(&file);
+            context_store.save_contexts(&file)?;
         }
-        sink.on_event(CoreEvent::TaskCompleted {
-            id: 0,
-            message: format!("Updated context '{}'", ctx_id.as_str()),
-        });
+        sink.on_event(CoreEvent::Info(format!(
+            "Updated context '{}'",
+            ctx_id.as_str()
+        )));
     }
 
     // Step 2: Attach vaults (global scope only)
     for vault in &input.vaults {
         if scope == Scope::Global {
             if !dry_run {
-                if let Err(e) = crate::app::features::asset::sync::attach_vault(
+                crate::app::features::asset::sync::attach_vault(
                     vault.id.clone(),
                     vault.config.clone(),
                     store,
-                ) {
-                    sink.on_error(format!("Failed to attach vault '{}': {}", vault.id, e));
-                    continue;
-                }
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to attach vault '{}': {}", vault.id, e))?;
             }
             sink.on_event(CoreEvent::VaultAttached(vault.id.clone()));
         }
     }
 
     // Step 3: Activate providers
-    let mut config = store.load(scope).unwrap_or_default();
+    let mut config = store.load(scope)?;
     for pid in &input.providers {
         if !config.providers.contains(pid) {
             if !dry_run {
@@ -119,13 +122,13 @@ pub fn run(
     }
 
     if !dry_run {
-        let _ = store.save(scope, &config);
+        store.save(scope, &config)?;
     }
 
-    sink.on_event(CoreEvent::TaskCompleted {
-        id: 0,
-        message: format!("Applied config from {}", input.source_url),
-    });
+    sink.on_event(CoreEvent::Info(format!(
+        "Applied config from {}",
+        input.source_url
+    )));
 
     Ok(CoreOutcome::Ok)
 }
@@ -366,5 +369,158 @@ mod tests {
         let config = store.load(Scope::Workspace).unwrap();
         assert_eq!(config.profiles.len(), 1);
         assert_eq!(config.profiles[0].name, "backend");
+    }
+
+    /// A config store whose `save` always fails — used to verify that
+    /// `apply::run` propagates save errors instead of swallowing them.
+    struct SaveFailingStore;
+
+    impl ConfigStorePort for SaveFailingStore {
+        fn load(&self, _scope: Scope) -> anyhow::Result<ConfigFile> {
+            Ok(ConfigFile::default())
+        }
+        fn save(&self, _scope: Scope, _config: &ConfigFile) -> anyhow::Result<()> {
+            anyhow::bail!("disk full")
+        }
+    }
+
+    /// A config store whose `load` always fails — used to verify that
+    /// `apply::run` surfaces a malformed/missing config instead of
+    /// defaulting silently.
+    struct LoadFailingStore;
+
+    impl ConfigStorePort for LoadFailingStore {
+        fn load(&self, _scope: Scope) -> anyhow::Result<ConfigFile> {
+            anyhow::bail!("config file is malformed")
+        }
+        fn save(&self, _scope: Scope, _config: &ConfigFile) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A context store whose `save_contexts` always fails — used to verify
+    /// that `apply::run` propagates context-save errors instead of ignoring
+    /// them via `let _ =`.
+    struct SaveFailingCtxStore;
+
+    impl ContextStorePort for SaveFailingCtxStore {
+        fn load_contexts(&self) -> anyhow::Result<ContextFile> {
+            Ok(ContextFile::default())
+        }
+        fn save_contexts(&self, _file: &ContextFile) -> anyhow::Result<()> {
+            anyhow::bail!("context store write failed")
+        }
+        fn current_context(&self) -> anyhow::Result<ContextId> {
+            Ok(ContextId::new("default"))
+        }
+        fn switch_context(&self, _id: &ContextId) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn apply_vault_attach_failure_returns_err_not_false_success() {
+        let store = SaveFailingStore;
+        let ctx_store = FakeCtxStore::new();
+        let input = ApplyConfigInput::from_url("https://example.com/team.yaml").with_vault(
+            "team",
+            VaultConfig::Local(crate::domain::config::LocalVaultSource {
+                path: "/tmp".into(),
+            }),
+        );
+        let mut sink = CollectingSink::new();
+        let result = run(
+            input,
+            Scope::Global,
+            None,
+            None,
+            false,
+            &store,
+            &ctx_store,
+            vec![],
+            &mut sink,
+        );
+        // Previously this returned Ok while printing the error via on_error —
+        // a false-success. Now the attach failure must propagate as Err.
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Failed to attach vault 'team'"));
+        // No VaultAttached success event should fire on failure.
+        assert!(!sink
+            .events
+            .iter()
+            .any(|e| matches!(e, CoreEvent::VaultAttached(_))));
+    }
+
+    #[test]
+    fn apply_config_load_failure_surfaces_error_not_default() {
+        let store = LoadFailingStore;
+        let ctx_store = FakeCtxStore::new();
+        // A provider is required to reach the `store.load` line; a vault in
+        // global scope would hit attach_vault's load first, which also fails.
+        let input =
+            ApplyConfigInput::from_url("https://example.com/team.yaml").with_provider("opencode");
+        let mut sink = CollectingSink::new();
+        let result = run(
+            input,
+            Scope::Workspace,
+            None,
+            None,
+            false,
+            &store,
+            &ctx_store,
+            vec![],
+            &mut sink,
+        );
+        // Previously `store.load(scope).unwrap_or_default()` masked this.
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("malformed"));
+    }
+
+    #[test]
+    fn apply_config_save_failure_returns_err_not_false_success() {
+        let store = SaveFailingStore;
+        let ctx_store = FakeCtxStore::new();
+        let input =
+            ApplyConfigInput::from_url("https://example.com/team.yaml").with_provider("opencode");
+        let mut sink = CollectingSink::new();
+        let result = run(
+            input,
+            Scope::Workspace,
+            None,
+            None,
+            false,
+            &store,
+            &ctx_store,
+            vec![],
+            &mut sink,
+        );
+        // Previously `let _ = store.save(scope, &config)` swallowed this and
+        // returned Ok — a false-success. Now the save error propagates.
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("disk full"));
+    }
+
+    #[test]
+    fn apply_context_save_failure_returns_err_not_false_success() {
+        let store = FakeStore::new();
+        let ctx_store = SaveFailingCtxStore;
+        let input =
+            ApplyConfigInput::from_url("https://example.com/team.yaml").with_provider("opencode");
+        let mut sink = CollectingSink::new();
+        let result = run(
+            input,
+            Scope::Global,
+            None,
+            Some(ContextId::new("company-x")),
+            false,
+            &store,
+            &ctx_store,
+            vec![],
+            &mut sink,
+        );
+        // Previously `let _ = context_store.save_contexts(&file)` swallowed
+        // this and returned Ok — a false-success. Now it propagates.
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("context store write failed"));
     }
 }

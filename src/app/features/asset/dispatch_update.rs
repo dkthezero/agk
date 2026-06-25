@@ -8,6 +8,19 @@ use crate::app::event::CoreEvent;
 use crate::app::outcome::{CoreEventSink, CoreOutcome, CoreResult};
 use crate::domain::scope::Scope;
 
+/// Emit a `TaskFailed` event (so the TUI clears its spinner and the
+/// human-readable `[0] Failed:` line renders) AND return an `Err` carrying
+/// the same message, so the CLI dispatcher maps the failure to a non-zero
+/// exit code.
+fn fail(sink: &mut dyn CoreEventSink, error: impl Into<String>) -> CoreResult {
+    let error = error.into();
+    sink.on_event(CoreEvent::TaskFailed {
+        id: 0,
+        error: error.clone(),
+    });
+    Err(anyhow::anyhow!(error))
+}
+
 pub(super) fn update_asset_cmd(
     identity: &str,
     scope: Scope,
@@ -22,13 +35,7 @@ pub(super) fn update_asset_cmd(
 
     let config = match core.store.load(scope) {
         Ok(c) => c,
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Failed to load config: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Err(e) => return fail(sink, format!("Failed to load config: {}", e)),
     };
 
     let mut providers = core.registry.active_providers_from_config(&config);
@@ -36,29 +43,13 @@ pub(super) fn update_asset_cmd(
         providers.retain(|p| p.id() == filter);
     }
     if providers.is_empty() {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: "No active providers".into(),
-        });
-        return Ok(CoreOutcome::Ok);
+        return fail(sink, "No active providers");
     }
 
     let pkg = match core.registry.find_package_by_identity(identity) {
         Ok(Some(p)) => p,
-        Ok(None) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Asset '{}' not found", identity),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
-        Err(e) => {
-            sink.on_event(CoreEvent::TaskFailed {
-                id: 0,
-                error: format!("Lookup failed: {}", e),
-            });
-            return Ok(CoreOutcome::Ok);
-        }
+        Ok(None) => return fail(sink, format!("Asset '{}' not found", identity)),
+        Err(e) => return fail(sink, format!("Lookup failed: {}", e)),
     };
 
     let mut any_failed = false;
@@ -77,11 +68,8 @@ pub(super) fn update_asset_cmd(
         sink.on_event(CoreEvent::AssetUpdated {
             identity: pkg.identity.name.clone(),
         });
+        Ok(CoreOutcome::Ok)
     } else {
-        sink.on_event(CoreEvent::TaskFailed {
-            id: 0,
-            error: format!("Failed to update '{}'", identity),
-        });
+        fail(sink, format!("Failed to update '{}'", identity))
     }
-    Ok(CoreOutcome::Ok)
 }

@@ -29,22 +29,52 @@ pub fn dispatch(cli: &Cli, workspace: &std::path::Path, core: &AgkCore) -> anyho
             config_dir: std::path::PathBuf::from("."),
             command: command.clone(),
         };
-        let rc = llm::dispatch(&args, workspace, &mut presenter);
+        let rc = match llm::dispatch(&args, workspace, &mut presenter) {
+            Ok(code) => code,
+            Err(e) => {
+                // `llm::dispatch` returns `Err` for failures that did not emit
+                // a structured event (e.g. an unknown provider id or a
+                // malformed kind).  Push the error into the JSON batch (in
+                // JSON mode) or render it to stderr (text mode) via
+                // `on_error`, then surface a non-zero exit code — mirroring
+                // the main `Err` arm below so `--json` consumers always get a
+                // structured error instead of a stray `Error: ...` line from
+                // `main.rs`.
+                if !presenter.already_reported_task_failure() {
+                    presenter.on_error(format!("{}", e));
+                }
+                crate::cli::EXIT_GENERAL_FAILURE
+            }
+        };
         presenter.finalize();
-        return rc;
+        return Ok(rc);
     }
 
     if let Some(command) = &cli.command {
         let cmd = to_core_command(command, workspace)?;
         let result = core.execute(cmd, &mut presenter);
-        presenter.finalize();
-        match result {
-            Ok(_) => Ok(crate::cli::EXIT_SUCCESS),
-            Err(e) => {
-                presenter.on_error(format!("{}", e));
-                Ok(crate::cli::EXIT_GENERAL_FAILURE)
+        let exit = match result {
+            Ok(crate::app::outcome::CoreOutcome::ValidationReport { passed: false, .. }) => {
+                crate::cli::EXIT_GENERAL_FAILURE
             }
-        }
+            Ok(_) => crate::cli::EXIT_SUCCESS,
+            Err(e) => {
+                // Some use cases emit a `TaskFailed` CoreEvent (which renders
+                // `[0] Failed: ...` to stderr) AND return `Err` so the exit
+                // code is non-zero.  In that case the failure has already
+                // been rendered; avoid a duplicate `Error: ...` line.
+                if !presenter.already_reported_task_failure() {
+                    presenter.on_error(format!("{}", e));
+                }
+                crate::cli::EXIT_GENERAL_FAILURE
+            }
+        };
+        // `finalize()` prints the JSON batch (if any).  It must run AFTER the
+        // `Err` arm so that an `Err`-only failure (which `on_error` pushes
+        // into `events` as a structured `CoreEvent::Error`) is included in the
+        // batch rather than dropped.
+        presenter.finalize();
+        Ok(exit)
     } else {
         // No subcommand — fall through to TUI in main.rs
         Ok(crate::cli::EXIT_SUCCESS)
@@ -212,7 +242,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::entry::{ProfileCommands, ScopeArg};
+    use crate::app::registry::Registry;
+    use crate::app::test_support::FakeStore;
+    use crate::cli::entry::{Cli, ProfileCommands, ScopeArg};
+    use crate::domain::config::{AssetBucket, AssetSource, ConfigFile, VaultSection};
+    use crate::domain::scope::Scope;
+    use std::sync::Arc;
 
     #[test]
     fn to_core_command_profile_start() {
@@ -249,5 +284,316 @@ mod tests {
             result,
             CoreCommand::CreateProfile { input } if input.id.as_str() == "test"
         ));
+    }
+
+    /// Regression: `agk validate` must exit non-zero when validation fails.
+    /// Previously it printed "Validation failed" but returned exit 0 because
+    /// the use case returned `Ok(CoreOutcome::Ok)`.
+    fn validate_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Validate { scope: None }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_validate_returns_failure_exit_on_failed_validation() {
+        let store = FakeStore::new();
+        let mut config = ConfigFile::default();
+        config.vault_defs.insert(
+            "ghost-vault".to_string(),
+            VaultSection {
+                vault: None,
+                skills: Some(AssetBucket {
+                    items: vec!["[ghost:1.0.0:deadbeef00]".to_string()],
+                    source: Some(AssetSource::Personal),
+                }),
+                instructions: None,
+                mcps: None,
+                profiles: None,
+            },
+        );
+        store.seed(Scope::Workspace, config);
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = validate_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "a failed validation must surface as a non-zero exit code"
+        );
+    }
+
+    #[test]
+    fn dispatch_validate_returns_success_exit_on_passed_validation() {
+        // Empty config -> no installed assets -> nothing fails -> passed.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = validate_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "a passing validation must keep exit code 0"
+        );
+    }
+
+    /// Regression: `agk sync` must exit non-zero when there are no active
+    /// providers.  Previously the use case emitted a `TaskFailed` event
+    /// (rendering `[0] Failed: No active providers`) but returned
+    /// `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the failure —
+    /// the `TaskFailed`-then-`Ok` anti-pattern documented in AGENTS.md.
+    fn sync_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Sync {
+                global: false,
+                dry_run: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_sync_returns_failure_exit_when_no_active_providers() {
+        // Empty config -> no providers active -> sync must fail.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = sync_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "sync with no active providers must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk sync --dry-run` is a *preview* — it computes what
+    /// would be synced without touching providers (the per-asset loop
+    /// short-circuits with `continue` before the provider update).  Enforcing
+    /// the empty-providers guard on a dry-run made `agk sync --dry-run` fail
+    /// with "No active providers" even though it needs none, masking the
+    /// useful preview of installed/available assets.
+    fn sync_dry_run_cli() -> Cli {
+        Cli {
+            command: Some(Commands::Sync {
+                global: false,
+                dry_run: true,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_sync_dry_run_succeeds_with_no_active_providers() {
+        // Empty config -> no providers active, but dry_run=true must NOT
+        // trip the empty-providers guard — the preview should succeed and
+        // emit a (possibly empty) SyncComplete event.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = sync_dry_run_cli();
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "sync --dry-run is a preview and must not fail when no providers are active"
+        );
+    }
+
+    /// Regression: `agk install <identity>` must exit non-zero when there
+    /// are no active providers (same `TaskFailed`-then-`Ok` anti-pattern as
+    /// sync).
+    fn install_cli(identity: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Install {
+                identity: identity.to_string(),
+                scope: None,
+                dry_run: false,
+                provider: None,
+                evals: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_install_returns_failure_exit_when_no_active_providers() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = install_cli("ghost:1.0.0:deadbeef00");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "install with no active providers must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk install <identity> --dry-run` is a preview and must
+    /// NOT fail on the empty-providers guard (matching `sync --dry-run`), and
+    /// must NOT trigger the remote ClawHub fetch (which writes files as a real
+    /// side effect, violating the dry-run contract). Previously it exited 1
+    /// with "No active providers" even on a dry-run.
+    #[test]
+    fn dispatch_install_dry_run_succeeds_with_no_active_providers() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = Cli {
+            command: Some(Commands::Install {
+                identity: "ghost:1.0.0:deadbeef00".to_string(),
+                scope: None,
+                dry_run: true,
+                provider: None,
+                evals: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        };
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_SUCCESS,
+            "install --dry-run is a preview and must not fail when no providers are active"
+        );
+    }
+
+    /// Regression: `agk context switch <name>` must exit non-zero when the
+    /// target context does not exist.  Previously the use case called
+    /// `sink.on_error` (rendering `Error: Context '...' does not exist`) but
+    /// returned `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the
+    /// failure — the `on_error`-then-`Ok` anti-pattern.
+    fn context_switch_cli(name: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Context {
+                command: ContextCommands::Switch {
+                    name: name.to_string(),
+                    dry_run: false,
+                },
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        }
+    }
+
+    #[test]
+    fn dispatch_context_switch_returns_failure_exit_for_missing_context() {
+        // `test_core`'s FakeCtxStore returns an empty ContextFile, so any
+        // non-"default" context lookup fails — but note `default` is also
+        // absent from the map (only `current_context` is set), so even
+        // switching to "default" is a no-op error here.  Use an explicit
+        // missing name to make the intent unambiguous.
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = context_switch_cli("nonexistent");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "switching to a missing context must surface as a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk <cmd> --json` that fails with an `Err`-only error (no
+    /// structured failure event) must still surface a non-zero exit code while
+    /// the structured `CoreEvent::Error` is emitted into the JSON batch
+    /// (asserted at the presenter level in
+    /// `presenter::tests::on_error_in_json_mode_pushes_structured_error_event`).
+    fn context_switch_json_cli(name: &str) -> Cli {
+        Cli {
+            command: Some(Commands::Context {
+                command: ContextCommands::Switch {
+                    name: name.to_string(),
+                    dry_run: false,
+                },
+            }),
+            quiet: false,
+            verbose: false,
+            json: true,
+        }
+    }
+
+    #[test]
+    fn dispatch_json_mode_failure_returns_nonzero_exit() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = context_switch_json_cli("nonexistent");
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "a JSON-mode failure must still surface a non-zero exit code"
+        );
+    }
+
+    /// Regression: `agk pack <identity>` must exit non-zero when the asset is
+    /// not found in any vault.  Previously the use case called `sink.on_error`
+    /// (rendering `Error: Asset '...' not found in any vault`) but returned
+    /// `Ok(CoreOutcome::Ok)`, so the CLI exited 0 despite the failure.
+    #[cfg(feature = "pack")]
+    #[test]
+    fn dispatch_pack_returns_failure_exit_for_missing_asset() {
+        let store = FakeStore::new();
+        store.seed(Scope::Workspace, ConfigFile::default());
+
+        // Empty registry -> no package matches the identity.
+        let registry = Registry::new();
+        let core = crate::app::core::test_core_with(Arc::new(store), Arc::new(registry));
+        let cli = Cli {
+            command: Some(Commands::Pack {
+                identity: "ghost-skill:1.0.0:deadbeef00".to_string(),
+                target: crate::cli::entry::PackTarget::ClaudeDesktop,
+                stdout: false,
+            }),
+            quiet: false,
+            verbose: false,
+            json: false,
+        };
+
+        let rc = dispatch(&cli, std::path::Path::new("."), &core).unwrap();
+        assert_eq!(
+            rc,
+            crate::cli::EXIT_GENERAL_FAILURE,
+            "packing a missing asset must surface as a non-zero exit code"
+        );
     }
 }
