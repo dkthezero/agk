@@ -73,6 +73,14 @@ pub enum CoreCommand {
     AttachVault {
         input: crate::app::features::vault::command::AttachVaultInput,
     },
+    /// Attach a local vault directory by path. The use-case reads
+    /// `<path>/.agk/vault.toml`, parses the manifest, and canonicalizes the
+    /// path; the CLI adapter stays a pure translator (no filesystem I/O).
+    /// Attaches at global scope, matching `attach::run`.
+    AttachLocalVault {
+        path: String,
+        id: Option<String>,
+    },
     DetachVault {
         vault_id: String,
         scope: crate::domain::scope::Scope,

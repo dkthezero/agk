@@ -242,56 +242,14 @@ pub enum VaultCommands {
         #[arg(long)]
         dry_run: bool,
     },
-}
 
-#[derive(Subcommand, Debug)]
-pub enum TeamCommands {
-    /// Initialize team configuration
-    Init {
-        /// Team name
+    /// Attach a local vault directory to this workspace's global config
+    Attach {
+        /// Path to the vault directory (must contain .agk/vault.toml)
+        path: String,
+
+        /// Override the vault ID (defaults to the name in vault.toml)
         #[arg(short, long)]
-        name: String,
-        /// Only show what would change
-        #[arg(long)]
-        dry_run: bool,
+        id: Option<String>,
     },
-    /// Add a vault to the team marketplace
-    AddVault {
-        /// Vault identity
-        identity: String,
-        /// Vault type (github, local, clawhub)
-        #[arg(long, name = "type", default_value = "github")]
-        vault_type: String,
-        /// Vault URL
-        #[arg(long)]
-        url: String,
-        /// Branch
-        #[arg(short, long, default_value = "main")]
-        branch: String,
-    },
-    /// Add a skill requirement to the team
-    Add {
-        /// Skill identity (e.g., acme-org/react-conventions)
-        identity: String,
-        /// Vault to install from
-        #[arg(long)]
-        vault: String,
-        /// Asset kind
-        #[arg(long, default_value = "skill")]
-        kind: String,
-        /// Version constraint (e.g., >= 2.0.0)
-        #[arg(long)]
-        version_constraint: Option<String>,
-    },
-    /// Remove a skill requirement from the team
-    Remove {
-        /// Skill identity to remove
-        identity: String,
-    },
-    /// Show diff between team requirements and installed state
-    Diff,
-    /// Show team status (installed vs missing)
-    Status,
-    /// Update team.toml from source repository (not yet implemented)
-    Update,
 }

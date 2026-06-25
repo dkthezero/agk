@@ -65,6 +65,8 @@ pub struct AppState {
     pub export_resolve_vaults: bool,
     // Profile import state (Ctrl+I on Profile tab)
     pub import_file_path: String,
+    // True when workspace root contains .agk/vault.toml (vault source repo mode)
+    pub is_vault_workspace: bool,
 }
 
 impl AppState {
@@ -124,6 +126,7 @@ impl AppState {
             export_file_path: String::new(),
             export_resolve_vaults: false,
             import_file_path: String::new(),
+            is_vault_workspace: false,
         }
     }
 
@@ -183,6 +186,9 @@ impl AppState {
     }
 
     pub fn toggle_scope(&mut self) {
+        if self.is_vault_workspace {
+            return;
+        }
         self.active_scope = match self.active_scope {
             Scope::Global => Scope::Workspace,
             Scope::Workspace => Scope::Global,
@@ -211,6 +217,9 @@ impl AppState {
     }
 
     pub fn scope_label(&self) -> &'static str {
+        if self.is_vault_workspace {
+            return "[VAULT]";
+        }
         match self.active_scope {
             Scope::Global => "[Tab] GLOBAL",
             Scope::Workspace => "[Tab] WORKSPACE",
@@ -263,6 +272,19 @@ mod tests {
     fn filtered_packages_empty_query_returns_all() {
         let state = state_with_skills(vec![make_pkg("alpha"), make_pkg("beta")]);
         assert_eq!(state.filtered_packages().len(), 2);
+    }
+
+    #[test]
+    fn confirm_vault_init_is_a_list_mode() {
+        let mode = ListMode::ConfirmVaultInit;
+        assert!(matches!(mode, ListMode::ConfirmVaultInit));
+    }
+
+    #[test]
+    fn pending_vault_local_path_used_as_vault_name_scratch() {
+        let mut state = state_with_skills(vec![]);
+        state.pending_vault_local_path = "my-vault".to_string();
+        assert_eq!(state.pending_vault_local_path, "my-vault");
     }
 
     #[test]
@@ -356,6 +378,25 @@ mod tests {
     }
 
     #[test]
+    fn toggle_scope_locked_in_vault_workspace() {
+        let mut state = state_with_skills(vec![]);
+        state.is_vault_workspace = true;
+        state.toggle_scope();
+        assert_eq!(
+            state.active_scope,
+            Scope::Workspace,
+            "vault mode must not toggle scope"
+        );
+    }
+
+    #[test]
+    fn scope_label_shows_vault_in_vault_workspace() {
+        let mut state = state_with_skills(vec![]);
+        state.is_vault_workspace = true;
+        assert_eq!(state.scope_label(), "[VAULT]");
+    }
+
+    #[test]
     fn is_installed_false_for_empty_config() {
         let state = state_with_skills(vec![]);
         assert!(!state.is_installed("workspace", "any-skill", &AssetKind::Skill));
@@ -385,5 +426,81 @@ mod tests {
         assert_eq!(state.tab_kinds[1], TabKind::Mcp); // MCP
         assert_eq!(state.tab_kinds[3], TabKind::Provider); // Providers
         assert_eq!(state.tab_kinds[4], TabKind::Vault); // Vault
+    }
+
+    struct StubFileOpener;
+    impl crate::app::ports::FileOpenerPort for StubFileOpener {
+        fn open_file_manager(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn open_terminal(&self, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn enter_vault_init_sets_confirm_mode() {
+        use crate::tui::event::EventContext;
+        use std::sync::Arc;
+
+        let mut state = state_with_skills(vec![]);
+        assert_ne!(state.list_mode, ListMode::ConfirmVaultInit);
+
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let ctx = EventContext {
+            tx,
+            workspace_root: std::path::PathBuf::from("/tmp/my-workspace"),
+            file_opener: Arc::new(StubFileOpener),
+            core: Arc::new(crate::app::core::test_core()),
+        };
+
+        crate::tui::features::vaults::controller::enter_vault_init(&mut state, &ctx);
+
+        // The real handler must enter confirm mode and derive the modal's
+        // display name from the workspace folder.
+        assert!(matches!(state.list_mode, ListMode::ConfirmVaultInit));
+        assert_eq!(state.pending_vault_local_path, "my-workspace");
+    }
+
+    #[test]
+    fn vault_initialized_event_sets_is_vault_workspace() {
+        use crate::app::event::CoreEvent;
+        use crate::tui::core_event_reducer::apply_core_event;
+        let mut state = state_with_skills(vec![]);
+        assert!(!state.is_vault_workspace);
+        apply_core_event(
+            &mut state,
+            &CoreEvent::VaultInitialized("my-vault".to_string()),
+        );
+        assert!(
+            state.is_vault_workspace,
+            "VaultInitialized must set is_vault_workspace = true"
+        );
+    }
+
+    #[test]
+    fn vault_keybinds_include_init_when_not_vault_workspace() {
+        use crate::tui::render::keybinds::resolve_keybinds;
+        let mut state = AppState::new(vec!["Vaults".to_string()], vec![true], HashMap::new());
+        state.tab_kinds = vec![TabKind::Vault];
+        state.is_vault_workspace = false;
+        let keybinds = resolve_keybinds(&state);
+        assert!(
+            keybinds.contains("F1"),
+            "non-vault workspace must show [F1] Init as Vault"
+        );
+    }
+
+    #[test]
+    fn vault_keybinds_hide_init_when_vault_workspace() {
+        use crate::tui::render::keybinds::resolve_keybinds;
+        let mut state = AppState::new(vec!["Vaults".to_string()], vec![true], HashMap::new());
+        state.tab_kinds = vec![TabKind::Vault];
+        state.is_vault_workspace = true;
+        let keybinds = resolve_keybinds(&state);
+        assert!(
+            !keybinds.contains("F1"),
+            "vault workspace must NOT show [F1] Init as Vault"
+        );
     }
 }

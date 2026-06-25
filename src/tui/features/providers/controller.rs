@@ -92,6 +92,12 @@ pub fn handle_deactivate_last_provider_cancel(state: &mut AppState) -> Result<Co
 }
 
 pub fn handle_space_provider(state: &mut AppState, ctx: &EventContext) -> Result<()> {
+    if state.is_vault_workspace {
+        state.status_line =
+            "Providers are not used in vault source mode — skills install to skills/ directly"
+                .to_string();
+        return Ok(());
+    }
     if let Some(entry) = state.provider_entries.get(state.selected_index) {
         let provider = ctx
             .core

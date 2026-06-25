@@ -189,3 +189,35 @@ pub fn handle_clawhub_install_confirm(
     state.status_line = "ClawHub attachment handled by AgkCore.".to_string();
     Ok(ControlFlow::Continue)
 }
+
+/// Enter the vault-init confirmation modal.
+/// Stores the workspace folder name in `pending_vault_local_path` for the modal to display.
+pub fn enter_vault_init(state: &mut AppState, ctx: &EventContext) {
+    let name = ctx
+        .workspace_root
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "vault".to_string());
+    state.pending_vault_local_path = name;
+    state.list_mode = ListMode::ConfirmVaultInit;
+    state.status_line.clear();
+}
+
+pub fn handle_vault_init_confirm(state: &mut AppState, ctx: &EventContext) -> Result<ControlFlow> {
+    let _ = ctx.tx.send(AppEvent::ExecuteCommand(
+        crate::app::command::CoreCommand::VaultInit {
+            name: None,
+            dry_run: false,
+        },
+    ));
+    state.list_mode = ListMode::Normal;
+    state.pending_vault_local_path.clear();
+    Ok(ControlFlow::Continue)
+}
+
+pub fn handle_vault_init_cancel(state: &mut AppState) -> Result<ControlFlow> {
+    state.list_mode = ListMode::Normal;
+    state.pending_vault_local_path.clear();
+    state.status_line = "Cancelled vault init".to_string();
+    Ok(ControlFlow::Continue)
+}

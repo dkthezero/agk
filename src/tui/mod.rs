@@ -4,6 +4,7 @@ pub mod core_event_reducer;
 pub mod edit_profile_state;
 pub mod entry;
 pub mod event;
+pub mod event_types;
 pub mod features;
 pub mod layout;
 pub mod list_mode;

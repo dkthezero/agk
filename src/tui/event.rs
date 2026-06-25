@@ -1,68 +1,9 @@
-use crate::app::command::CoreCommand;
-use crate::app::core::AgkCore;
-use crate::app::event::CoreEvent;
 use crate::tui::app::AppState;
 use crate::tui::list_mode::ListMode;
-use crate::tui::reload::ReloadSnapshot;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyModifiers};
-use std::sync::Arc;
 
-pub enum ControlFlow {
-    Continue,
-    Quit,
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-    /// Keyboard events from `crossterm` forwarded by `main.rs` into the async
-    /// channel consumed by `runtime_loop::run_loop`.
-    Input(crossterm::event::Event),
-    TaskStarted {
-        id: usize,
-        name: String,
-    },
-    TaskProgress {
-        id: usize,
-        percent: u8,
-    },
-    TaskCompleted {
-        id: usize,
-        message: String,
-    },
-    TaskFailed {
-        id: usize,
-        error: String,
-    },
-    TriggerReload,
-    ClawHubSearchResults {
-        packages: Vec<crate::domain::asset::ScannedPackage>,
-        task_id: usize,
-    },
-    Tick,
-    /// Background reload finished atomically so the UI never freezes.
-    ReloadComplete(ReloadSnapshot),
-    /// then resume TUI. The child runs interactively (user can type/respond).
-    RunInteractiveProcess {
-        command: String,
-        args: Vec<String>,
-        current_dir: std::path::PathBuf,
-        profile_name: Option<String>,
-    },
-    /// Execute a [`CoreCommand`] through [`AgkCore`] in a blocking task.
-    ExecuteCommand(CoreCommand),
-    /// A [`CoreEvent`] emitted by [`AgkCore`] back to the TUI.
-    CoreEvent(CoreEvent),
-}
-
-pub struct EventContext {
-    pub tx: tokio::sync::mpsc::UnboundedSender<AppEvent>,
-    pub workspace_root: std::path::PathBuf,
-    pub file_opener: Arc<dyn crate::app::ports::FileOpenerPort>,
-    /// Reference to the shared [`AgkCore`] façade so controllers can dispatch
-    /// commands and the runtime loop can execute them.
-    pub core: Arc<AgkCore>,
-}
+pub use crate::tui::event_types::{AppEvent, ControlFlow, EventContext};
 
 fn is_clawhub_active(ctx: &EventContext) -> bool {
     ctx.core
@@ -152,6 +93,7 @@ pub fn handle(
             ListMode::ConfirmMcpTest
                 | ListMode::ConfirmClawHubInstall
                 | ListMode::ConfirmDetachVault
+                | ListMode::ConfirmVaultInit
                 | ListMode::ConfirmDeactivateLastProvider
                 | ListMode::ConfirmDeleteProfile
         );
@@ -172,6 +114,9 @@ pub fn handle(
                 }
                 ListMode::ConfirmDeleteProfile => {
                     crate::tui::features::profiles::controller::handle_delete_profile_confirm(state, ctx)
+                }
+                ListMode::ConfirmVaultInit => {
+                    crate::tui::features::vaults::controller::handle_vault_init_confirm(state, ctx)
                 }
                 _ => Ok(ControlFlow::Continue),
             };
@@ -200,6 +145,9 @@ pub fn handle(
                     state.pending_delete_profile = None;
                     state.status_line = "Cancelled profile deletion".to_string();
                     Ok(ControlFlow::Continue)
+                }
+                ListMode::ConfirmVaultInit => {
+                    crate::tui::features::vaults::controller::handle_vault_init_cancel(state)
                 }
                 _ => Ok(ControlFlow::Continue),
             };
@@ -240,7 +188,7 @@ pub fn handle(
             KeyCode::Enter if state.list_mode == ListMode::Normal => {
                 crate::tui::features::common::controller::handle_enter(state, ctx)?;
             }
-            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(3) | KeyCode::F(2)
+            KeyCode::F(5) | KeyCode::F(4) | KeyCode::F(3) | KeyCode::F(2) | KeyCode::F(1)
                 if state.list_mode == ListMode::Normal =>
             {
                 crate::tui::features::common::controller::handle_f_keys(state, ctx, &key.code)?;
@@ -303,6 +251,7 @@ mod tests {
     use super::*;
 
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     struct StubFileOpener;
     impl crate::app::ports::FileOpenerPort for StubFileOpener {

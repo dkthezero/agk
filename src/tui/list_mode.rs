@@ -7,6 +7,7 @@ pub enum ListMode {
     AttachVaultPath,
     AttachVaultName,
     ConfirmDetachVault,
+    ConfirmVaultInit,
     ConfirmClawHubInstall,
     ConfirmDeactivateLastProvider,
     /// MCP server registration modal sub-steps

@@ -112,5 +112,8 @@ pub fn dispatch(
 
 mod dispatch_helpers;
 mod dispatch_sync;
-use dispatch_helpers::{install_asset_cmd, remove_asset_cmd, update_asset_cmd};
+mod dispatch_update;
+mod vault_dispatch;
+use dispatch_helpers::{install_asset_cmd, remove_asset_cmd};
 use dispatch_sync::sync_assets_cmd;
+use dispatch_update::update_asset_cmd;

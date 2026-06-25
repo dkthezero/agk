@@ -165,6 +165,12 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 name: name.clone(),
                 dry_run: *dry_run,
             }),
+            // Manifest read/parse/canonicalize live in the vault use-case
+            // (`attach::attach_local`) so this stays a pure translator.
+            VaultCommands::Attach { path, id } => Ok(CoreCommand::AttachLocalVault {
+                path: path.clone(),
+                id: id.clone(),
+            }),
         },
         Commands::Team { command } => match command {
             TeamCommands::Init { name, dry_run } => Ok(CoreCommand::TeamInit {

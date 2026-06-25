@@ -172,6 +172,11 @@ where
                         | crate::app::event::CoreEvent::AssetRemoved { .. }
                         | crate::app::event::CoreEvent::AssetUpdated { .. }
                         | crate::app::event::CoreEvent::SyncComplete { .. }
+                        | crate::app::event::CoreEvent::VaultAttached(_)
+                        | crate::app::event::CoreEvent::VaultDetached(_)
+                        | crate::app::event::CoreEvent::VaultInitialized(_)
+                        | crate::app::event::CoreEvent::ProviderActivated(_)
+                        | crate::app::event::CoreEvent::ProviderDeactivated(_)
                         | crate::app::event::CoreEvent::TeamInitialized(_)
                         | crate::app::event::CoreEvent::TeamVaultAdded(_)
                         | crate::app::event::CoreEvent::TeamRequirementAdded(_)
