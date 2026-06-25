@@ -212,3 +212,83 @@ fn provider_list_json_schema() {
         );
     }
 }
+
+/// Contract: the PRD-documented `agk telemetry export --csv --file <path>`
+/// invocation (docs/product/features/telemetry/prd.md §v0.3.1 CSV Export)
+/// must succeed, write a CSV file whose first line is the documented header,
+/// and exit 0.
+#[test]
+fn telemetry_export_csv_file_prd_form() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // Isolate HOME so we don't touch the developer's real analytics.toml.
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let out = tmp.path().join("agk-usage.csv");
+
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args([
+        "telemetry",
+        "export",
+        "--csv",
+        "--file",
+        out.to_str().unwrap(),
+    ]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "telemetry export --csv --file failed: exit={:?} stdout={} stderr={}",
+        output.status.code(),
+        stdout,
+        stderr
+    );
+    assert!(
+        out.exists(),
+        "export file should exist at {}",
+        out.display()
+    );
+    let written = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        written.starts_with("category,name,count,last_used,providers"),
+        "CSV header mismatch; got: {}",
+        written.lines().next().unwrap_or("")
+    );
+}
+
+/// Contract: the canonical `--format csv` / `--output` forms still work
+/// alongside the PRD-documented `--csv` / `--file` shorthand.
+#[test]
+fn telemetry_export_canonical_and_shorthand_forms() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+
+    // Canonical: --format csv to stdout
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args(["telemetry", "export", "--format", "csv"]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && stdout.starts_with("category,"),
+        "canonical --format csv failed: exit={:?} stdout={}",
+        output.status.code(),
+        stdout
+    );
+
+    // Shorthand: --csv to stdout (same output)
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args(["telemetry", "export", "--csv"]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout2 = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && stdout2 == stdout,
+        "--csv shorthand must match --format csv output"
+    );
+}

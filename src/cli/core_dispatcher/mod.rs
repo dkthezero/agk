@@ -174,17 +174,32 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             TelemetryCommands::Enable => Ok(CoreCommand::EnableTelemetry),
             TelemetryCommands::Disable => Ok(CoreCommand::DisableTelemetry),
             TelemetryCommands::Status => Ok(CoreCommand::TelemetryStatus),
-            TelemetryCommands::Export { format, output } => Ok(CoreCommand::ExportTelemetry {
-                format: match format {
-                    crate::cli::entry::ExportFormat::Json => {
-                        crate::domain::telemetry::TelemetryExportFormat::Json
-                    }
-                    crate::cli::entry::ExportFormat::Csv => {
-                        crate::domain::telemetry::TelemetryExportFormat::Csv
-                    }
-                },
-                output_path: output.clone(),
-            }),
+            TelemetryCommands::Export {
+                format,
+                output,
+                csv,
+                file,
+            } => {
+                // Normalize the PRD-documented shorthand flags (`--csv`,
+                // `--file`) onto the canonical `format`/`output` fields.
+                let resolved_format = if *csv {
+                    crate::cli::entry::ExportFormat::Csv
+                } else {
+                    *format
+                };
+                let resolved_output = file.clone().or_else(|| output.clone());
+                Ok(CoreCommand::ExportTelemetry {
+                    format: match resolved_format {
+                        crate::cli::entry::ExportFormat::Json => {
+                            crate::domain::telemetry::TelemetryExportFormat::Json
+                        }
+                        crate::cli::entry::ExportFormat::Csv => {
+                            crate::domain::telemetry::TelemetryExportFormat::Csv
+                        }
+                    },
+                    output_path: resolved_output,
+                })
+            }
         },
         Commands::Debug { command } => match command {
             DebugCommands::Tasks => Ok(CoreCommand::DebugListTasks),
