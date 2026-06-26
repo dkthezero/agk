@@ -152,7 +152,9 @@ fn build_firebender_manifest(pkg: &ScannedPackage) -> anyhow::Result<FirebenderM
 /// Standard base64 encoder (RFC 4648) with padding, no line wrapping.
 fn base64_encode(input: &[u8]) -> String {
     const ALPHA: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((input.len() * 4).div_ceil(3));
+    // Each 3-byte chunk encodes to 4 chars; a remainder of 1→4 (2 data + "==")
+    // or 2→4 (3 data + "="). So the padded output length is 4 * ceil(len/3).
+    let mut out = String::with_capacity(4 * input.len().div_ceil(3));
     let mut chunks = input.chunks_exact(3);
     for chunk in &mut chunks {
         let n = ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | (chunk[2] as u32);
