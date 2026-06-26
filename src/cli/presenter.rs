@@ -220,6 +220,34 @@ impl CliPresenter {
         }
     }
 
+    /// Render a `ProviderListed` event to the human-readable streams.
+    ///
+    /// In JSON mode the event is emitted via the batch in `finalize()`, so
+    /// the human-readable lines are suppressed here to avoid duplicates.
+    pub(crate) fn render_provider_listed(&self, entries: &[crate::app::snapshot::ProviderEntry]) {
+        if matches!(self.mode, OutputMode::Json) {
+            // The event is accumulated into the JSON batch by `finalize()`;
+            // avoid a duplicate inline print.
+        } else if entries.is_empty() {
+            self.print("No providers registered.");
+        } else {
+            for e in entries {
+                let active = if e.active { "[✓]" } else { "[ ]" };
+                let mcp = if e.supports_mcp { "✓" } else { "✗" };
+                let profiles = if e.supports_profiles { "✓" } else { "✗" };
+                let tools = if e.available_tools.is_empty() {
+                    "—".to_string()
+                } else {
+                    e.available_tools.len().to_string()
+                };
+                self.print(&format!(
+                    "{} {} [MCP: {}] [Profiles: {}] [Tools: {}]",
+                    active, e.name, mcp, profiles, tools
+                ));
+            }
+        }
+    }
+
     /// Render an `LlmProviderHealth` event to the human-readable streams.
     ///
     /// In JSON mode the event is emitted via the batch in `finalize()`, so

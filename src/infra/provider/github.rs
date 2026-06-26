@@ -171,3 +171,122 @@ impl McpProvider for GithubProvider {
         self.save_mcp_config(&scope, &config)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::mcp::McpTransport;
+    use std::collections::HashMap;
+
+    fn sample_server(name: &str) -> McpServer {
+        let mut env = HashMap::new();
+        env.insert("API_KEY".to_string(), "secret".to_string());
+        McpServer {
+            name: name.to_string(),
+            command: "npx".to_string(),
+            args: vec![
+                "-y".to_string(),
+                "@modelcontextprotocol/server-fs".to_string(),
+            ],
+            env,
+            transport: McpTransport::Stdio,
+            description: Some("Test FS server".to_string()),
+            tested: false,
+            tested_at: None,
+            activation: HashMap::new(),
+            security_flags: Vec::new(),
+        }
+    }
+
+    fn provider_in_temp() -> GithubProvider {
+        GithubProvider::new(tempfile::tempdir().unwrap().path().to_path_buf())
+    }
+
+    #[test]
+    fn write_read_roundtrip_persists_server() {
+        let provider = provider_in_temp();
+        let server = sample_server("filesystem");
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let entry = &written["mcpServers"]["filesystem"];
+        assert_eq!(entry["type"], "local");
+        assert_eq!(entry["command"], "npx");
+        assert_eq!(entry["args"][1], "@modelcontextprotocol/server-fs");
+        assert_eq!(entry["env"]["API_KEY"], "secret");
+        assert_eq!(entry["tools"][0], "*");
+    }
+
+    #[test]
+    fn write_then_remove_clears_entry() {
+        let provider = provider_in_temp();
+        let server = sample_server("filesystem");
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+        provider
+            .remove_mcp_server("filesystem", Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(written["mcpServers"].get("filesystem").is_none());
+    }
+
+    #[test]
+    fn preserves_existing_settings_on_write() {
+        let provider = provider_in_temp();
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"mcpServers":{"existing":{"type":"local","command":"foo","args":[],"env":{},"tools":["*"]}},"otherKey":42}"#,
+        ).unwrap();
+
+        provider
+            .write_mcp_server(&sample_server("filesystem"), Scope::Workspace)
+            .unwrap();
+
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        // existing server preserved
+        assert_eq!(written["mcpServers"]["existing"]["command"], "foo");
+        // unrelated key preserved
+        assert_eq!(written["otherKey"], 42);
+        // new server added
+        assert_eq!(written["mcpServers"]["filesystem"]["command"], "npx");
+    }
+
+    #[test]
+    fn overwrite_existing_server_updates_fields() {
+        let provider = provider_in_temp();
+        let mut server = sample_server("filesystem");
+        server.command = "node".to_string();
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+        // second write with changed args
+        server.args = vec!["server.js".to_string()];
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let entry = &written["mcpServers"]["filesystem"];
+        assert_eq!(entry["command"], "node");
+        assert_eq!(entry["args"][0], "server.js");
+    }
+
+    #[test]
+    fn supports_mcp_true_for_github() {
+        use crate::app::ports::ProviderPort;
+        assert!(ProviderPort::supports_mcp(&provider_in_temp()));
+    }
+}

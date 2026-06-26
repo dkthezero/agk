@@ -93,6 +93,10 @@ pub fn apply_core_event(state: &mut AppState, event: &crate::app::event::CoreEve
         CoreEvent::ProviderDeactivated(id) => {
             state.status_line = format!("Provider '{}' deactivated", id);
         }
+        CoreEvent::ProviderListed(entries) => {
+            state.provider_entries = entries.clone();
+            state.status_line = format!("{} providers listed", entries.len());
+        }
         CoreEvent::McpRegistered(name) => {
             state.status_line = format!("MCP '{}' registered", name);
             state.mcp_state.refresh();

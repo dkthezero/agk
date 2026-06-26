@@ -34,6 +34,9 @@ impl CoreEventSink for CliPresenter {
             CoreEvent::ContextListed(entries) => {
                 self.render_context_listed(entries);
             }
+            CoreEvent::ProviderListed(entries) => {
+                self.render_provider_listed(entries);
+            }
             CoreEvent::ProviderActivated(id) => {
                 self.print(&format!("Provider '{}' activated", id));
             }

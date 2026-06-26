@@ -134,3 +134,161 @@ fn mcp_list_json_schema() {
         "JSON output must contain at least one top-level 'events' array"
     );
 }
+
+/// Contract: `agk provider list --json` must emit a valid JSON summary
+/// whose `events` array contains a `ProviderListed` event with the v0.3
+/// capability fields documented in `docs/product/features/providers/prd.md`
+/// (`supports_mcp`, `supports_profiles`, `available_tools`,
+/// `available_permission_modes`).
+#[test]
+fn provider_list_json_schema() {
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.args(["provider", "list", "--json"]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "provider list failed: stdout={} stderr={}",
+        stdout,
+        stderr
+    );
+
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!(
+            "provider list --json produced invalid JSON: {}\n{}",
+            e, stdout
+        )
+    });
+    let events = json
+        .get("events")
+        .and_then(|v| v.as_array())
+        .expect("provider list --json must contain a top-level 'events' array");
+
+    let listed = events
+        .iter()
+        .find(|e| e.get("type").and_then(|t| t.as_str()) == Some("ProviderListed"))
+        .expect("events must contain a ProviderListed entry");
+    let providers = listed
+        .get("providers")
+        .and_then(|p| p.as_array())
+        .expect("ProviderListed must carry a 'providers' array");
+    // The bootstrap registry always wires at least claude-code + opencode.
+    assert!(
+        !providers.is_empty(),
+        "provider list must enumerate at least the bootstrap providers"
+    );
+    for p in providers {
+        assert!(p.get("id").and_then(|v| v.as_str()).is_some(), "missing id");
+        assert!(
+            p.get("name").and_then(|v| v.as_str()).is_some(),
+            "missing name"
+        );
+        assert!(
+            p.get("active").and_then(|v| v.as_bool()).is_some(),
+            "missing active flag"
+        );
+        assert!(
+            p.get("supports_mcp").and_then(|v| v.as_bool()).is_some(),
+            "missing supports_mcp"
+        );
+        assert!(
+            p.get("supports_profiles")
+                .and_then(|v| v.as_bool())
+                .is_some(),
+            "missing supports_profiles"
+        );
+        assert!(
+            p.get("available_tools")
+                .and_then(|v| v.as_array())
+                .is_some(),
+            "missing available_tools"
+        );
+        assert!(
+            p.get("available_permission_modes")
+                .and_then(|v| v.as_array())
+                .is_some(),
+            "missing available_permission_modes"
+        );
+    }
+}
+
+/// Contract: the PRD-documented `agk telemetry export --csv --file <path>`
+/// invocation (docs/product/features/telemetry/prd.md §v0.3.1 CSV Export)
+/// must succeed, write a CSV file whose first line is the documented header,
+/// and exit 0.
+#[test]
+fn telemetry_export_csv_file_prd_form() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    // Isolate HOME so we don't touch the developer's real analytics.toml.
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let out = tmp.path().join("agk-usage.csv");
+
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args([
+        "telemetry",
+        "export",
+        "--csv",
+        "--file",
+        out.to_str().unwrap(),
+    ]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "telemetry export --csv --file failed: exit={:?} stdout={} stderr={}",
+        output.status.code(),
+        stdout,
+        stderr
+    );
+    assert!(
+        out.exists(),
+        "export file should exist at {}",
+        out.display()
+    );
+    let written = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        written.starts_with("category,name,count,last_used,providers"),
+        "CSV header mismatch; got: {}",
+        written.lines().next().unwrap_or("")
+    );
+}
+
+/// Contract: the canonical `--format csv` / `--output` forms still work
+/// alongside the PRD-documented `--csv` / `--file` shorthand.
+#[test]
+fn telemetry_export_canonical_and_shorthand_forms() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+
+    // Canonical: --format csv to stdout
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args(["telemetry", "export", "--format", "csv"]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && stdout.starts_with("category,"),
+        "canonical --format csv failed: exit={:?} stdout={}",
+        output.status.code(),
+        stdout
+    );
+
+    // Shorthand: --csv to stdout (same output)
+    let mut cmd = std::process::Command::cargo_bin("agk").expect("cargo_bin not found");
+    cmd.env("HOME", &home);
+    cmd.current_dir(tmp.path());
+    cmd.args(["telemetry", "export", "--csv"]);
+    let output = cmd.output().expect("failed to spawn agk");
+    let stdout2 = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && stdout2 == stdout,
+        "--csv shorthand must match --format csv output"
+    );
+}

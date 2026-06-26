@@ -32,6 +32,18 @@ pub trait ProviderPort: Send + Sync {
         // (folder_name, description)
         vec![]
     }
+
+    /// NEW: read the persisted config-root choice for this provider.
+    /// Returns the folder name stored under
+    /// `config.provider_roots[self.id()]` for the given scope
+    /// (workspace-only; global always uses the hardcoded default and
+    /// therefore returns `None`).
+    fn selected_config_root(&self, scope: &Scope, config: Option<&ConfigFile>) -> Option<String> {
+        if !matches!(scope, Scope::Workspace) {
+            return None;
+        }
+        config.and_then(|c| c.provider_roots.get(self.id())).cloned()
+    }
 }
 ```
 
@@ -55,13 +67,14 @@ Each provider's `provider_root()` must now:
 Example for OpenCode:
 ```rust
 fn provider_root(&self, scope: &Scope, config: Option<&ConfigFile>) -> PathBuf {
-    let folder = config
-        .and_then(|c| c.provider_roots.get(self.id()))
-        .map(|s| s.as_str())
-        .unwrap_or(".opencode");
     match scope {
         Scope::Global => dirs_next::home_dir().unwrap().join(".config/opencode"),
-        Scope::Workspace => self.workspace_root.join(folder),
+        Scope::Workspace => {
+            let folder = self
+                .selected_config_root(scope, config)
+                .unwrap_or_else(|| ".opencode".to_string());
+            self.workspace_root.join(folder)
+        }
     }
 }
 ```
@@ -99,16 +112,16 @@ When `list_mode == SelectProviderRoot`:
 Provider instances are constructed with `workspace_root` but **not** with config yet (config is loaded after providers are built). So `provider_root()` must accept the config lazily (passed at call time from actions).
 
 ### Testing strategy
-- [ ] Unit test: `OpenCodeProvider::provider_root` respects config override.
-- [ ] Unit test: `ConfigFile` round-trips `provider_roots` in TOML.
-- [ ] Unit test: TUI `SelectProviderRoot` state transitions correctly on Enter/Esc.
-- [ ] Integration: enable OpenCode in TUI, select `.agents`, verify skill installs to `.agents/skills/`.
+- [x] Unit test: `OpenCodeProvider::provider_root` respects config override.
+- [x] Unit test: `ConfigFile` round-trips `provider_roots` in TOML.
+- [x] Unit test: TUI `SelectProviderRoot` state transitions correctly on Enter/Esc.
+- [x] Integration: enable OpenCode in TUI, select `.agents`, verify skill installs to `.agents/skills/`.
 
 ## Module changes
 
 ```
 src/
-  app/ports.rs           — add available_config_roots
+  app/ports.rs           — add available_config_roots + selected_config_root
   domain/config.rs       — add provider_roots HashMap
   infra/provider/
     opencode.rs          — use config-driven root

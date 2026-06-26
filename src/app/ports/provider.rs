@@ -42,6 +42,19 @@ pub trait ProviderPort: Send + Sync {
         vec![]
     }
 
+    /// Read the persisted config-root choice for this provider, if any.
+    /// Returns the folder name stored under `config.provider_roots[self.id()]`
+    /// for the given scope (workspace-only; global always uses the hardcoded
+    /// default and therefore returns `None`).
+    fn selected_config_root(&self, scope: &Scope, config: Option<&ConfigFile>) -> Option<String> {
+        if !matches!(scope, Scope::Workspace) {
+            return None;
+        }
+        config
+            .and_then(|c| c.provider_roots.get(self.id()))
+            .cloned()
+    }
+
     /// Return true if this provider supports profile sessions.
     fn supports_profiles(&self) -> bool {
         false
@@ -211,5 +224,44 @@ mod tests {
     fn provider_port_default_available_roots_empty() {
         let p = DummyProvider;
         assert!(p.available_config_roots().is_empty());
+    }
+
+    #[test]
+    fn selected_config_root_reads_provider_roots_for_workspace() {
+        let p = DummyProvider;
+        let mut config = ConfigFile::default();
+        config
+            .provider_roots
+            .insert("dummy".to_string(), ".custom".to_string());
+        assert_eq!(
+            p.selected_config_root(&Scope::Workspace, Some(&config)),
+            Some(".custom".to_string()),
+        );
+    }
+
+    #[test]
+    fn selected_config_root_returns_none_when_unset() {
+        let p = DummyProvider;
+        let config = ConfigFile::default();
+        assert_eq!(
+            p.selected_config_root(&Scope::Workspace, Some(&config)),
+            None
+        );
+    }
+
+    #[test]
+    fn selected_config_root_returns_none_for_global_scope() {
+        let p = DummyProvider;
+        let mut config = ConfigFile::default();
+        config
+            .provider_roots
+            .insert("dummy".to_string(), ".custom".to_string());
+        assert_eq!(p.selected_config_root(&Scope::Global, Some(&config)), None);
+    }
+
+    #[test]
+    fn selected_config_root_returns_none_without_config() {
+        let p = DummyProvider;
+        assert_eq!(p.selected_config_root(&Scope::Workspace, None), None);
     }
 }

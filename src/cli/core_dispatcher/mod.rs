@@ -8,7 +8,8 @@ use crate::app::outcome::CoreEventSink;
 #[cfg(feature = "pack")]
 use crate::cli::entry::PackTarget;
 use crate::cli::entry::{
-    Cli, Commands, ContextCommands, DebugCommands, TeamCommands, TelemetryCommands, VaultCommands,
+    Cli, Commands, ContextCommands, DebugCommands, ProviderCommands, TeamCommands,
+    TelemetryCommands, VaultCommands,
 };
 use crate::cli::presenter::CliPresenter;
 use crate::domain::context::ContextId;
@@ -173,17 +174,32 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
             TelemetryCommands::Enable => Ok(CoreCommand::EnableTelemetry),
             TelemetryCommands::Disable => Ok(CoreCommand::DisableTelemetry),
             TelemetryCommands::Status => Ok(CoreCommand::TelemetryStatus),
-            TelemetryCommands::Export { format, output } => Ok(CoreCommand::ExportTelemetry {
-                format: match format {
-                    crate::cli::entry::ExportFormat::Json => {
-                        crate::domain::telemetry::TelemetryExportFormat::Json
-                    }
-                    crate::cli::entry::ExportFormat::Csv => {
-                        crate::domain::telemetry::TelemetryExportFormat::Csv
-                    }
-                },
-                output_path: output.clone(),
-            }),
+            TelemetryCommands::Export {
+                format,
+                output,
+                csv,
+                file,
+            } => {
+                // Normalize the PRD-documented shorthand flags (`--csv`,
+                // `--file`) onto the canonical `format`/`output` fields.
+                let resolved_format = if *csv {
+                    crate::cli::entry::ExportFormat::Csv
+                } else {
+                    *format
+                };
+                let resolved_output = file.clone().or_else(|| output.clone());
+                Ok(CoreCommand::ExportTelemetry {
+                    format: match resolved_format {
+                        crate::cli::entry::ExportFormat::Json => {
+                            crate::domain::telemetry::TelemetryExportFormat::Json
+                        }
+                        crate::cli::entry::ExportFormat::Csv => {
+                            crate::domain::telemetry::TelemetryExportFormat::Csv
+                        }
+                    },
+                    output_path: resolved_output,
+                })
+            }
         },
         Commands::Debug { command } => match command {
             DebugCommands::Tasks => Ok(CoreCommand::DebugListTasks),
@@ -201,6 +217,19 @@ fn to_core_command(cmd: &Commands, _workspace: &std::path::Path) -> anyhow::Resu
                 path: path.clone(),
                 id: id.clone(),
             }),
+        },
+        Commands::Provider { command } => match command {
+            ProviderCommands::List => Ok(CoreCommand::ListProviders),
+            ProviderCommands::Toggle { id, state, scope } => match state {
+                crate::cli::entry::ToggleState::On => Ok(CoreCommand::ActivateProvider {
+                    id: id.clone(),
+                    scope: scope.into_domain_scope(),
+                }),
+                crate::cli::entry::ToggleState::Off => Ok(CoreCommand::DeactivateProvider {
+                    id: id.clone(),
+                    scope: scope.into_domain_scope(),
+                }),
+            },
         },
         Commands::Team { command } => match command {
             TeamCommands::Init { name, dry_run } => Ok(CoreCommand::TeamInit {

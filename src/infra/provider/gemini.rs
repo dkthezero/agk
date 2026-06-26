@@ -28,10 +28,9 @@ impl GeminiProvider {
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".gemini"),
             Scope::Workspace => {
-                let folder = config
-                    .and_then(|c| c.provider_roots.get(self.id()))
-                    .map(|s| s.as_str())
-                    .unwrap_or(".gemini");
+                let folder = self
+                    .selected_config_root(scope, config)
+                    .unwrap_or_else(|| ".gemini".to_string());
                 self.workspace_root.join(folder)
             }
         }
@@ -190,6 +189,32 @@ impl McpProvider for GeminiProvider {
 mod tests {
     use super::*;
     use crate::domain::config::ConfigFile;
+    use crate::domain::mcp::McpTransport;
+    use std::collections::HashMap;
+
+    fn sample_server(name: &str) -> McpServer {
+        let mut env = HashMap::new();
+        env.insert("API_KEY".to_string(), "secret".to_string());
+        McpServer {
+            name: name.to_string(),
+            command: "npx".to_string(),
+            args: vec![
+                "-y".to_string(),
+                "@modelcontextprotocol/server-fs".to_string(),
+            ],
+            env,
+            transport: McpTransport::Stdio,
+            description: Some("Test FS server".to_string()),
+            tested: false,
+            tested_at: None,
+            activation: HashMap::new(),
+            security_flags: Vec::new(),
+        }
+    }
+
+    fn provider_in_temp() -> GeminiProvider {
+        GeminiProvider::new(tempfile::tempdir().unwrap().path().to_path_buf())
+    }
 
     #[test]
     fn gemini_provider_root_uses_config_override() {
@@ -201,5 +226,87 @@ mod tests {
             .insert("gemini-cli".to_string(), ".ai".to_string());
         let root = provider.provider_root(&Scope::Workspace, Some(&config));
         assert_eq!(root, dir.path().join(".ai"));
+    }
+
+    #[test]
+    fn write_read_roundtrip_persists_server_with_gemini_schema() {
+        let provider = provider_in_temp();
+        provider
+            .write_mcp_server(&sample_server("filesystem"), Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let entry = &written["mcpServers"]["filesystem"];
+        assert_eq!(entry["command"], "npx");
+        assert_eq!(entry["args"][1], "@modelcontextprotocol/server-fs");
+        assert_eq!(entry["env"]["API_KEY"], "secret");
+        assert_eq!(entry["trust"], true);
+        assert_eq!(entry["includeTools"][0], "*");
+    }
+
+    #[test]
+    fn write_then_remove_clears_entry() {
+        let provider = provider_in_temp();
+        provider
+            .write_mcp_server(&sample_server("filesystem"), Scope::Workspace)
+            .unwrap();
+        provider
+            .remove_mcp_server("filesystem", Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(written["mcpServers"].get("filesystem").is_none());
+    }
+
+    #[test]
+    fn preserves_existing_settings_on_write() {
+        let provider = provider_in_temp();
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"mcpServers":{"existing":{"command":"foo","args":[],"env":{},"trust":true,"includeTools":["*"]}},"otherKey":7}"#,
+        ).unwrap();
+
+        provider
+            .write_mcp_server(&sample_server("filesystem"), Scope::Workspace)
+            .unwrap();
+
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(written["mcpServers"]["existing"]["command"], "foo");
+        assert_eq!(written["otherKey"], 7);
+        assert_eq!(written["mcpServers"]["filesystem"]["command"], "npx");
+    }
+
+    #[test]
+    fn overwrite_existing_server_updates_fields() {
+        let provider = provider_in_temp();
+        let mut server = sample_server("filesystem");
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+        server.command = "node".to_string();
+        server.args = vec!["server.js".to_string()];
+        provider
+            .write_mcp_server(&server, Scope::Workspace)
+            .unwrap();
+
+        let path = provider.mcp_json_path(&Scope::Workspace);
+        let written: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let entry = &written["mcpServers"]["filesystem"];
+        assert_eq!(entry["command"], "node");
+        assert_eq!(entry["args"][0], "server.js");
+    }
+
+    #[test]
+    fn supports_mcp_true_for_gemini() {
+        use crate::app::ports::ProviderPort;
+        assert!(ProviderPort::supports_mcp(&provider_in_temp()));
     }
 }

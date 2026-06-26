@@ -1,8 +1,6 @@
-//! Subcommand enums for the `agk` CLI.
-//!
-//! Extracted from `entry.rs` to satisfy the ADR-001 §6.4 file-size limit.
-//! Re-exported by `entry.rs` so consumer paths
-//! (`crate::cli::entry::ProfileCommands`, etc.) remain unchanged.
+//! Subcommand enums for the `agk` CLI (extracted from `entry.rs` to satisfy
+//! the ADR-001 §6.4 file-size limit). Re-exported by `entry.rs` so consumer
+//! paths (`crate::cli::entry::ProfileCommands`, etc.) remain unchanged.
 
 use crate::cli::entry::{ExportFormat, ScopeArg};
 use clap::Subcommand;
@@ -202,6 +200,14 @@ pub enum TelemetryCommands {
         /// Output file (default: stdout)
         #[arg(long)]
         output: Option<String>,
+
+        /// Shorthand for `--format csv` (telemetry PRD).
+        #[arg(long)]
+        csv: bool,
+
+        /// Shorthand for `--output <FILE>` (telemetry PRD).
+        #[arg(long)]
+        file: Option<String>,
     },
 }
 
@@ -263,6 +269,31 @@ pub enum VaultCommands {
         #[arg(short, long)]
         id: Option<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProviderCommands {
+    /// List all registered providers with their capability flags
+    List,
+
+    /// Activate or deactivate a provider for a scope
+    Toggle {
+        /// Provider id (e.g. `claude-code`, `opencode`)
+        id: String,
+
+        /// Desired state: `on` activates, `off` deactivates
+        state: ToggleState,
+
+        /// Target scope
+        #[arg(short, long, value_enum, default_value = "workspace")]
+        scope: ScopeArg,
+    },
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum ToggleState {
+    On,
+    Off,
 }
 
 pub use crate::cli::entry_team_subcommands::TeamCommands;

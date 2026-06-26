@@ -19,7 +19,9 @@ pub(crate) fn event_to_json(event: &CoreEvent) -> serde_json::Value {
         CoreEvent::ProfileDeleted(id) => {
             serde_json::json!({ "type": "ProfileDeleted", "id": id.as_str() })
         }
-        CoreEvent::ProfileListed(_) | CoreEvent::ContextListed(_) => {
+        CoreEvent::ProfileListed(_)
+        | CoreEvent::ContextListed(_)
+        | CoreEvent::ProviderListed(_) => {
             crate::cli::presenter_json_listings::listing_event_to_json(event)
         }
         CoreEvent::ProfileValidated { id, valid, message } => {

@@ -1327,6 +1327,7 @@ permission_mode = "default"
 | Problem | Solution |
 |---|---|
 | Terminal rendering is broken | Ensure your terminal supports true color and is at least 80×24. Try `export TERM=xterm-256color`. |
+| "agk TUI requires an interactive terminal" | Launched without a TTY (piped/CI/no pty). Use a headless subcommand (`agk <command>`) instead, or attach a pty (`agk` under a real terminal / `script -q /dev/null agk`). |
 | Keybindings not responding | Some terminals intercept function keys. Try a different terminal (iTerm2, Kitty, Alacritty). |
 | Scope toggle not working | Press `Tab` to toggle between Global and Workspace scope. The current scope is shown in the footer. |
 | Search not finding remote skills | Ensure ClawHub vault is activated (Vaults tab, `Space` on `clawhub`). |

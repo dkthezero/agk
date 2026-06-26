@@ -39,13 +39,21 @@ impl VaultEntry {
     }
 }
 
-/// Display-only struct for the Providers tab.
+/// Display-only struct for the Providers tab and `agk provider list`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProviderEntry {
     pub id: String,
     pub name: String,
     pub active: bool,
     pub supports_mcp: bool,
+    /// Whether the provider supports profile sessions.
+    pub supports_profiles: bool,
+    /// Configurable profile tools advertised by the provider (e.g. `Read`,
+    /// `Glob`, …). Empty for providers without tool selection.
+    pub available_tools: Vec<String>,
+    /// Permission modes advertised by the provider, as `(id, description)`.
+    /// Empty for providers without permission-mode selection.
+    pub available_permission_modes: Vec<(String, String)>,
 }
 
 /// Display-only struct for the Profiles tab.

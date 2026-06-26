@@ -109,6 +109,9 @@ pub enum CoreCommand {
         id: String,
         scope: crate::domain::scope::Scope,
     },
+    /// List all registered providers with their capability flags. Used by
+    /// `agk provider list` (and the TUI Providers tab snapshot path).
+    ListProviders,
 
     // -----------------------------------------------------------------------
     // MCP commands

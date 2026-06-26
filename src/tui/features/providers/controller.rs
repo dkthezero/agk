@@ -260,6 +260,9 @@ mod tests {
             name: "Fake".to_string(),
             active: true,
             supports_mcp: false,
+            supports_profiles: false,
+            available_tools: vec![],
+            available_permission_modes: vec![],
         }];
 
         let mut config = ConfigFile {
@@ -303,5 +306,147 @@ mod tests {
             "Expected confirm popup when deactivating last provider with installed assets"
         );
         assert_eq!(state.pending_deactivate_provider_id, "fake");
+    }
+
+    fn state_in_select_root_mode() -> AppState {
+        let mut state = empty_state(5);
+        state.active_scope = Scope::Workspace;
+        state.configs.insert(
+            Scope::Workspace,
+            ConfigFile {
+                providers: vec![],
+                ..ConfigFile::default()
+            },
+        );
+        state.list_mode = ListMode::SelectProviderRoot {
+            provider_id: "opencode".to_string(),
+            options: vec![
+                (
+                    ".opencode".to_string(),
+                    "OpenCode native folder".to_string(),
+                ),
+                (".agents".to_string(), "Shared agents folder".to_string()),
+            ],
+            selected: 0,
+        };
+        state
+    }
+
+    fn event_context(
+        store: Arc<FakeStore>,
+    ) -> (EventContext, tokio::sync::mpsc::UnboundedReceiver<AppEvent>) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut registry = crate::app::registry::Registry::new();
+        registry.register_provider(Box::new(FakeProvider {
+            id: "opencode".into(),
+        }));
+        let registry = Arc::new(registry);
+        let ctx = EventContext {
+            tx,
+            workspace_root: std::path::PathBuf::from("."),
+            file_opener: Arc::new(StubFileOpener),
+            core: Arc::new(crate::app::core::test_core_with(store, registry)),
+        };
+        (ctx, rx)
+    }
+
+    #[test]
+    fn select_provider_root_up_down_cycles_selection() {
+        let mut state = state_in_select_root_mode();
+        let store = Arc::new(FakeStore::new(state.active_config().clone()));
+        let (ctx, _rx) = event_context(store);
+
+        // Down moves selection 0 -> 1
+        handle_select_provider_root(&mut state, &ctx, &KeyCode::Down).unwrap();
+        if let ListMode::SelectProviderRoot { selected, .. } = &state.list_mode {
+            assert_eq!(*selected, 1);
+        } else {
+            panic!("expected SelectProviderRoot mode");
+        }
+
+        // Down again is clamped (stays at last index)
+        handle_select_provider_root(&mut state, &ctx, &KeyCode::Down).unwrap();
+        if let ListMode::SelectProviderRoot { selected, .. } = &state.list_mode {
+            assert_eq!(*selected, 1);
+        } else {
+            panic!("expected SelectProviderRoot mode");
+        }
+
+        // Up moves selection 1 -> 0
+        handle_select_provider_root(&mut state, &ctx, &KeyCode::Up).unwrap();
+        if let ListMode::SelectProviderRoot { selected, .. } = &state.list_mode {
+            assert_eq!(*selected, 0);
+        } else {
+            panic!("expected SelectProviderRoot mode");
+        }
+
+        // Up at index 0 is clamped to 0 (saturating_sub)
+        handle_select_provider_root(&mut state, &ctx, &KeyCode::Up).unwrap();
+        if let ListMode::SelectProviderRoot { selected, .. } = &state.list_mode {
+            assert_eq!(*selected, 0);
+        } else {
+            panic!("expected SelectProviderRoot mode");
+        }
+    }
+
+    #[test]
+    fn select_provider_root_enter_saves_choice_and_returns_to_normal() {
+        let mut state = state_in_select_root_mode();
+        // Move to second option (.agents)
+        let store = Arc::new(FakeStore::new(state.active_config().clone()));
+        let (ctx, mut rx) = event_context(store.clone());
+        handle_select_provider_root(&mut state, &ctx, &KeyCode::Down).unwrap();
+
+        // Enter confirms: config gets the chosen root, mode returns to Normal,
+        // and an ActivateProvider command is sent.
+        let res = handle_select_provider_root(&mut state, &ctx, &KeyCode::Enter).unwrap();
+        assert!(matches!(res, ControlFlow::Continue));
+        assert_eq!(state.list_mode, ListMode::Normal);
+        let saved = store.config.lock().unwrap().clone();
+        assert_eq!(
+            saved.provider_roots.get("opencode"),
+            Some(&".agents".to_string()),
+            "Enter must persist the selected root into provider_roots"
+        );
+        // An ActivateProvider command should have been emitted on the channel.
+        let emitted = rx.try_recv();
+        assert!(
+            matches!(
+                emitted,
+                Ok(AppEvent::ExecuteCommand(CoreCommand::ActivateProvider { ref id, .. }))
+                    if id == "opencode"
+            ),
+            "Enter must emit ActivateProvider for the chosen provider, got {:?}",
+            emitted
+        );
+    }
+
+    #[test]
+    fn select_provider_root_esc_cancels_without_persisting() {
+        let mut state = state_in_select_root_mode();
+        let store = Arc::new(FakeStore::new(state.active_config().clone()));
+        let (ctx, _rx) = event_context(store.clone());
+
+        let res = handle_select_provider_root(&mut state, &ctx, &KeyCode::Esc).unwrap();
+        assert!(matches!(res, ControlFlow::Continue));
+        assert_eq!(
+            state.list_mode,
+            ListMode::Normal,
+            "Esc must cancel the modal and return to Normal"
+        );
+        assert!(
+            state.status_line.contains("cancelled"),
+            "Esc should surface a cancellation status line"
+        );
+        // Config must be unchanged (no provider_roots entry written)
+        let saved = store.config.lock().unwrap().clone();
+        assert!(
+            saved.provider_roots.is_empty(),
+            "Esc must not persist any selection"
+        );
+        assert!(
+            !saved.providers.contains(&"opencode".to_string()),
+            "Esc must not activate the provider"
+        );
     }
 }

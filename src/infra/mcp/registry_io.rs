@@ -10,6 +10,47 @@ use crate::domain::mcp::McpRegistry;
 use anyhow::Result;
 use std::path::Path;
 
+/// Write `content` to `path` and restrict it to owner-only access
+/// (`0600` on Unix), per the mcp-vault PRD Security Considerations.
+///
+/// On Unix the restrictive mode is applied at creation time via
+/// `OpenOptions::mode(0o600)` so a freshly-created file is never briefly
+/// world/group-readable. `create(true).truncate(true)` opens an *existing*
+/// file without changing its mode, so `set_permissions` is invoked
+/// afterward to tighten a pre-existing file created with looser perms (e.g.
+/// by an older release or a migration); its error is propagated so a
+/// security-posture degradation surfaces rather than silently leaving
+/// secret env values world-readable.
+///
+/// On non-Unix platforms the file is written without Unix mode hardening
+/// (Windows ACLs are not adjusted here). There is no chmod attempt whose
+/// error could surface; callers on non-Unix must rely on filesystem-level
+/// protections.
+fn write_restricted(path: &Path, content: &str) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::fs::PermissionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(content.as_bytes())?;
+        // Tighten pre-existing files whose mode was looser than 0600.
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        let _ = file;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, content)?;
+        let _ = path;
+    }
+    Ok(())
+}
+
 impl McpRegistry {
     pub fn load(path: &Path) -> Result<Self> {
         if !path.exists() {
@@ -25,7 +66,7 @@ impl McpRegistry {
             std::fs::create_dir_all(parent)?;
         }
         let content = toml::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
+        write_restricted(path, &content)?;
         Ok(())
     }
 }
@@ -75,5 +116,45 @@ mod tests {
         let path = dir.path().join("absent.toml");
         let loaded = McpRegistry::load(&path).unwrap();
         assert!(loaded.servers.is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_sets_owner_only_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mcp.toml");
+        McpRegistry::default().save(&path).unwrap();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "mcp.toml should be 0600 owner-only, got {:o}",
+            mode & 0o777
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_tightens_pre_existing_loose_permissions() {
+        // A pre-existing mcp.toml created with looser perms (e.g. by an older
+        // release) must be tightened to 0600 on the next save, otherwise
+        // secret env values stay world/group-readable.
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mcp.toml");
+        std::fs::write(&path, "# stale\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let mode_before = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode_before & 0o777, 0o644);
+
+        McpRegistry::default().save(&path).unwrap();
+        let mode_after = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(
+            mode_after & 0o777,
+            0o600,
+            "pre-existing mcp.toml should be tightened to 0600, got {:o}",
+            mode_after & 0o777
+        );
     }
 }

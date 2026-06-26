@@ -14,6 +14,7 @@ mod mcp_register;
 mod mcp_roundtrip;
 mod mcp_security;
 mod profile_export_import;
+mod provider_root_install;
 mod provider_toggle;
 mod skill_install;
 mod sync_update;

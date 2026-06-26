@@ -53,6 +53,20 @@ fn run_headless(cli: agk::cli::entry::Cli, workspace: &std::path::Path) -> Resul
 
 /// Run the interactive TUI.
 async fn run_tui(workspace: std::path::PathBuf) -> Result<()> {
+    use std::io::IsTerminal;
+
+    // The TUI requires an interactive terminal. When stdin/stdout are not a
+    // TTY (e.g. piped in CI, run under `agk < /dev/null`, or spawned by an
+    // agent without a pty), crossterm's event reader panics with an opaque
+    // "reader source not set" message. Fail fast with a clear, actionable
+    // error and the documented general-failure exit code instead.
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        anyhow::bail!(
+            "agk TUI requires an interactive terminal. \
+             Run `agk <subcommand>` for headless/CLI usage, or attach a pty."
+        );
+    }
+
     let (registry, scan, store, global_config, workspace_config) =
         agk::app::bootstrap::build(workspace.clone())?;
     let core = build_core(&workspace, registry, store)?;

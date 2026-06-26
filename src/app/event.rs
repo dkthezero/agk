@@ -70,6 +70,10 @@ pub enum CoreEvent {
     // -----------------------------------------------------------------------
     ProviderActivated(String),
     ProviderDeactivated(String),
+    /// One `ProviderListed` event carrying all providers returned by
+    /// `ListProviders` (one entry per registered provider). Holds the
+    /// lightweight display view model so CLI/JSON/TUI render identically.
+    ProviderListed(Vec<crate::app::snapshot::ProviderEntry>),
 
     // -----------------------------------------------------------------------
     // MCP
