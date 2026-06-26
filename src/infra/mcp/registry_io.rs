@@ -10,20 +10,35 @@ use crate::domain::mcp::McpRegistry;
 use anyhow::Result;
 use std::path::Path;
 
-/// Restrict the MCP registry file to owner-only access (`0600` on Unix),
-/// per the mcp-vault PRD Security Considerations. On non-Unix platforms
-/// this is a no-op (Windows ACLs are not adjusted here); the file is still
-/// written, just without the Unix mode hardening.
-fn restrict_permissions(path: &Path) {
+/// Write `content` to `path` and restrict it to owner-only access
+/// (`0600` on Unix), per the mcp-vault PRD Security Considerations.
+///
+/// On Unix the restrictive mode is applied at creation time via
+/// `OpenOptions::mode(0o600)` so the file is never briefly world/group-
+/// readable between creation and a follow-up chmod. On non-Unix platforms
+/// the file is written without Unix mode hardening (Windows ACLs are not
+/// adjusted here); a non-fatal chmod attempt is still made so any error
+/// surfaces rather than being silently swallowed.
+fn write_restricted(path: &Path, content: &str) -> Result<()> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(content.as_bytes())?;
+        let _ = file;
     }
     #[cfg(not(unix))]
     {
+        std::fs::write(path, content)?;
         let _ = path;
     }
+    Ok(())
 }
 
 impl McpRegistry {
@@ -41,8 +56,7 @@ impl McpRegistry {
             std::fs::create_dir_all(parent)?;
         }
         let content = toml::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
-        restrict_permissions(path);
+        write_restricted(path, &content)?;
         Ok(())
     }
 }
